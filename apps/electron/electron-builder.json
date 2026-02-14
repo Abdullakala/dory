@@ -1,0 +1,42 @@
+{
+    "appId": "com.dory.app",
+    "productName": "Dory",
+    "extraMetadata": {
+        "main": "dist-electron/main.js"
+    },
+    "protocols": [
+        {
+            "name": "Dory Protocol",
+            "schemes": [
+                "dory"
+            ]
+        }
+    ],
+    "files": [
+        "dist-electron/**/*",
+        "package.json"
+    ],
+    "extraResources": [
+        {
+            "from": "../../release/standalone",
+            "to": "standalone"
+        }
+    ],
+    "asar": true,
+    "asarUnpack": [
+        "**/*.node"
+    ],
+    "afterSign": "./scripts/notarize.js",
+    "mac": {
+        "icon": "../web/public/logo.icns",
+        "category": "public.app-category.developer-tools",
+        "hardenedRuntime": true,
+        "gatekeeperAssess": false,
+        "entitlements": "./scripts/entitlements.mac.plist",
+        "entitlementsInherit": "./scripts/entitlements.mac.plist",
+        "target": [
+            "dmg",
+            "zip"
+        ]
+    }
+}

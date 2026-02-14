@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 
 import { connections, connectionIdentities, connectionIdentitySecrets, connectionSsh } from '@/lib/database/postgres/schemas/connections';
 import { getDBEngineViaType } from '@/lib/database/utils';
@@ -8,7 +8,6 @@ import type { PostgresDBClient } from '@/types';
 import { translateDatabase } from '@/lib/database/i18n';
 
 import type {
-    ConnectionIdentity,
     ConnectionIdentitySecret,
     ConnectionIdentityStatus,
     ConnectionSsh,
@@ -56,6 +55,12 @@ export class PostgresConnectionsRepository {
                 throw new DatabaseError(translateDatabase('Database.Errors.ConnectionFailed'), 500);
             }
             this.db = client as PostgresDBClient;
+
+            if (process.env.NEXT_PUBLIC_DORY_RUNTIME?.trim() === 'desktop') {
+                await this.db.execute(
+                    sql`ALTER TABLE "connections" DROP CONSTRAINT IF EXISTS "connections_created_by_user_id_user_id_fk"`,
+                );
+            }
         } catch (e) {
             console.error(translateDatabase('Database.Logs.InitFailed'), e);
             throw new DatabaseError(translateDatabase('Database.Errors.InitFailed'), 500);

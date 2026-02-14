@@ -1,6 +1,5 @@
 import { pgTable, text, integer, timestamp, jsonb, index } from 'drizzle-orm/pg-core';
 import { newEntityId } from '@/lib/id';
-import { connections } from './connections';
 
 export const queryAudit = pgTable(
     'query_audit',
@@ -12,7 +11,7 @@ export const queryAudit = pgTable(
         tabId: text('tab_id'),
         userId: text('user_id').notNull(),
         source: text('source').$type<'console' | 'chatbot' | 'api' | 'task'>().notNull(),
-        connectionId: text('connection_id').references(() => connections.id),
+        connectionId: text('connection_id'),
         connectionName: text('connection_name'),
         databaseName: text('database_name'),
         queryId: text('query_id'),

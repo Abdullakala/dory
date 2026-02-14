@@ -153,7 +153,7 @@ export function SignInForm({ className, imageUrl, ...props }: React.ComponentPro
         setMsg(null);
         setDemoLoading(true);
         try {
-            const res = await fetch('/api/auth/demo', { method: 'POST' });
+            const res = await authFetch('/api/auth/demo', { method: 'POST' });
             if (!res.ok) {
                 const data = await res.json().catch(() => null);
                 throw new Error(data?.message ?? t('SignIn.LoginFailedRetry'));

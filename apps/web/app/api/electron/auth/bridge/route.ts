@@ -1,4 +1,5 @@
 import { getAuth } from '@/lib/auth';
+import { proxyAuthRequest, shouldProxyAuthRequest } from '@/lib/auth/auth-proxy';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
@@ -7,6 +8,9 @@ export const dynamic = 'force-dynamic';
 const DEFAULT_DEEP_LINK = 'dory://auth/callback';
 
 export async function GET(req: NextRequest) {
+    if (shouldProxyAuthRequest()) {
+        return proxyAuthRequest(req);
+    }
     const auth = await getAuth();
     const origin = req.nextUrl.origin;
 

@@ -1,8 +1,6 @@
 import { boolean, integer, text, timestamp, pgTable, check, index, uniqueIndex } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { newEntityId } from '@/lib/id';
-import { user } from './auth-schema';
-import { teams } from './teams/teams';
 
 export type ConnectionType = 'clickhouse' | 'doris' | 'mysql' | 'postgres';
 export type ConnectionStatus = 'draft' | 'ready' | 'error' | 'disabled';
@@ -15,14 +13,10 @@ export const connections = pgTable(
             .$defaultFn(() => newEntityId()),
 
         // Creator (nullable)
-        createdByUserId: text('created_by_user_id').references(() => user.id, {
-            onDelete: 'set null',
-        }),
+        createdByUserId: text('created_by_user_id'),
 
         // Team-scoped resource
-        teamId: text('team_id')
-            .notNull()
-            .references(() => teams.id, { onDelete: 'cascade' }),
+        teamId: text('team_id').notNull(),
 
         type: text('type').notNull(),
 
@@ -95,14 +89,10 @@ export const connectionIdentities = pgTable(
             .primaryKey()
             .$defaultFn(() => newEntityId()),
 
-        connectionId: text('connection_id')
-            .notNull()
-            .references(() => connections.id, { onDelete: 'cascade' }),
+        connectionId: text('connection_id').notNull(),
 
         // Redundant teamId for permission checks/queries
-        teamId: text('team_id')
-            .notNull()
-            .references(() => teams.id, { onDelete: 'cascade' }),
+        teamId: text('team_id').notNull(),
 
         // Display name for users, e.g. "Admin", "Read-only analyst"
         name: text('name').notNull(),
@@ -154,9 +144,7 @@ export const connectionIdentities = pgTable(
 export const connectionIdentitySecrets = pgTable(
     'connection_identity_secrets',
     {
-        identityId: text('identity_id')
-            .primaryKey()
-            .references(() => connectionIdentities.id, { onDelete: 'cascade' }),
+        identityId: text('identity_id').primaryKey(),
 
         // Encrypted password; app handles encrypt/decrypt
         passwordEncrypted: text('password_encrypted'),
@@ -175,9 +163,7 @@ export const connectionIdentitySecrets = pgTable(
 export const connectionSsh = pgTable(
     'connection_ssh',
     {
-        connectionId: text('connection_id')
-            .primaryKey()
-            .references(() => connections.id, { onDelete: 'cascade' }),
+        connectionId: text('connection_id').primaryKey(),
 
         enabled: boolean('enabled').notNull().default(false),
 

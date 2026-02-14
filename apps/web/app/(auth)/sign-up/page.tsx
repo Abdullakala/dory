@@ -5,6 +5,7 @@ import { cn } from '@/registry/new-york-v4/lib/utils';
 import localFont from 'next/font/local';
 import { StarsBackground } from '@/components/animate-ui/components/backgrounds/stars';
 import { HeroBackground } from '../components/bg';
+import { RuntimeHint } from '../components/runtime-hint';
 // import { StarsBackground } from '@/components/animate-ui/components/backgrounds/stars';
 // import { cookies } from 'next/headers';
 
@@ -35,12 +36,13 @@ export default async function SignUpPage() {
     return (
         <div
             className={cn(
-                'bg-muted dark:bg-background flex flex-1 flex-col items-center justify-center gap-16 p-6 h-screen',
+                'bg-muted dark:bg-background relative flex flex-1 flex-col items-center justify-center gap-16 p-6 h-screen',
                 // fontSans.variable,
                 // fontSerif.variable,
                 // fontManrope.variable,
             )}
         >
+            <RuntimeHint className="absolute right-4 top-4 z-20" />
             <SignUpForm className="z-100" />
             <HeroBackground className="absolute z-10 inset-0 flex items-center justify-center" />
         </div>

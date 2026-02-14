@@ -1,5 +1,3 @@
-CREATE TYPE "public"."datasource_status" AS ENUM('draft', 'active', 'disabled');--> statement-breakpoint
-CREATE TYPE "public"."datasource_type" AS ENUM('mysql', 'clickhouse', 'postgres', 'doris', 'sqlite', 'pglite');--> statement-breakpoint
 CREATE TABLE "tabs" (
 	"tab_id" text PRIMARY KEY NOT NULL,
 	"tab_type" text DEFAULT 'sql' NOT NULL,
@@ -256,6 +254,7 @@ CREATE TABLE "saved_queries" (
 	"title" text NOT NULL,
 	"description" text,
 	"sql_text" text NOT NULL,
+	"connection_id" text NOT NULL,
 	"context" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"tags" text[] DEFAULT '{}'::text[] NOT NULL,
 	"work_id" uuid,
@@ -264,20 +263,6 @@ CREATE TABLE "saved_queries" (
 	"archived_at" timestamp with time zone
 );
 --> statement-breakpoint
-ALTER TABLE "tabs" ADD CONSTRAINT "tabs_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "tabs" ADD CONSTRAINT "tabs_connection_id_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "user" ADD CONSTRAINT "user_default_team_id_teams_id_fk" FOREIGN KEY ("default_team_id") REFERENCES "public"."teams"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "query_audit" ADD CONSTRAINT "query_audit_connection_id_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."connections"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "team_members" ADD CONSTRAINT "team_members_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "team_members" ADD CONSTRAINT "team_members_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "connection_identities" ADD CONSTRAINT "connection_identities_connection_id_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "connection_identities" ADD CONSTRAINT "connection_identities_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "connection_identity_secrets" ADD CONSTRAINT "connection_identity_secrets_identity_id_connection_identities_id_fk" FOREIGN KEY ("identity_id") REFERENCES "public"."connection_identities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "connection_ssh" ADD CONSTRAINT "connection_ssh_connection_id_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "connections" ADD CONSTRAINT "connections_created_by_user_id_user_id_fk" FOREIGN KEY ("created_by_user_id") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "connections" ADD CONSTRAINT "connections_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "idx_chat_messages_session_time" ON "chat_messages" USING btree ("team_id","session_id","created_at");--> statement-breakpoint
 CREATE INDEX "idx_chat_messages_session_id" ON "chat_messages" USING btree ("team_id","session_id","id");--> statement-breakpoint
 CREATE INDEX "idx_chat_messages_team_conn_time" ON "chat_messages" USING btree ("team_id","connection_id","created_at");--> statement-breakpoint

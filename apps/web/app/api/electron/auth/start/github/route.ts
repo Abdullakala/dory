@@ -1,4 +1,5 @@
 import { getAuth } from '@/lib/auth';
+import { proxyAuthRequest, shouldProxyAuthRequest } from '@/lib/auth/auth-proxy';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
@@ -10,6 +11,9 @@ const querySchema = z.object({
 });
 
 export async function GET(req: NextRequest) {
+    if (shouldProxyAuthRequest()) {
+        return proxyAuthRequest(req);
+    }
     const auth = await getAuth();
     const query = Object.fromEntries(req.nextUrl.searchParams);
     const { redirectTo } = querySchema.parse(query);

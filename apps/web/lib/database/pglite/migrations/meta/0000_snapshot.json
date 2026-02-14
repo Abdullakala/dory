@@ -1,5 +1,5 @@
 {
-  "id": "a06d844e-e5bf-40aa-9af0-ee96a833175c",
+  "id": "d685acb7-6fe4-4ab4-b2d2-d5c0530a840e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -101,34 +101,7 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {
-        "tabs_user_id_user_id_fk": {
-          "name": "tabs_user_id_user_id_fk",
-          "tableFrom": "tabs",
-          "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "tabs_connection_id_connections_id_fk": {
-          "name": "tabs_connection_id_connections_id_fk",
-          "tableFrom": "tabs",
-          "tableTo": "connections",
-          "columnsFrom": [
-            "connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -221,21 +194,7 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {
-        "account_user_id_user_id_fk": {
-          "name": "account_user_id_user_id_fk",
-          "tableFrom": "account",
-          "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -354,21 +313,7 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {
-        "session_user_id_user_id_fk": {
-          "name": "session_user_id_user_id_fk",
-          "tableFrom": "session",
-          "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "session_token_unique": {
@@ -439,21 +384,7 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {
-        "user_default_team_id_teams_id_fk": {
-          "name": "user_default_team_id_teams_id_fk",
-          "tableFrom": "user",
-          "tableTo": "teams",
-          "columnsFrom": [
-            "default_team_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "user_email_unique": {
@@ -1236,21 +1167,7 @@
           "with": {}
         }
       },
-      "foreignKeys": {
-        "query_audit_connection_id_connections_id_fk": {
-          "name": "query_audit_connection_id_connections_id_fk",
-          "tableFrom": "query_audit",
-          "tableTo": "connections",
-          "columnsFrom": [
-            "connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -1361,34 +1278,7 @@
           "with": {}
         }
       },
-      "foreignKeys": {
-        "team_members_user_id_user_id_fk": {
-          "name": "team_members_user_id_user_id_fk",
-          "tableFrom": "team_members",
-          "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "team_members_team_id_teams_id_fk": {
-          "name": "team_members_team_id_teams_id_fk",
-          "tableFrom": "team_members",
-          "tableTo": "teams",
-          "columnsFrom": [
-            "team_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -1641,34 +1531,7 @@
           "with": {}
         }
       },
-      "foreignKeys": {
-        "connection_identities_connection_id_connections_id_fk": {
-          "name": "connection_identities_connection_id_connections_id_fk",
-          "tableFrom": "connection_identities",
-          "tableTo": "connections",
-          "columnsFrom": [
-            "connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "connection_identities_team_id_teams_id_fk": {
-          "name": "connection_identities_team_id_teams_id_fk",
-          "tableFrom": "connection_identities",
-          "tableTo": "teams",
-          "columnsFrom": [
-            "team_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -1712,21 +1575,7 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {
-        "connection_identity_secrets_identity_id_connection_identities_id_fk": {
-          "name": "connection_identity_secrets_identity_id_connection_identities_id_fk",
-          "tableFrom": "connection_identity_secrets",
-          "tableTo": "connection_identities",
-          "columnsFrom": [
-            "identity_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -1807,21 +1656,7 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {
-        "connection_ssh_connection_id_connections_id_fk": {
-          "name": "connection_ssh_connection_id_connections_id_fk",
-          "tableFrom": "connection_ssh",
-          "tableTo": "connections",
-          "columnsFrom": [
-            "connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -2078,34 +1913,7 @@
           "with": {}
         }
       },
-      "foreignKeys": {
-        "connections_created_by_user_id_user_id_fk": {
-          "name": "connections_created_by_user_id_user_id_fk",
-          "tableFrom": "connections",
-          "tableTo": "user",
-          "columnsFrom": [
-            "created_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "connections_team_id_teams_id_fk": {
-          "name": "connections_team_id_teams_id_fk",
-          "tableFrom": "connections",
-          "tableTo": "teams",
-          "columnsFrom": [
-            "team_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -2377,6 +2185,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "connection_id": {
+          "name": "connection_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
         "context": {
           "name": "context",
           "type": "jsonb",
@@ -2464,29 +2278,7 @@
       "isRLSEnabled": false
     }
   },
-  "enums": {
-    "public.datasource_status": {
-      "name": "datasource_status",
-      "schema": "public",
-      "values": [
-        "draft",
-        "active",
-        "disabled"
-      ]
-    },
-    "public.datasource_type": {
-      "name": "datasource_type",
-      "schema": "public",
-      "values": [
-        "mysql",
-        "clickhouse",
-        "postgres",
-        "doris",
-        "sqlite",
-        "pglite"
-      ]
-    }
-  },
+  "enums": {},
   "schemas": {},
   "sequences": {},
   "roles": {},

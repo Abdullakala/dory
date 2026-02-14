@@ -1,6 +1,5 @@
 import { pgTable, text, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core';
 import { newEntityId } from '@/lib/id';
-import { teams, user } from '..';
 
 
 // Can be exported separately for app use
@@ -14,13 +13,9 @@ export const teamMembers = pgTable(
             .primaryKey()
             .$defaultFn(() => newEntityId()),
 
-        userId: text('user_id')
-            .notNull()
-            .references(() => user.id, { onDelete: 'cascade' }),
+        userId: text('user_id').notNull(),
 
-        teamId: text('team_id')
-            .notNull()
-            .references(() => teams.id, { onDelete: 'cascade' }),
+        teamId: text('team_id').notNull(),
 
         // Role: merged definitions, with viewer added
         role: text('role').$type<TeamMemberRole>().notNull().default('member'),

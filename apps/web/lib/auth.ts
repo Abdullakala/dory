@@ -77,26 +77,14 @@ function createAuth() {
                 storeStateStrategy: 'database',
                 skipStateCookieCheck: true,
             },
-            trustedOrigins: async request => {
-                const envOrigins =
-                    process.env.TRUSTED_ORIGINS?.split(',')
-                        .map(o => o.trim())
-                        .filter(Boolean) ?? [];
-
-                if (!request) return envOrigins;
-
-                const origin = request.headers.get('origin') || '';
-
-                if (envOrigins.includes(origin)) {
-                    return [origin];
-                }
-
-                if (/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(origin)) {
-                    return [origin];
-                }
-
-                return [];
-            },
+            trustedOrigins: [
+                'http://127.0.0.1:*',
+                'http://localhost:*',
+                `dory://`,
+                ...(process.env.TRUSTED_ORIGINS?.split(',')
+                    .map(s => s.trim())
+                    .filter(Boolean) ?? []),
+            ],
 
             /**
              * Extra user field: defaultTeamId

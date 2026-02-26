@@ -37,6 +37,12 @@
         "target": [
             "dmg",
             "zip"
+        ],
+        "signIgnore": [
+            ".*\\/Resources\\/standalone\\/.*",
+            ".*\\.map$",
+            ".*\\.ttf$",
+            ".*\\.woff2?$"
         ]
     }
 }

@@ -1,6 +1,5 @@
 import { notarize } from 'electron-notarize';
 import { config as dotenvConfig } from 'dotenv';
-import { resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 

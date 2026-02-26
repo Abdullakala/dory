@@ -1,6 +1,6 @@
 // lib/auth/session.ts
 
-import { headers } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import type { NextRequest } from 'next/server';
 import { getAuth } from '../auth';
 import { createAuthProxyHeaders, shouldProxyAuthRequest } from './auth-proxy';

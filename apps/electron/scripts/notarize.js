@@ -1,8 +1,18 @@
 import { notarize } from 'electron-notarize';
 import { config as dotenvConfig } from 'dotenv';
 import { resolve } from 'path';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
 
-dotenvConfig({ path: resolve(process.cwd(), '..', '.env.apple') });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+dotenvConfig({ path: resolve(__dirname, '../.env.apple') });
+console.log('🔑 Apple Notarization Config Loaded:', {
+    APPLE_TEAM_ID: process.env.APPLE_TEAM_ID,
+    APPLE_ID: process.env.APPLE_ID,
+    APPLE_ID_PASSWORD: process.env.APPLE_ID_PASSWORD,
+});
 
 export default async function notarizing(context) {
     const { electronPlatformName, appOutDir } = context;

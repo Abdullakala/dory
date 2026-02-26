@@ -44,12 +44,13 @@ export function createMainWindow({ preloadPath, targetUrl, log }: CreateMainWind
 
 export function sendAuthCallback(url: string, logWarn: LogFn) {
   if (!mainWindow || mainWindow.isDestroyed()) {
-    logWarn('[electron] main window unavailable, queueing auth callback');
+    logWarn('[electron] main window unavailable, queueing auth callback:', url);
     pendingAuthCallback = url;
     return;
   }
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.focus();
+  logWarn('[electron] sending auth callback to renderer:', url);
   mainWindow.webContents.send('auth:callback', url);
 }
 

@@ -13,7 +13,6 @@ import { IconBrandGithub } from '@tabler/icons-react';
 import { authClient, signInViaGithub } from '@/lib/auth-client'; //Introducing authClient
 import { InputPassword } from '@/components/originui/input-password';
 import { authFetch } from '@/lib/client/auth-fetch';
-import { clearAuthToken, setAuthToken } from '@/lib/client/auth-token';
 import { useTranslations } from 'next-intl';
 
 export function SignInForm({ className, imageUrl, ...props }: React.ComponentProps<'div'> & { imageUrl?: string }) {
@@ -26,27 +25,12 @@ export function SignInForm({ className, imageUrl, ...props }: React.ComponentPro
     const [err, setErr] = useState<string | null>(null);
     const [msg, setMsg] = useState<string | null>(null);
 
-    function decodeJwtPayload(token: string): Record<string, unknown> | null {
-        try {
-            const payloadBase64 = token.split('.')[1];
-            if (!payloadBase64) return null;
-            const normalized = payloadBase64.replace(/-/g, '+').replace(/_/g, '/');
-            const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
-            const json = atob(padded);
-            return JSON.parse(json) as Record<string, unknown>;
-        } catch (error) {
-            console.warn('[auth] failed to decode jwt payload', error);
-            return null;
-        }
-    }
-
     useEffect(() => {
         if (!window.authBridge?.onCallback) return;
         const unsubscribe = window.authBridge.onCallback(async deepLink => {
             try {
                 const url = new URL(deepLink);
-                const code = url.searchParams.get('code');
-                const token = url.searchParams.get('token');
+                const ticket = url.searchParams.get('ticket');
                 const error = url.searchParams.get('error');
 
                 if (error) {
@@ -54,42 +38,25 @@ export function SignInForm({ className, imageUrl, ...props }: React.ComponentPro
                     return;
                 }
 
-                if (code) {
-                    const finalizeRes = await authFetch('/api/electron/auth/finalize', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ code }),
-                    });
-                    if (!finalizeRes.ok) {
-                        const data = await finalizeRes.json().catch(() => null);
-                        throw new Error(data?.message ?? t('SignIn.AuthFailed', { error: 'finalize_failed' }));
-                    }
-                    await clearAuthToken();
-                    const sessionRes = await authFetch('/api/auth/get-session', { method: 'GET' });
-                    const session = sessionRes.ok ? await sessionRes.json().catch(() => null) : null;
-                    const defaultTeamId = typeof session?.user?.defaultTeamId === 'string' ? session.user.defaultTeamId : null;
-                    setMsg(t('SignIn.SuccessRefreshing'));
-                    router.refresh();
-                    router.replace(defaultTeamId ? `/${defaultTeamId}/connections` : '/');
-                    return;
-                }
-
-                if (!token) {
+                if (!ticket) {
                     setErr(t('SignIn.MissingToken'));
                     return;
                 }
 
-                await setAuthToken(token);
-                setMsg(t('SignIn.SuccessRefreshing'));
-                const payload = decodeJwtPayload(token);
-                console.log('payload', payload);
-                const defaultTeamId = typeof payload?.defaultTeamId === 'string' ? payload.defaultTeamId : null;
-                router.refresh();
-                if (defaultTeamId) {
-                    router.replace(`/${defaultTeamId}/connections`);
-                } else {
-                    router.replace(`/`);
+                const consumeRes = await fetch('/api/electron/auth/consume', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ticket }),
+                });
+
+                if (!consumeRes.ok) {
+                    const data = await consumeRes.json().catch(() => null);
+                    throw new Error(data?.error ?? t('SignIn.AuthFailed', { error: 'consume_failed' }));
                 }
+
+                setMsg(t('SignIn.SuccessRefreshing'));
+                router.refresh();
+                router.replace(`/`);
             } catch (e) {
                 setErr(t('SignIn.InvalidCallback'));
             }
@@ -104,9 +71,7 @@ export function SignInForm({ className, imageUrl, ...props }: React.ComponentPro
         setErr(null);
         setMsg(null);
         try {
-            const res = await authFetch('/api/electron/auth/start/github?redirectTo=dory://auth/callback', {
-                method: 'GET',
-            });
+            const res = await authFetch('/api/electron/auth/start/github', { method: 'GET' });
             console.log('GitHub OAuth start response:', res);
             const data = await res.json().catch(() => ({}));
             if (!res.ok || !data?.url) {
@@ -124,18 +89,34 @@ export function SignInForm({ className, imageUrl, ...props }: React.ComponentPro
         setMsg(null);
         setLoading(true);
         try {
-            const { error } = await authClient.signIn.email({
-                email,
-                password: pwd,
-                //Jump after logging in (can be modified as needed)
-                callbackURL: `/`,
-                //You can also add rememberMe: true
-            });
-            if (error) {
-                setErr(error.message ?? t('SignIn.LoginFailedRetry'));
+            if (window.authBridge?.openExternal) {
+                const res = await fetch('/api/electron/auth/sign-in/email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password: pwd }),
+                });
+                const data = await res.json().catch(() => null);
+                if (!res.ok) {
+                    const message = typeof data?.error === 'string' ? data.error : t('SignIn.LoginFailedRetry');
+                    setErr(message);
+                } else {
+                    router.refresh();
+                    router.push(`/`);
+                }
             } else {
-                //Success: Better Auth will handle the callback; for SSR/CSR consistency, it will also perform a local jump.
-                router.push(`/`);
+                const { error } = await authClient.signIn.email({
+                    email,
+                    password: pwd,
+                    //Jump after logging in (can be modified as needed)
+                    callbackURL: `/`,
+                    //You can also add rememberMe: true
+                });
+                if (error) {
+                    setErr(error.message ?? t('SignIn.LoginFailedRetry'));
+                } else {
+                    //Success: Better Auth will handle the callback; for SSR/CSR consistency, it will also perform a local jump.
+                    router.push(`/`);
+                }
             }
         } catch (e: any) {
             setErr(e?.message ?? t('SignIn.NetworkErrorRetry'));

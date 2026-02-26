@@ -65,7 +65,9 @@ export function createStandaloneServerManager({
     stopStandaloneServer();
 
     const hostname = '127.0.0.1';
-    const port = await findAvailablePort(Number(process.env.PORT) || 3000);
+    const port = await findAvailablePort();
+
+    log(`[electron] Starting bootstrap script on port ${port}...`);
 
     await new Promise<void>((resolve, reject) => {
       const bootstrapProc = fork(bootstrapPath, [], {
@@ -133,7 +135,7 @@ export function createStandaloneServerManager({
     if (cachedServerUrl) return cachedServerUrl;
 
     if (isDev) {
-      cachedServerUrl = process.env.ELECTRON_START_URL ?? 'http://localhost:3000';
+      cachedServerUrl = process.env.ELECTRON_START_URL ?? 'http://127.0.0.1:3000';
       return cachedServerUrl;
     }
 
@@ -147,25 +149,16 @@ export function createStandaloneServerManager({
   };
 }
 
-function findAvailablePort(startPort: number): Promise<number> {
+function findAvailablePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
 
-    server.once('error', (error: NodeJS.ErrnoException) => {
-      server.close();
-      if (error.code === 'EADDRINUSE' || error.code === 'EACCES') {
-        resolve(findAvailablePort(startPort + 1));
-        return;
-      }
-      reject(error);
-    });
-
-    server.once('listening', () => {
+    server.listen(0, () => {
       const { port } = server.address() as AddressInfo;
       server.close(() => resolve(port));
     });
 
-    server.listen(startPort, '127.0.0.1');
+    server.on('error', reject);
   });
 }
 

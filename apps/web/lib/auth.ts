@@ -25,6 +25,12 @@ function createAuth() {
     return (async () => {
         const db = (await getClient()) as PostgresDBClient;
         const provider = getDatabaseProvider() === 'pglite' ? 'pg' : 'pg';
+        const runtime = process.env.NEXT_PUBLIC_DORY_RUNTIME?.trim();
+        const isDesktop = runtime === 'desktop';
+        const desktopOrigin =
+            process.env.DORY_ELECTRON_ORIGIN?.trim() ||
+            process.env.NEXT_PUBLIC_DORY_ELECTRON_ORIGIN?.trim() ||
+            (isDesktop ? `http://127.0.0.1:${process.env.PORT ?? 3000}` : '');
 
         console.log('[auth] TRUSTED_ORIGINS =', process.env.TRUSTED_ORIGINS);
 
@@ -73,6 +79,8 @@ function createAuth() {
         return betterAuth({
             database: drizzleAdapter(db, { provider, schema }),
             plugins: [jwt()],
+            baseURL: isDesktop && desktopOrigin ? desktopOrigin : undefined,
+            advanced: isDesktop ? { useSecureCookies: false } : undefined,
             account: {
                 storeStateStrategy: 'database',
                 skipStateCookieCheck: true,

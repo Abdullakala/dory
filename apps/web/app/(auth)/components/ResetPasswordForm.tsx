@@ -64,6 +64,9 @@ export function ResetPasswordForm({ className, ...props }: React.ComponentProps<
             setMsg(t('ResetPassword.Success'));
             setPwd('');
             setConfirmPwd('');
+            setTimeout(() => {
+                router.replace('/sign-in');
+            }, 800);
         } catch (e: any) {
             setErr(e?.message || t('ResetPassword.NetworkError'));
         } finally {

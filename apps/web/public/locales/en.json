@@ -74,7 +74,7 @@
             "Terms": "Terms of Service",
             "And": "and",
             "Privacy": "Privacy Policy",
-            "VerifyMatchPattern": "verify|unverified|exists"
+            "VerifyMatchPattern": "verify|unverified"
         },
         "SignIn": {
             "AuthFailed": "Authorization failed: {error}",

@@ -44,13 +44,13 @@ export function SignUpForm({ className, ...props }: React.ComponentProps<'div'>)
                 },
             );
 
-            //Regardless of whether the email is actually delivered, the user is directed to "verify email"
+            // Only switch to verify panel after server confirms sign-up success.
             if (!error) {
                 setEmailForVerify(email);
                 setStage('verify');
             } else {
-                //Common: the email address has been occupied; it may also be "unverified existing account"
-                //You can also enter the verify panel here, and users can use "Resend" to complete the verification.
+                // Keep user on the form for regular errors (e.g. email already exists).
+                // Only switch for "unverified account" type errors.
                 if (verifyMatchRegex.test(error.message ?? '')) {
                     setEmailForVerify(email);
                     setStage('verify');

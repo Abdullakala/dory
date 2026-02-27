@@ -78,7 +78,7 @@
             "Terms": "服务条款",
             "And": "和",
             "Privacy": "隐私政策",
-            "VerifyMatchPattern": "未验证|verify|unverified|exists"
+            "VerifyMatchPattern": "未验证|verify|unverified"
         },
         "SignIn": {
             "AuthFailed": "授权失败：{error}",

@@ -2,7 +2,7 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 
-import { Link } from '@/lib/i18n/navigation';
+import Link from 'next/link';
 import { Button } from '@/registry/new-york-v4/ui/button';
 
 // This page renders when a route like `/unknown.txt` is requested.

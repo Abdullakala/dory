@@ -26,23 +26,6 @@ function normalizeCookieName(name: string): string[] {
     return Array.from(new Set([baseName, `__Secure-${baseName}`, `__Host-${baseName}`]));
 }
 
-function extractSessionTokenFromRequest(req: Request, cookieName: string): string | null {
-    const cookieHeader = req.headers.get('cookie');
-    if (!cookieHeader) return null;
-
-    const cookieNames = normalizeCookieName(cookieName);
-    for (const part of cookieHeader.split(';')) {
-        const [rawName, ...rest] = part.split('=');
-        const name = rawName?.trim();
-        if (!name || !cookieNames.includes(name)) continue;
-        const value = rest.join('=').trim();
-        if (!value) return null;
-        return decodeURIComponent(value);
-    }
-
-    return null;
-}
-
 function listRequestCookieNames(req: Request): string[] {
     const cookieHeader = req.headers.get('cookie');
     if (!cookieHeader) return [];
@@ -67,18 +50,47 @@ function getSetCookies(headers: Headers): string[] {
 function readCookieValueFromSetCookie(setCookie: string, name: string): string | null {
     const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const match = setCookie.match(new RegExp(`^${escapedName}=([^;]+)`));
-    return match?.[1] ? decodeURIComponent(match[1]) : null;
+    return match?.[1] ?? null;
 }
 
-function extractSessionTokenFromSetCookieHeaders(headers: Headers, cookieName: string): string | null {
+function extractSessionCookieFromSetCookieHeaders(headers: Headers, cookieName: string): { name: string; value: string } | null {
     const cookieNames = normalizeCookieName(cookieName);
     for (const cookie of getSetCookies(headers)) {
         for (const name of cookieNames) {
             const value = readCookieValueFromSetCookie(cookie, name);
-            if (value) return value;
+            if (value) return { name, value };
         }
     }
     return null;
+}
+
+async function getSessionFromFinalizeRequest(auth: Awaited<ReturnType<typeof getAuth>>, req: Request, url: URL) {
+    const sessionFromRequest = await auth.api.getSession({ headers: req.headers }).catch(() => null);
+    if (sessionFromRequest) return sessionFromRequest;
+
+    if (!url.searchParams.get('code') || !url.searchParams.get('state')) {
+        return null;
+    }
+
+    const response = await auth.api.callbackOAuth({
+        headers: req.headers,
+        params: { id: 'github' },
+        query: Object.fromEntries(url.searchParams),
+        asResponse: true,
+    });
+
+    const ctx = await auth.$context;
+    const sessionCookie = extractSessionCookieFromSetCookieHeaders(response.headers ?? new Headers(), ctx.authCookies.sessionToken.name);
+    if (!sessionCookie) {
+        return null;
+    }
+
+    const headers = new Headers(req.headers);
+    const existingCookie = headers.get('cookie');
+    const sessionCookiePair = `${sessionCookie.name}=${sessionCookie.value}`;
+    headers.set('cookie', existingCookie ? `${existingCookie}; ${sessionCookiePair}` : sessionCookiePair);
+
+    return auth.api.getSession({ headers }).catch(() => null);
 }
 
 function buildDeepLinkUrl(params: Record<string, string | undefined | null>) {
@@ -142,22 +154,12 @@ export async function GET(req: Request) {
         sessionCookieName: ctx.authCookies.sessionToken.name,
     });
 
-    let sessionToken = extractSessionTokenFromRequest(req, ctx.authCookies.sessionToken.name);
-    if (!sessionToken && url.searchParams.get('code') && url.searchParams.get('state')) {
-        const response = await auth.api.callbackOAuth({
-            headers: req.headers,
-            params: { id: 'github' },
-            query: Object.fromEntries(url.searchParams),
-            asResponse: true,
-        });
-        sessionToken = extractSessionTokenFromSetCookieHeaders(response.headers ?? new Headers(), ctx.authCookies.sessionToken.name);
-    }
-
-    if (!sessionToken) {
+    const activeSession = await getSessionFromFinalizeRequest(auth, req, url);
+    if (!activeSession?.session?.token) {
         return NextResponse.json({ error: 'missing_session_cookie' }, { status: 401 });
     }
 
-    const session = await ctx.internalAdapter.findSession(sessionToken);
+    const session = await ctx.internalAdapter.findSession(activeSession.session.token);
     if (!session) {
         return NextResponse.json({ error: 'missing_session' }, { status: 401 });
     }

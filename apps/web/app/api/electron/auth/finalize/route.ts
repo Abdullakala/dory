@@ -22,10 +22,8 @@ type TicketUser = {
 };
 
 function normalizeCookieName(name: string): string[] {
-    const names = [name];
-    if (name.startsWith('__Secure-')) names.push(name.replace(/^__Secure-/, ''));
-    if (name.startsWith('__Host-')) names.push(name.replace(/^__Host-/, ''));
-    return Array.from(new Set(names));
+    const baseName = name.replace(/^__Secure-/, '').replace(/^__Host-/, '');
+    return Array.from(new Set([baseName, `__Secure-${baseName}`, `__Host-${baseName}`]));
 }
 
 function extractSessionTokenFromRequest(req: Request, cookieName: string): string | null {
@@ -42,6 +40,44 @@ function extractSessionTokenFromRequest(req: Request, cookieName: string): strin
         return decodeURIComponent(value);
     }
 
+    return null;
+}
+
+function listRequestCookieNames(req: Request): string[] {
+    const cookieHeader = req.headers.get('cookie');
+    if (!cookieHeader) return [];
+
+    return cookieHeader
+        .split(';')
+        .map(part => part.split('=')[0]?.trim())
+        .filter((name): name is string => Boolean(name));
+}
+
+function getSetCookies(headers: Headers): string[] {
+    const anyHeaders = headers as unknown as { getSetCookie?: () => string[] };
+    if (typeof anyHeaders.getSetCookie === 'function') {
+        return anyHeaders.getSetCookie();
+    }
+
+    const raw = headers.get('set-cookie');
+    if (!raw) return [];
+    return [raw];
+}
+
+function readCookieValueFromSetCookie(setCookie: string, name: string): string | null {
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = setCookie.match(new RegExp(`^${escapedName}=([^;]+)`));
+    return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
+
+function extractSessionTokenFromSetCookieHeaders(headers: Headers, cookieName: string): string | null {
+    const cookieNames = normalizeCookieName(cookieName);
+    for (const cookie of getSetCookies(headers)) {
+        for (const name of cookieNames) {
+            const value = readCookieValueFromSetCookie(cookie, name);
+            if (value) return value;
+        }
+    }
     return null;
 }
 
@@ -99,7 +135,24 @@ export async function GET(req: Request) {
 
     const auth = await getAuth();
     const ctx = await auth.$context;
-    const sessionToken = extractSessionTokenFromRequest(req, ctx.authCookies.sessionToken.name);
+    console.log('[electron-auth][finalize] request summary', {
+        hasCode: Boolean(url.searchParams.get('code')),
+        hasState: Boolean(url.searchParams.get('state')),
+        cookieNames: listRequestCookieNames(req),
+        sessionCookieName: ctx.authCookies.sessionToken.name,
+    });
+
+    let sessionToken = extractSessionTokenFromRequest(req, ctx.authCookies.sessionToken.name);
+    if (!sessionToken && url.searchParams.get('code') && url.searchParams.get('state')) {
+        const response = await auth.api.callbackOAuth({
+            headers: req.headers,
+            params: { id: 'github' },
+            query: Object.fromEntries(url.searchParams),
+            asResponse: true,
+        });
+        sessionToken = extractSessionTokenFromSetCookieHeaders(response.headers ?? new Headers(), ctx.authCookies.sessionToken.name);
+    }
+
     if (!sessionToken) {
         return NextResponse.json({ error: 'missing_session_cookie' }, { status: 401 });
     }

@@ -92,6 +92,23 @@ jobs:
           APPLE_ID=${{ secrets.APPLE_ID }}
           EOF
 
+      - name: Prepare web env
+        run: |
+          cat > apps/web/.env <<EOF
+          BETTER_AUTH_SECRET=${{ secrets.BETTER_AUTH_SECRET }}
+          BETTER_AUTH_URL=${{ secrets.BETTER_AUTH_URL }}
+
+          DS_SECRET_KEY=${{ secrets.DS_SECRET_KEY }}
+
+          DB_TYPE=${{ secrets.DB_TYPE }}
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          TRUSTED_ORIGINS=${{ secrets.TRUSTED_ORIGINS }}
+
+          NEXT_PUBLIC_DORY_RUNTIME=${{ secrets.NEXT_PUBLIC_DORY_RUNTIME }}
+          NEXT_PUBLIC_DORY_CLOUD_API_URL=${{ secrets.NEXT_PUBLIC_DORY_CLOUD_API_URL }}
+          DORY_AI_CLOUD_URL=${{ secrets.DORY_AI_CLOUD_URL }}
+          EOF
+
       - name: Build Electron app (mac)
         env:
           CSC_LINK: ${{ secrets.APPLE_CERT_BASE64 }}

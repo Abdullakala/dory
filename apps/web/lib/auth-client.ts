@@ -3,17 +3,32 @@
 import { createAuthClient } from 'better-auth/react';
 import { translate } from '@/lib/i18n/i18n';
 import { getClientLocale } from '@/lib/i18n/client-locale';
+import { getAuthBaseUrl } from '@/lib/client/auth-runtime';
+
+const authBaseUrl = getAuthBaseUrl();
 
 export const authClient = createAuthClient({
     // Same origin: omit baseURL
     // Cross-origin (gateway/subdomain): baseURL: process.env.NEXT_PUBLIC_AUTH_ORIGIN,
+    ...(authBaseUrl ? { baseURL: authBaseUrl } : {}),
 });
+
 
 // ==== Wrapper: social login ====
 export function signInViaGithub(redirectTo = '/') {
     // Usually triggers a redirect; return value is not used
     return authClient.signIn.social({
         provider: 'github',
+        callbackURL: redirectTo,
+        // Recommended: add an error redirect
+        errorCallbackURL: '/auth/error',
+    });
+}
+
+export function signInViaGoogle(redirectTo = '/') {
+    // Usually triggers a redirect; return value is not used
+    return authClient.signIn.social({
+        provider: 'google',
         callbackURL: redirectTo,
         // Recommended: add an error redirect
         errorCallbackURL: '/auth/error',

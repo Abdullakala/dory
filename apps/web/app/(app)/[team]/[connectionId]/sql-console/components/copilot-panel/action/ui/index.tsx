@@ -10,6 +10,8 @@ import { QuickActionList, QuickActionListItem } from './QuickActionList';
 import { ActionResultPanel } from './ActionResultPanel/ActionResultPanel';
 import { CopilotFixInput } from '@/app/(app)/[team]/[connectionId]/chatbot/copilot/types/copilot-fix-input';
 import { useTranslations } from 'next-intl';
+import { isMissingAiEnvError } from '@/lib/ai/errors';
+import { USE_CLOUD_AI } from '@/app/config/app';
 
 type ApplySqlResult = {
     previousSql: string;
@@ -35,6 +37,7 @@ export type ActionTabProps = {
 
 export function ActionTab({ input, onApplySql, onExecuted, autoRun, onAutoRunHandled }: ActionTabProps) {
     const t = useTranslations('SqlConsole') as any;
+    const suppressMissingAiEnv = USE_CLOUD_AI;
     const [result, setResult] = useState<ActionResult | null>(null);
     const [running, setRunning] = useState(false);
     const [runError, setRunError] = useState<string | null>(null);
@@ -98,8 +101,12 @@ export function ActionTab({ input, onApplySql, onExecuted, autoRun, onAutoRunHan
                 setResult(r);
                 onExecuted?.({ intent: action.intent, result: r });
             } catch (e: any) {
-                if (e?.code === 'MISSING_AI_ENV') {
-                    setRunError(t('Copilot.Actions.MissingAiEnv'));
+                if (isMissingAiEnvError(e) || e?.code === 'MISSING_AI_ENV') {
+                    setRunError(
+                        suppressMissingAiEnv
+                            ? t('Copilot.Actions.RunFailed')
+                            : t('Copilot.Actions.MissingAiEnv'),
+                    );
                 } else {
                     setRunError(e?.message ?? t('Copilot.Actions.RunFailed'));
                 }

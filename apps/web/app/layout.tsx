@@ -13,9 +13,11 @@ import { getLocale, getMessages } from 'next-intl/server';
 import { cn } from '@/lib/utils';
 import { ActiveThemeProvider } from '@/components/active-theme';
 import { FontSizeProvider } from '@/components/font-size-provider';
+import { ElectronThemeSync } from '@/components/electron-theme-sync';
 
 import { siteConfig } from './config/site';
 import { JotaiProvider } from '@/lib/providers/jotai-provider';
+import { PublicEnvProvider, PublicEnvScript } from 'next-runtime-env';
 
 const META_THEME_COLORS = {
     light: '#ffffff',
@@ -87,6 +89,7 @@ export default async function RootLayout({
     return (
         <html lang={locale} suppressHydrationWarning>
             <head>
+                <PublicEnvScript />
                 <script
                     dangerouslySetInnerHTML={{
                         __html: `
@@ -108,17 +111,20 @@ export default async function RootLayout({
                 )}
             >
                 <FontSizeProvider />
-                <NextIntlClientProvider locale={locale} messages={messages}>
-                    <JotaiProvider>
-                        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange enableColorScheme>
-                            <ActiveThemeProvider initialTheme={activeThemeValue}>
-                                {children}
-                                <Toaster />
-                                <Analytics />
-                            </ActiveThemeProvider>
-                        </ThemeProvider>
-                    </JotaiProvider>
-                </NextIntlClientProvider>
+                <PublicEnvProvider>
+                    <NextIntlClientProvider locale={locale} messages={messages}>
+                        <JotaiProvider>
+                            <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange enableColorScheme>
+                                <ElectronThemeSync />
+                                <ActiveThemeProvider initialTheme={activeThemeValue}>
+                                    {children}
+                                    <Toaster />
+                                    <Analytics />
+                                </ActiveThemeProvider>
+                            </ThemeProvider>
+                        </JotaiProvider>
+                    </NextIntlClientProvider>
+                </PublicEnvProvider>
             </body>
         </html>
     );

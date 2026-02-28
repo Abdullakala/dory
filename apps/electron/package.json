@@ -4,8 +4,9 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "compile": "tsc -p tsconfig.json",
+        "compile": "tsc -p tsconfig.json && node ./scripts/copy-assets.cjs",
         "dev": "yarn run compile && electron ./dist-electron/main.js",
+        "dev:app": "yarn run compile && electron-builder --mac --dir && open \"dist/mac-arm64/Dory.app\"",
         "electron:standalone": "bash ../../scripts/build-app-standalone.sh",
         "build": "yarn --cwd ../web run build && yarn run compile && electron-builder",
         "electron:build:apple": "yarn run compile && electron-builder --mac"
@@ -18,41 +19,8 @@
         "electron-notarize": "^1.2.2",
         "typescript": "^5.9.3"
     },
-    "build": {
-        "appId": "com.dory.app",
-        "productName": "Dory",
-        "extraMetadata": {
-            "main": "dist-electron/main.js"
-        },
-        "files": [
-            "dist-electron/**/*",
-            "package.json"
-        ],
-        "extraResources": [
-            {
-                "from": "../../release/standalone",
-                "to": "standalone"
-            }
-        ],
-        "asar": true,
-        "asarUnpack": [
-            "**/*.node"
-        ],
-        "afterSign": "./scripts/notarize.js",
-        "mac": {
-            "icon": "../web/public/logo.icns",
-            "category": "public.app-category.developer-tools",
-            "hardenedRuntime": true,
-            "gatekeeperAssess": false,
-            "entitlements": "./scripts/entitlements.mac.plist",
-            "entitlementsInherit": "./scripts/entitlements.mac.plist",
-            "target": [
-                "dmg",
-                "zip"
-            ]
-        }
-    },
     "dependencies": {
-        "electron-log": "^5.4.3"
+        "electron-log": "^5.4.3",
+        "electron-store": "^9.0.0"
     }
 }

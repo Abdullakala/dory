@@ -10,10 +10,9 @@ import { Card, CardContent } from '@/registry/new-york-v4/ui/card';
 import { Input } from '@/registry/new-york-v4/ui/input';
 import { Label } from '@/registry/new-york-v4/ui/label';
 import { IconBrandGithub } from '@tabler/icons-react';
-import { authClient, signInViaGithub } from '@/lib/auth-client'; //Introducing authClient
+import { authClient, signInViaGithub, signInViaGoogle } from '@/lib/auth-client'; //Introducing authClient
 import { InputPassword } from '@/components/originui/input-password';
 import { authFetch } from '@/lib/client/auth-fetch';
-import { setAuthToken } from '@/lib/client/auth-token';
 import { useTranslations } from 'next-intl';
 
 export function SignInForm({ className, imageUrl, ...props }: React.ComponentProps<'div'> & { imageUrl?: string }) {
@@ -26,26 +25,24 @@ export function SignInForm({ className, imageUrl, ...props }: React.ComponentPro
     const [err, setErr] = useState<string | null>(null);
     const [msg, setMsg] = useState<string | null>(null);
 
-    function decodeJwtPayload(token: string): Record<string, unknown> | null {
-        try {
-            const payloadBase64 = token.split('.')[1];
-            if (!payloadBase64) return null;
-            const normalized = payloadBase64.replace(/-/g, '+').replace(/_/g, '/');
-            const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
-            const json = atob(padded);
-            return JSON.parse(json) as Record<string, unknown>;
-        } catch (error) {
-            console.warn('[auth] failed to decode jwt payload', error);
-            return null;
-        }
-    }
-
     useEffect(() => {
         if (!window.authBridge?.onCallback) return;
         const unsubscribe = window.authBridge.onCallback(async deepLink => {
             try {
                 const url = new URL(deepLink);
+                const path = url.pathname && url.pathname !== '/' ? url.pathname : `/${url.hostname}`;
                 const token = url.searchParams.get('token');
+
+                if (path === '/reset-password') {
+                    if (!token) {
+                        setErr(t('SignIn.MissingToken'));
+                        return;
+                    }
+                    router.replace(`/reset-password?token=${encodeURIComponent(token)}`);
+                    return;
+                }
+
+                const ticket = url.searchParams.get('ticket');
                 const error = url.searchParams.get('error');
 
                 if (error) {
@@ -53,21 +50,25 @@ export function SignInForm({ className, imageUrl, ...props }: React.ComponentPro
                     return;
                 }
 
-                if (!token) {
+                if (!ticket) {
                     setErr(t('SignIn.MissingToken'));
                     return;
                 }
 
-                await setAuthToken(token);
-                setMsg(t('SignIn.SuccessRefreshing'));
-                const payload = decodeJwtPayload(token);
-                const defaultTeamId = typeof payload?.defaultTeamId === 'string' ? payload.defaultTeamId : null;
-                router.refresh();
-                if (defaultTeamId) {
-                    router.replace(`/${defaultTeamId}/connections`);
-                } else {
-                    router.push(`/${defaultTeamId}/connections`);
+                const consumeRes = await fetch('/api/electron/auth/consume', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ticket }),
+                });
+
+                if (!consumeRes.ok) {
+                    const data = await consumeRes.json().catch(() => null);
+                    throw new Error(data?.error ?? t('SignIn.AuthFailed', { error: 'consume_failed' }));
                 }
+
+                setMsg(t('SignIn.SuccessRefreshing'));
+                router.refresh();
+                router.replace(`/`);
             } catch (e) {
                 setErr(t('SignIn.InvalidCallback'));
             }
@@ -82,9 +83,7 @@ export function SignInForm({ className, imageUrl, ...props }: React.ComponentPro
         setErr(null);
         setMsg(null);
         try {
-            const res = await authFetch('/api/electron/auth/start/github?redirectTo=dory://auth/callback', {
-                method: 'GET',
-            });
+            const res = await authFetch('/api/electron/auth/start/github', { method: 'GET' });
             console.log('GitHub OAuth start response:', res);
             const data = await res.json().catch(() => ({}));
             if (!res.ok || !data?.url) {
@@ -96,24 +95,56 @@ export function SignInForm({ className, imageUrl, ...props }: React.ComponentPro
         }
     }
 
+    async function signInViaGoogleElectron() {
+        setErr(null);
+        setMsg(null);
+        try {
+            const res = await authFetch('/api/electron/auth/start/google', { method: 'GET' });
+            console.log('Google OAuth start response:', res);
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data?.url) {
+                throw new Error(data?.message || t('SignIn.GoogleStartFailed'));
+            }
+            await window.authBridge?.openExternal(data.url);
+        } catch (e: any) {
+            setErr(e?.message ?? t('SignIn.GoogleStartFailed'));
+        }
+    }
+
     async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
         setErr(null);
         setMsg(null);
         setLoading(true);
         try {
-            const { error } = await authClient.signIn.email({
-                email,
-                password: pwd,
-                //Jump after logging in (can be modified as needed)
-                callbackURL: `/`,
-                //You can also add rememberMe: true
-            });
-            if (error) {
-                setErr(error.message ?? t('SignIn.LoginFailedRetry'));
+            if (window.authBridge?.openExternal) {
+                const res = await fetch('/api/electron/auth/sign-in/email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password: pwd }),
+                });
+                const data = await res.json().catch(() => null);
+                if (!res.ok) {
+                    const message = typeof data?.error === 'string' ? data.error : t('SignIn.LoginFailedRetry');
+                    setErr(message);
+                } else {
+                    router.refresh();
+                    router.push(`/`);
+                }
             } else {
-                //Success: Better Auth will handle the callback; for SSR/CSR consistency, it will also perform a local jump.
-                router.push(`/`);
+                const { error } = await authClient.signIn.email({
+                    email,
+                    password: pwd,
+                    //Jump after logging in (can be modified as needed)
+                    callbackURL: `/`,
+                    //You can also add rememberMe: true
+                });
+                if (error) {
+                    setErr(error.message ?? t('SignIn.LoginFailedRetry'));
+                } else {
+                    //Success: Better Auth will handle the callback; for SSR/CSR consistency, it will also perform a local jump.
+                    router.push(`/`);
+                }
             }
         } catch (e: any) {
             setErr(e?.message ?? t('SignIn.NetworkErrorRetry'));
@@ -131,17 +162,39 @@ export function SignInForm({ className, imageUrl, ...props }: React.ComponentPro
         setMsg(null);
         setLoading(true);
         try {
-            const { error } = await authClient.requestPasswordReset({
+            const redirectTo = window.authBridge?.openExternal
+                ? 'dory://reset-password'
+                : `${window.location.origin}/reset-password`;
+            console.log('[auth] request-password-reset start', {
                 email,
-                //After the link opens, it jumps to your reset password page (this page completes resetPassword from the token in the URL)
-                redirectTo: `${window.location.origin}/reset-password`,
+                origin: window.location.origin,
+                redirectTo,
+                runtime: process.env.NEXT_PUBLIC_DORY_RUNTIME,
+                cloudApi: process.env.NEXT_PUBLIC_DORY_CLOUD_API_URL,
             });
-            if (error) {
-                setErr(error.message ?? t('SignIn.ResetEmailFailed'));
-            } else {
-                setMsg(t('SignIn.ResetEmailSent'));
+            const res = await authFetch('/api/auth/request-password-reset', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email,
+                    // After the link opens, it jumps to your reset password page
+                    redirectTo,
+                }),
+            });
+            const data = await res.json().catch(() => null);
+            console.log('[auth] request-password-reset response', {
+                ok: res.ok,
+                status: res.status,
+                data,
+            });
+            if (!res.ok) {
+                const message = typeof data?.error === 'string' ? data.error : t('SignIn.ResetEmailFailed');
+                setErr(message);
+                return;
             }
+            setMsg(t('SignIn.ResetEmailSent'));
         } catch (e: any) {
+            console.error('[auth] request-password-reset error', e);
             setErr(e?.message ?? t('SignIn.SendFailedRetry'));
         } finally {
             setLoading(false);
@@ -153,7 +206,7 @@ export function SignInForm({ className, imageUrl, ...props }: React.ComponentPro
         setMsg(null);
         setDemoLoading(true);
         try {
-            const res = await fetch('/api/auth/demo', { method: 'POST' });
+            const res = await authFetch('/api/auth/demo', { method: 'POST' });
             if (!res.ok) {
                 const data = await res.json().catch(() => null);
                 throw new Error(data?.message ?? t('SignIn.LoginFailedRetry'));
@@ -233,8 +286,18 @@ export function SignInForm({ className, imageUrl, ...props }: React.ComponentPro
                                     <span className="sr-only">{t('SignIn.LoginWithGithub')}</span>
                                 </Button>
 
-                                <Button variant="outline" type="button" className="w-full" disabled>
-                                    {/* Google placeholder: connect socialProviders.google on demand*/}
+                                <Button
+                                    variant="outline"
+                                    type="button"
+                                    className="w-full"
+                                    onClick={() => {
+                                        if (window.authBridge?.openExternal) {
+                                            void signInViaGoogleElectron();
+                                        } else {
+                                            signInViaGoogle();
+                                        }
+                                    }}
+                                >
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                                         <path
                                             d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"
@@ -253,7 +316,7 @@ export function SignInForm({ className, imageUrl, ...props }: React.ComponentPro
                             </div>
                         </div>
                     </form>
-{/* 
+                    {/* 
                     <div className="bg-primary/50 relative hidden md:block">
                         {imageUrl && <Image fill src={imageUrl} alt="Image" className="absolute inset-0 h-full w-full object-cover" />}
                     </div> */}
@@ -261,9 +324,7 @@ export function SignInForm({ className, imageUrl, ...props }: React.ComponentPro
             </Card>
 
             <div className="text-muted-foreground *:[a]:hover:text-primary text-center text-xs text-balance *:[a]:underline *:[a]:underline-offset-4">
-                {t('SignIn.ContinueAgreement')}{' '}
-                <a href="#">{t('SignIn.Terms')}</a> {t('SignIn.And')}{' '}
-                <a href="#">{t('SignIn.Privacy')}</a>.
+                {t('SignIn.ContinueAgreement')} <a href="#">{t('SignIn.Terms')}</a> {t('SignIn.And')} <a href="#">{t('SignIn.Privacy')}</a>.
             </div>
         </div>
     );

@@ -48,6 +48,12 @@
         "connectionErrorContact": "联系支持团队",
         "connectionErrorSupportEmail": "支持邮箱：support@example.com"
     },
+    "NotFoundPage": {
+        "title": "你访问的页面不存在",
+        "description": "链接可能已失效或页面已被移动。你可以回到主页继续浏览。",
+        "backToHome": "回到主页",
+        "contactSupport": "联系支持"
+    },
     "Auth": {
         "EmailVerifyRequired": "需要邮箱验证，请先完成验证。",
         "SignInFailed": "登录失败",
@@ -72,7 +78,7 @@
             "Terms": "服务条款",
             "And": "和",
             "Privacy": "隐私政策",
-            "VerifyMatchPattern": "未验证|verify|unverified|exists"
+            "VerifyMatchPattern": "未验证|verify|unverified"
         },
         "SignIn": {
             "AuthFailed": "授权失败：{error}",
@@ -80,6 +86,8 @@
             "SuccessRefreshing": "登录成功，正在刷新…",
             "InvalidCallback": "无效的回调链接，请重试",
             "GithubStartFailed": "启动 GitHub 登录失败",
+            "GoogleStartFailed": "启动 Google 登录失败",
+            "GoogleNotSupportedDesktop": "桌面端暂不支持 Google 登录。",
             "LoginFailedRetry": "登录失败，请稍后重试",
             "NetworkErrorRetry": "网络异常，请稍后重试",
             "ForgotPasswordEmailRequired": "请先输入邮箱，再点“忘记密码”。",
@@ -125,12 +133,36 @@
         "Emails": {
             "ResetPassword": {
                 "Subject": "重置你的密码",
-                "Text": "点击链接重置你的密码：{url}"
+                "Text": "点击链接重置你的密码：{url}",
+                "Intro": "点击下方按钮重置密码。",
+                "BrandName": "Dory",
+                "Button": "重置密码",
+                "Fallback": "如果按钮无法使用，请复制下面的链接到浏览器打开："
             },
             "VerifyEmail": {
                 "Subject": "验证你的邮箱地址",
-                "Text": "点击链接验证你的邮箱：{url}"
+                "Text": "点击链接验证你的邮箱：{url}",
+                "Intro": "点击下方按钮验证你的邮箱。",
+                "BrandName": "Dory",
+                "Button": "验证邮箱",
+                "Fallback": "如果按钮无法使用，请复制下面的链接到浏览器打开："
             }
+        },
+        "ResetPassword": {
+            "Title": "重置密码",
+            "Description": "请输入你的新密码。",
+            "NewPassword": "新密码",
+            "ConfirmPassword": "确认密码",
+            "Submitting": "正在重置…",
+            "Submit": "重置密码",
+            "GoToSignIn": "返回登录",
+            "InvalidLink": "重置链接无效或已过期。",
+            "MissingToken": "缺少重置令牌，请使用邮件中的链接。",
+            "PasswordRequired": "请输入并确认新密码。",
+            "PasswordMismatch": "两次输入的密码不一致。",
+            "Failed": "重置失败，请重试。",
+            "NetworkError": "网络错误，请稍后重试。",
+            "Success": "密码重置成功，现在可以登录了。"
         }
     },
     "HomePage": {

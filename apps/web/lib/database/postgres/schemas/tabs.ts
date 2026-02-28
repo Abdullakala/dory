@@ -1,7 +1,5 @@
 import { integer, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
-import { user } from './auth-schema';
 import { newEntityId } from '@/lib/id';
-import { connections } from './connections';
 import { TabPayload, TabResultMetaPayload } from '@/types/tabs';
 
 export const tabs = pgTable('tabs', {
@@ -10,12 +8,8 @@ export const tabs = pgTable('tabs', {
         .$defaultFn(() => newEntityId()),
     tabType: text('tab_type').notNull().default('sql'),
     tabName: text('tab_name').notNull().default('New Query'),
-    userId: text('user_id')
-        .notNull()
-        .references(() => user.id, { onDelete: 'cascade' }),
-    connectionId: text('connection_id')
-        .notNull()
-        .references(() => connections.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull(),
+    connectionId: text('connection_id').notNull(),
 
     // SQL tabs leave empty; Table tabs fill this
     databaseName: text('database_name'),

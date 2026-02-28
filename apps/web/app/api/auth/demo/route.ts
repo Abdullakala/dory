@@ -51,18 +51,48 @@ export async function POST(req: NextRequest) {
         }
     }
 
-    const { headers } = await auth.api.signInEmail({
+    const response = await auth.api.signInEmail({
         headers: req.headers,
         body: {
             email: DEMO_USER.email,
             password: DEMO_USER.password,
         },
-        returnHeaders: true,
+        asResponse: true,
     });
 
     const res = NextResponse.json({ ok: true });
-    headers?.forEach((value, key) => {
-        res.headers.append(key, value);
+    const isSecureRequest = new URL(req.url).protocol === 'https:';
+    if (isSecureRequest) {
+        response.headers?.forEach((value, key) => {
+            if (key.toLowerCase() === 'set-cookie') {
+                res.headers.append('set-cookie', value);
+            }
+        });
+        return res;
+    }
+
+    response.headers?.forEach((value, key) => {
+        if (key.toLowerCase() !== 'set-cookie') return;
+        const parts = value.split(';');
+        const [nameValue, ...attrs] = parts;
+        let rewrittenNameValue = nameValue;
+        if (!isSecureRequest && /^__Secure-/i.test(nameValue)) {
+            rewrittenNameValue = nameValue.replace(/^__Secure-/i, '');
+        }
+        const rewritten = attrs
+            .map(attr => attr.trim())
+            .filter(attr => !/^domain=/i.test(attr))
+            .map(attr => {
+                if (!isSecureRequest && /^secure$/i.test(attr)) {
+                    return '';
+                }
+                if (!isSecureRequest && /^samesite=none$/i.test(attr)) {
+                    return 'SameSite=Lax';
+                }
+                return attr;
+            })
+            .filter(Boolean);
+        res.headers.append('set-cookie', [rewrittenNameValue, ...rewritten].join('; '));
     });
     return res;
 }

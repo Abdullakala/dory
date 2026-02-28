@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1769399999558,
-      "tag": "0000_complete_tyrannus",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1770019908900,
-      "tag": "0001_noisy_skaar",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1770305788967,
-      "tag": "0002_previous_scream",
+      "when": 1771057082961,
+      "tag": "0000_opposite_baron_strucker",
       "breakpoints": true
     }
   ]

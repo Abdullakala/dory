@@ -17,6 +17,11 @@ type AuthBridge = {
 
 interface Window {
   authBridge?: AuthBridge;
+  themeBridge?: {
+    getTheme: () => Promise<'light' | 'dark' | 'system'>;
+    setTheme: (theme: 'light' | 'dark' | 'system') => Promise<'light' | 'dark' | 'system'>;
+    onThemeChanged: (callback: (theme: 'light' | 'dark' | 'system') => void) => () => void;
+  };
   electron?: {
     platform: string;
     isPackaged: boolean;

@@ -16,3 +16,15 @@ contextBridge.exposeInMainWorld('authBridge', {
         return () => ipcRenderer.removeListener('auth:callback', listener);
     },
 });
+
+contextBridge.exposeInMainWorld('themeBridge', {
+    getTheme: () => ipcRenderer.invoke('theme:get'),
+    setTheme: (theme: 'light' | 'dark' | 'system') => ipcRenderer.invoke('theme:set', theme),
+    onThemeChanged: (callback: (theme: 'light' | 'dark' | 'system') => void) => {
+        const listener = (_event: unknown, theme: 'light' | 'dark' | 'system') => {
+            callback(theme);
+        };
+        ipcRenderer.on('theme:changed', listener);
+        return () => ipcRenderer.removeListener('theme:changed', listener);
+    },
+});

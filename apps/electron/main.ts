@@ -14,6 +14,7 @@ import {
   setPendingAuthCallback,
   setMainWindowQuitting,
 } from './main/window.js';
+import { applyTheme, getStoredTheme, registerThemeIpc } from './main/theme.js';
 import { getUserDataPath } from './paths.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -40,6 +41,9 @@ const serverManager = createStandaloneServerManager({
   logWarn,
   logError,
 });
+
+registerThemeIpc();
+applyTheme(getStoredTheme());
 
 function setupAppMenu() {
   const logFilePath = getMainLogFilePath();

@@ -3,9 +3,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { APP_ID, PROTOCOL, isDev } from './main/constants.js';
 import { ensureDirectoryExists } from './main/filesystem.js';
+import { createMainI18n } from './main/i18n.js';
 import { getMainLogFilePath, setupMainLogger } from './main/logger.js';
 import { registerProtocolClient } from './main/protocol.js';
 import { createStandaloneServerManager } from './main/server.js';
+import { setupUpdater } from './main/updater.js';
 import {
   createMainWindow,
   focusMainWindow,
@@ -45,8 +47,28 @@ const serverManager = createStandaloneServerManager({
 registerThemeIpc();
 applyTheme(getStoredTheme());
 
-function setupAppMenu() {
+function setupAppMenu(options: {
+  onCheckUpdate: () => void;
+  onResetSkippedUpdate: () => void;
+  onOpenUpdateDialogDebug?: () => void;
+  checkForUpdatesLabel: string;
+  resetSkippedUpdateLabel: string;
+  openUpdateDialogDebugLabel: string;
+  openLogLabel: string;
+  openLogFailedTitle: string;
+}) {
   const logFilePath = getMainLogFilePath();
+  const debugMenuItems: MenuItemConstructorOptions[] = [];
+  if (options.onOpenUpdateDialogDebug) {
+    const onOpenUpdateDialogDebug = options.onOpenUpdateDialogDebug;
+    debugMenuItems.push({
+      label: options.openUpdateDialogDebugLabel,
+      click: () => {
+        onOpenUpdateDialogDebug();
+      },
+    });
+  }
+
   const template: MenuItemConstructorOptions[] = [
     { role: 'appMenu' },
     { role: 'fileMenu' },
@@ -57,12 +79,26 @@ function setupAppMenu() {
       role: 'help',
       submenu: [
         {
-          label: 'Open Log',
+          label: options.checkForUpdatesLabel,
+          click: () => {
+            options.onCheckUpdate();
+          },
+        },
+        {
+          label: options.resetSkippedUpdateLabel,
+          click: () => {
+            options.onResetSkippedUpdate();
+          },
+        },
+        ...debugMenuItems,
+        { type: 'separator' },
+        {
+          label: options.openLogLabel,
           click: async () => {
             const result = await shell.openPath(logFilePath);
             if (result) {
               logWarn('[electron] open log file failed:', result);
-              dialog.showErrorBox('Open Log Failed', result);
+              dialog.showErrorBox(options.openLogFailedTitle, result);
             }
           },
         },
@@ -114,8 +150,28 @@ if (!gotLock) {
 
   app.whenReady().then(() => {
     log('[electron] app ready');
+    const { locale, t } = createMainI18n();
+    log('[electron] locale:', locale);
     registerProtocolClient(PROTOCOL, log);
-    setupAppMenu();
+    const updater = setupUpdater({ log, logWarn, logError, locale, t });
+    setupAppMenu({
+      onCheckUpdate: () => {
+        updater.checkForUpdatesFromMenu();
+      },
+      onResetSkippedUpdate: () => {
+        updater.clearSkippedVersionFromMenu();
+      },
+      onOpenUpdateDialogDebug: isDev
+        ? () => {
+            updater.openUpdateDialogDebug();
+          }
+        : undefined,
+      checkForUpdatesLabel: t('menu.checkForUpdates'),
+      resetSkippedUpdateLabel: t('menu.resetSkippedUpdate'),
+      openUpdateDialogDebugLabel: t('menu.openUpdateDialogDebug'),
+      openLogLabel: t('menu.openLog'),
+      openLogFailedTitle: t('error.openLogFailed'),
+    });
 
     const deepLinkArg = process.argv.find(arg => arg.startsWith(`${PROTOCOL}://`));
     if (deepLinkArg) {

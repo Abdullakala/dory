@@ -6,6 +6,14 @@ const assets = [
     src: path.join(__dirname, '../main/splash.html'),
     dest: path.join(__dirname, '../dist-electron/main/splash.html'),
   },
+  {
+    src: path.join(__dirname, '../main/update-available-dialog.html'),
+    dest: path.join(__dirname, '../dist-electron/main/update-available-dialog.html'),
+  },
+  {
+    src: path.join(__dirname, '../main/update-progress-dialog.html'),
+    dest: path.join(__dirname, '../dist-electron/main/update-progress-dialog.html'),
+  },
 ];
 
 for (const asset of assets) {

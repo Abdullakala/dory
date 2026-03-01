@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Software Update</title>
+  <style>
+    :root {
+      --bg: #f3f3f5;
+      --surface: #f3f3f5;
+      --text: #1f2328;
+      --muted: #676b73;
+      --primary: #0a84ff;
+      --btn: #e3e3e7;
+      --logo-bg: #ececef;
+      --logo-border: #d7d7dc;
+      --progress-track: #e2e3e7;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1b1b1d;
+        --surface: #232326;
+        --text: #f4f4f5;
+        --muted: #b7bac1;
+        --btn: #3a3a3f;
+        --logo-bg: #2e2f34;
+        --logo-border: #3f4148;
+        --progress-track: #3a3d45;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      overflow: hidden;
+    }
+
+    .dialog {
+      width: 100%;
+      height: 100%;
+      background: var(--surface);
+      padding: 56px 28px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .content {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+
+    .logo {
+      width: 72px;
+      height: 72px;
+      border-radius: 18px;
+      background: var(--logo-bg);
+      border: 1px solid var(--logo-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      font-weight: 700;
+      flex: none;
+      user-select: none;
+    }
+
+    .main {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .message {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.45;
+      font-weight: 700;
+      letter-spacing: 0.1px;
+    }
+
+    .detail {
+      margin: 4px 0 0;
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--muted);
+      min-height: 18px;
+    }
+
+    .progress {
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--progress-track);
+      overflow: hidden;
+      margin-top: 10px;
+    }
+
+    .bar {
+      height: 100%;
+      width: 0;
+      background: var(--primary);
+      transition: width 160ms linear;
+    }
+
+    .bar.indeterminate {
+      width: 28%;
+      animation: indeterminate 1.15s ease-in-out infinite;
+    }
+
+    @keyframes indeterminate {
+      0% { transform: translateX(-120%); }
+      100% { transform: translateX(370%); }
+    }
+
+    .progress-text {
+      margin-top: 8px;
+      min-height: 16px;
+      font-size: 12px;
+      line-height: 1.4;
+      color: var(--muted);
+    }
+
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: auto;
+    }
+
+    button {
+      min-width: 150px;
+      height: 34px;
+      border: 0;
+      border-radius: 17px;
+      background: var(--btn);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0 18px;
+    }
+
+    button.primary {
+      background: var(--primary);
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="dialog">
+    <div class="content">
+      <div class="logo">◎</div>
+      <div class="main">
+        <p class="message" id="message">Checking for updates...</p>
+        <p class="detail" id="detail">Please wait</p>
+        <div class="progress" id="progressWrap">
+          <div class="bar" id="bar"></div>
+        </div>
+        <div class="progress-text" id="progressText"></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="secondaryBtn">Cancel</button>
+      <button id="primaryBtn" class="primary" style="display:none;">Restart and Install</button>
+    </div>
+  </div>
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    const messageEl = document.getElementById('message');
+    const detailEl = document.getElementById('detail');
+    const barEl = document.getElementById('bar');
+    const progressTextEl = document.getElementById('progressText');
+    const secondaryBtn = document.getElementById('secondaryBtn');
+    const primaryBtn = document.getElementById('primaryBtn');
+
+    let secondaryAction = 'dismiss';
+    let primaryAction = 'restart-now';
+
+    const applyState = state => {
+      document.documentElement.lang = state.lang || 'en';
+      document.title = state.title || 'Software Update';
+      messageEl.textContent = state.message || '';
+      detailEl.textContent = state.detail || '';
+      progressTextEl.textContent = state.progressText || '';
+
+      if (state.progress === null) {
+        barEl.classList.add('indeterminate');
+        barEl.style.width = '';
+      } else {
+        barEl.classList.remove('indeterminate');
+        const clamped = Math.max(0, Math.min(1, Number(state.progress) || 0));
+        barEl.style.width = `${clamped * 100}%`;
+      }
+
+      if (state.secondaryLabel) {
+        secondaryBtn.style.display = 'inline-flex';
+        secondaryBtn.textContent = state.secondaryLabel;
+      } else {
+        secondaryBtn.style.display = 'none';
+      }
+
+      if (state.primaryLabel) {
+        primaryBtn.style.display = 'inline-flex';
+        primaryBtn.textContent = state.primaryLabel;
+      } else {
+        primaryBtn.style.display = 'none';
+      }
+
+      if (state.primaryLabel) {
+        secondaryAction = 'dismiss';
+        primaryAction = 'restart-now';
+      } else {
+        secondaryAction = state.progress === null ? 'dismiss' : 'cancel-download';
+      }
+    };
+
+    secondaryBtn.addEventListener('click', () => {
+      ipcRenderer.send('updater:action', secondaryAction);
+    });
+
+    primaryBtn.addEventListener('click', () => {
+      ipcRenderer.send('updater:action', primaryAction);
+    });
+
+    ipcRenderer.on('updater:progress-state', (_event, state) => {
+      applyState(state);
+    });
+  </script>
+</body>
+</html>

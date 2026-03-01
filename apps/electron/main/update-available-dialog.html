@@ -56,8 +56,8 @@
     }
 
     .logo {
-      width: 58px;
-      height: 58px;
+      width: 64px;
+      height: 64px;
       border-radius: 12px;
       background: transparent;
       border: none;
@@ -116,10 +116,57 @@
     }
 
     .auto-download input {
+      -webkit-appearance: none;
+      appearance: none;
       width: 14px;
       height: 14px;
-      accent-color: var(--primary);
+      border: 1px solid #9b9ea6;
+      border-radius: 4px;
+      background-color: #fff;
       flex: none;
+      margin: 0;
+      display: inline-grid;
+      place-content: center;
+      cursor: pointer;
+      transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+    }
+
+    .auto-download input::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      transform: scale(0);
+      transition: transform 120ms ease;
+      background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.3 4.6 9 10 3.5' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    }
+
+    .auto-download input:hover {
+      border-color: #7f8289;
+    }
+
+    .auto-download input:checked {
+      border-color: var(--primary);
+      background-color: var(--primary);
+    }
+
+    .auto-download input:checked::before {
+      transform: scale(1);
+    }
+
+    .auto-download input:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.35);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .auto-download input {
+        border-color: #6f737d;
+        background-color: #24262b;
+      }
+
+      .auto-download input:hover {
+        border-color: #8a8f99;
+      }
     }
 
     .actions {

@@ -4,6 +4,14 @@
     "extraMetadata": {
         "main": "dist-electron/main.js"
     },
+    "publish": [
+        {
+            "provider": "github",
+            "owner": "dorylab",
+            "repo": "dory",
+            "releaseType": "release"
+        }
+    ],
     "protocols": [
         {
             "name": "Dory Protocol",
@@ -26,6 +34,9 @@
     "asarUnpack": [
         "**/*.node"
     ],
+    "dmg": {
+        "title": "${productName}-${version}-${arch}"
+    },
     "afterSign": "./scripts/notarize.js",
     "mac": {
         "icon": "../web/public/logo.icns",

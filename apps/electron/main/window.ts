@@ -154,6 +154,11 @@ export function hasMainWindow() {
     return Boolean(mainWindow && !mainWindow.isDestroyed());
 }
 
+export function getMainWindow() {
+    if (!mainWindow || mainWindow.isDestroyed()) return null;
+    return mainWindow;
+}
+
 export function setMainWindowQuitting(quitting: boolean) {
     isQuitting = quitting;
 }

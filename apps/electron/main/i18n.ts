@@ -28,6 +28,11 @@ type MessageKey =
     | 'updater.latestVersion'
     | 'updater.ok'
     | 'updater.failed'
+    | 'updater.checkFailedNetwork'
+    | 'updater.checkFailedServer'
+    | 'updater.checkFailedGeneric'
+    | 'updater.installLocationBlocked'
+    | 'updater.installLocationBlockedDetail'
     | 'updater.notConfigured'
     | 'updater.notConfiguredDetail'
     | 'updater.skipCleared';
@@ -59,6 +64,11 @@ const MESSAGES: Record<SupportedLocale, Record<MessageKey, string>> = {
         'updater.latestVersion': '当前已经是最新版本',
         'updater.ok': '知道了',
         'updater.failed': '更新失败',
+        'updater.checkFailedNetwork': '无法连接更新服务器，请检查网络后重试。',
+        'updater.checkFailedServer': '更新服务器暂时不可用，请稍后再试。',
+        'updater.checkFailedGeneric': '检查更新失败，请稍后重试。',
+        'updater.installLocationBlocked': '无法安装更新',
+        'updater.installLocationBlockedDetail': '请将应用移动到“应用程序”文件夹后再重试更新。',
         'updater.notConfigured': '更新功能未配置',
         'updater.notConfiguredDetail': '未找到 app-update.yml，请先在构建配置中设置 publish。',
         'updater.skipCleared': '已恢复跳过版本提醒',
@@ -89,6 +99,11 @@ const MESSAGES: Record<SupportedLocale, Record<MessageKey, string>> = {
         'updater.latestVersion': 'You are up to date.',
         'updater.ok': 'OK',
         'updater.failed': 'Update Failed',
+        'updater.checkFailedNetwork': 'Cannot reach update server. Please check your network and try again.',
+        'updater.checkFailedServer': 'Update server is temporarily unavailable. Please try again later.',
+        'updater.checkFailedGeneric': 'Failed to check for updates. Please try again later.',
+        'updater.installLocationBlocked': 'Cannot Install Update',
+        'updater.installLocationBlockedDetail': 'Move the app to the Applications folder, then try updating again.',
         'updater.notConfigured': 'Updater Not Configured',
         'updater.notConfiguredDetail': 'Missing app-update.yml. Configure publish in electron-builder first.',
         'updater.skipCleared': 'Skipped update preference has been reset.',

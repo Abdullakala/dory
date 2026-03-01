@@ -259,7 +259,7 @@
       ipcRenderer.send('updater:action', 'skip-version');
     });
     secondaryBtn.addEventListener('click', () => {
-      ipcRenderer.send('updater:action', 'dismiss');
+      ipcRenderer.send('updater:action', 'remind-later');
     });
     primaryBtn.addEventListener('click', () => {
       ipcRenderer.send('updater:action', 'install-update');

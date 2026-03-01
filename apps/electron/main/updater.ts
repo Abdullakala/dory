@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, type MessageBoxOptions } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, type MessageBoxOptions } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,7 +7,7 @@ import Store from 'electron-store';
 import { isDev } from './constants.js';
 import type { MainTranslator } from './i18n.js';
 import type { LogFn } from './logger.js';
-import { getMainWindow } from './window.js';
+import { getMainWindow, setMainWindowQuitting } from './window.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,7 +16,7 @@ const { autoUpdater } = electronUpdater;
 type ProgressInfo = import('electron-updater').ProgressInfo;
 type UpdateInfo = import('electron-updater').UpdateInfo;
 
-type UpdateAction = 'dismiss' | 'install-update' | 'cancel-download' | 'restart-now' | 'skip-version';
+type UpdateAction = 'dismiss' | 'install-update' | 'cancel-download' | 'restart-now' | 'skip-version' | 'remind-later';
 
 interface AvailableDialogState {
     lang: string;
@@ -62,15 +62,21 @@ let availableVersion: string | null = null;
 let currentLocale = 'en-US';
 let debugPreviewMode = false;
 let debugProgressTimer: NodeJS.Timeout | null = null;
+let errorDialogOpen = false;
+let lastErrorSignature = '';
+let lastErrorAt = 0;
+let restartInstallInFlight = false;
 
 const updaterPreferenceStore = new Store<{
     autoDownloadInstall: boolean;
     skippedVersion: string | null;
+    remindLaterUntil: number;
 }>({
     name: 'updater-preferences',
     defaults: {
-        autoDownloadInstall: false,
+        autoDownloadInstall: true,
         skippedVersion: null,
+        remindLaterUntil: 0,
     },
 });
 
@@ -86,6 +92,35 @@ function getDialogHtmlPath(fileName: string) {
         return path.resolve(__dirname, '../../main', fileName);
     }
     return path.join(__dirname, fileName);
+}
+
+function getDialogBackgroundColor() {
+    return nativeTheme.shouldUseDarkColors ? '#232326' : '#f3f3f5';
+}
+
+function getCenteredPosition(width: number, height: number) {
+    const main = getMainWindow();
+    if (!main || main.isDestroyed()) return {};
+    const [mx, my] = main.getPosition();
+    const [mw, mh] = main.getSize();
+    return {
+        x: Math.round(mx + (mw - width) / 2),
+        y: Math.round(my + (mh - height) / 2),
+    };
+}
+
+function compareVersions(a: string, b: string) {
+    const clean = (value: string) => value.split('-')[0];
+    const pa = clean(a).split('.').map(part => Number(part));
+    const pb = clean(b).split('.').map(part => Number(part));
+    const length = Math.max(pa.length, pb.length);
+    for (let i = 0; i < length; i += 1) {
+        const av = Number.isFinite(pa[i]) ? pa[i] : 0;
+        const bv = Number.isFinite(pb[i]) ? pb[i] : 0;
+        if (av > bv) return 1;
+        if (av < bv) return -1;
+    }
+    return 0;
 }
 
 function closeAvailableDialog() {
@@ -115,14 +150,49 @@ function stopDebugProgressTimer() {
     debugProgressTimer = null;
 }
 
+function cancelActiveDownload(log: LogFn) {
+    try {
+        const updaterWithCancel = autoUpdater as typeof autoUpdater & {
+            cancelDownload?: () => void;
+        };
+        updaterWithCancel.cancelDownload?.();
+    } catch (error) {
+        log('[updater] cancelDownload failed:', error);
+    }
+}
+
+function getAppBundlePath() {
+    // /path/MyApp.app/Contents/MacOS/MyApp -> /path/MyApp.app
+    return path.resolve(process.execPath, '../../..');
+}
+
+function canInstallUpdateInCurrentLocation() {
+    if (process.platform !== 'darwin') return true;
+    const appBundlePath = getAppBundlePath();
+    if (appBundlePath.startsWith('/Volumes/')) return false;
+    try {
+        fs.accessSync(appBundlePath, fs.constants.W_OK);
+        fs.accessSync(path.dirname(appBundlePath), fs.constants.W_OK);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 function openAvailableDialog(title: string) {
     if (availableDialog && !availableDialog.isDestroyed()) {
         availableDialog.setTitle(title);
+        availableDialog.setMovable(true);
+        const pos = getCenteredPosition(534, 180);
+        if (typeof pos.x === 'number' && typeof pos.y === 'number') {
+            availableDialog.setPosition(pos.x, pos.y);
+        }
         availableDialog.show();
         availableDialog.focus();
         return;
     }
 
+    const pos = getCenteredPosition(534, 180);
     availableDialog = new BrowserWindow({
         width: 534,
         height: 180,
@@ -135,10 +205,10 @@ function openAvailableDialog(title: string) {
         movable: true,
         show: false,
         title,
-        parent: getMainWindow() ?? undefined,
+        ...pos,
         modal: false,
         titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-        backgroundColor: '#f3f3f5',
+        backgroundColor: getDialogBackgroundColor(),
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
@@ -150,6 +220,7 @@ function openAvailableDialog(title: string) {
 
     availableDialog.once('ready-to-show', () => {
         if (!availableDialog || availableDialog.isDestroyed()) return;
+        availableDialog.setMovable(true);
         availableDialog.show();
         if (isDev) {
             availableDialog.webContents.openDevTools({ mode: 'detach', activate: false });
@@ -167,11 +238,17 @@ function openAvailableDialog(title: string) {
 function openProgressDialog(title: string) {
     if (progressDialog && !progressDialog.isDestroyed()) {
         progressDialog.setTitle(title);
+        progressDialog.setMovable(true);
+        const pos = getCenteredPosition(400, 150);
+        if (typeof pos.x === 'number' && typeof pos.y === 'number') {
+            progressDialog.setPosition(pos.x, pos.y);
+        }
         progressDialog.show();
         progressDialog.focus();
         return;
     }
 
+    const pos = getCenteredPosition(400, 150);
     progressDialog = new BrowserWindow({
         width: 400,
         height: 150,
@@ -184,10 +261,10 @@ function openProgressDialog(title: string) {
         movable: true,
         show: false,
         title,
-        parent: getMainWindow() ?? undefined,
+        ...pos,
         modal: false,
-        titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-        backgroundColor: '#f3f3f5',
+        titleBarStyle: 'default',
+        backgroundColor: getDialogBackgroundColor(),
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
@@ -199,6 +276,7 @@ function openProgressDialog(title: string) {
 
     progressDialog.once('ready-to-show', () => {
         if (!progressDialog || progressDialog.isDestroyed()) return;
+        progressDialog.setMovable(true);
         progressDialog.show();
         if (isDev) {
             progressDialog.webContents.openDevTools({ mode: 'detach', activate: false });
@@ -214,21 +292,21 @@ function openProgressDialog(title: string) {
 }
 
 function showAvailableDialog(state: AvailableDialogState) {
-    closeProgressDialog();
     queuedAvailableState = state;
     openAvailableDialog(state.title);
     if (availableDialog && !availableDialog.isDestroyed()) {
         availableDialog.webContents.send('updater:available-state', state);
     }
+    closeProgressDialog();
 }
 
 function showProgressDialog(state: ProgressDialogState) {
-    closeAvailableDialog();
     queuedProgressState = state;
     openProgressDialog(state.title);
     if (progressDialog && !progressDialog.isDestroyed()) {
         progressDialog.webContents.send('updater:progress-state', state);
     }
+    closeAvailableDialog();
 }
 
 function showCheckInProgress(locale: string, t: MainTranslator) {
@@ -354,15 +432,74 @@ function showNoUpdateDialog(t: MainTranslator) {
 }
 
 function showUpdateError(logError: LogFn, t: MainTranslator, error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
+    const rawMessage = error instanceof Error ? error.message : String(error);
+    const compactRaw = rawMessage.replace(/\s+/g, ' ').trim();
     logError('[updater] update flow failed:', error);
+
+    const isGithubFeedError = /github\.com\/.*releases\.atom/i.test(rawMessage);
+    const isServerUnavailable = /\b(502|503|504)\b/.test(rawMessage);
+    const isNetworkError = /(ENOTFOUND|ECONNREFUSED|ETIMEDOUT|EHOSTUNREACH|network)/i.test(rawMessage);
+
+    let message = t('updater.checkFailedGeneric');
+    if (isGithubFeedError && isServerUnavailable) {
+        message = t('updater.checkFailedServer');
+    } else if (isNetworkError) {
+        message = t('updater.checkFailedNetwork');
+    } else if (compactRaw.length > 0) {
+        message = compactRaw.length > 220 ? `${compactRaw.slice(0, 220)}...` : compactRaw;
+    }
+
+    const now = Date.now();
+    const signature = message.trim();
+    const dedupeWindowMs = 5000;
+    if (errorDialogOpen) {
+        logError('[updater] suppress duplicate error dialog while one is open:', signature);
+        return;
+    }
+    if (signature === lastErrorSignature && now - lastErrorAt < dedupeWindowMs) {
+        logError('[updater] suppress duplicate error dialog in cooldown window:', signature);
+        return;
+    }
+    lastErrorSignature = signature;
+    lastErrorAt = now;
 
     const mainWindow = getMainWindow();
     if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.setProgressBar(-1);
     }
+    closeAllDialogs();
 
-    dialog.showErrorBox(t('updater.failed'), message);
+    const options: MessageBoxOptions = {
+        type: 'error',
+        title: t('updater.failed'),
+        message,
+        buttons: [t('updater.ok')],
+        defaultId: 0,
+    };
+
+    errorDialogOpen = true;
+    const result = mainWindow && !mainWindow.isDestroyed()
+        ? dialog.showMessageBox(mainWindow, options)
+        : dialog.showMessageBox(options);
+    result.finally(() => {
+        errorDialogOpen = false;
+    });
+}
+
+function showInstallLocationBlockedDialog(t: MainTranslator) {
+    const options: MessageBoxOptions = {
+        type: 'warning',
+        title: t('updater.installLocationBlocked'),
+        message: t('updater.installLocationBlockedDetail'),
+        buttons: [t('updater.ok')],
+        defaultId: 0,
+    };
+    const mainWindow = getMainWindow();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        void dialog.showMessageBox(mainWindow, options);
+        return;
+    }
+    void dialog.showMessageBox(options);
 }
 
 function handleUpdateAction(log: LogFn, t: MainTranslator, action: UpdateAction) {
@@ -370,6 +507,7 @@ function handleUpdateAction(log: LogFn, t: MainTranslator, action: UpdateAction)
         case 'dismiss': {
             stopDebugProgressTimer();
             closeAllDialogs();
+            // "Restart later": keep downloaded update queued for install on app quit.
             break;
         }
         case 'install-update': {
@@ -389,14 +527,8 @@ function handleUpdateAction(log: LogFn, t: MainTranslator, action: UpdateAction)
             log('[updater] user clicked cancel download');
             if (debugPreviewMode) {
                 stopDebugProgressTimer();
-            }
-            try {
-                const updaterWithCancel = autoUpdater as typeof autoUpdater & {
-                    cancelDownload?: () => void;
-                };
-                updaterWithCancel.cancelDownload?.();
-            } catch (error) {
-                log('[updater] cancelDownload not available:', error);
+            } else {
+                cancelActiveDownload(log);
             }
 
             const mainWindow = getMainWindow();
@@ -412,14 +544,41 @@ function handleUpdateAction(log: LogFn, t: MainTranslator, action: UpdateAction)
                 closeAllDialogs();
                 break;
             }
+            if (!canInstallUpdateInCurrentLocation()) {
+                log('[updater] blocked restart install due to app location:', getAppBundlePath());
+                showInstallLocationBlockedDialog(t);
+                break;
+            }
             log('[updater] quitAndInstall');
-            autoUpdater.quitAndInstall();
+            log('[updater] restart install path:', getAppBundlePath());
+            log('[updater] restart install current version:', app.getVersion());
+            closeAllDialogs();
+            setMainWindowQuitting(true);
+            restartInstallInFlight = true;
+            try {
+                autoUpdater.quitAndInstall(false, true);
+                // Fallback: some environments ignore quitAndInstall silently.
+                setTimeout(() => {
+                    if (!restartInstallInFlight) return;
+                    log('[updater] quitAndInstall fallback -> app.quit()');
+                    app.quit();
+                }, 1500);
+            } catch (error) {
+                log('[updater] quitAndInstall failed, fallback to app.quit():', error);
+                app.quit();
+            }
             break;
         }
         case 'skip-version': {
             if (availableVersion) {
                 updaterPreferenceStore.set('skippedVersion', availableVersion);
             }
+            closeAvailableDialog();
+            break;
+        }
+        case 'remind-later': {
+            const remindLaterMs = 24 * 60 * 60 * 1000;
+            updaterPreferenceStore.set('remindLaterUntil', Date.now() + remindLaterMs);
             closeAvailableDialog();
             break;
         }
@@ -507,6 +666,8 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
 
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.allowPrerelease = false;
+    autoUpdater.allowDowngrade = false;
 
     autoUpdater.on('checking-for-update', () => {
         debugPreviewMode = false;
@@ -521,11 +682,25 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
         checkInProgress = false;
         availableVersion = info.version;
 
+        if (compareVersions(info.version, app.getVersion()) <= 0) {
+            logWarn('[updater] ignored non-newer version:', info.version, 'current:', app.getVersion());
+            closeAllDialogs();
+            isManualCheck = false;
+            return;
+        }
+
         const skippedVersion = updaterPreferenceStore.get('skippedVersion');
         if (skippedVersion && skippedVersion === info.version) {
             log('[updater] skipped version detected, suppress prompt:', info.version);
             closeAllDialogs();
             isManualCheck = false;
+            return;
+        }
+
+        const remindLaterUntil = updaterPreferenceStore.get('remindLaterUntil');
+        if (!isManualCheck && remindLaterUntil > Date.now()) {
+            log('[updater] remind-later active, suppress prompt until:', new Date(remindLaterUntil).toISOString());
+            closeAllDialogs();
             return;
         }
 
@@ -568,6 +743,7 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
         downloadInProgress = false;
         isManualCheck = false;
         availableVersion = null;
+        updaterPreferenceStore.set('remindLaterUntil', 0);
         showDownloaded(locale, t, info);
     });
 
@@ -580,6 +756,13 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
         availableVersion = null;
         closeAllDialogs();
         showUpdateError(logError, t, error);
+    });
+
+    app.on('before-quit', () => {
+        if (restartInstallInFlight) {
+            log('[updater] before-quit while restart install in flight');
+            restartInstallInFlight = false;
+        }
     });
 
     return {

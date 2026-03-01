@@ -70,7 +70,36 @@ function setupAppMenu(options: {
   }
 
   const template: MenuItemConstructorOptions[] = [
-    { role: 'appMenu' },
+    ...(process.platform === 'darwin'
+      ? [{
+          label: app.name,
+          submenu: [
+            { role: 'about' },
+            { type: 'separator' },
+            {
+              label: options.checkForUpdatesLabel,
+              click: () => {
+                options.onCheckUpdate();
+              },
+            },
+            {
+              label: options.resetSkippedUpdateLabel,
+              click: () => {
+                options.onResetSkippedUpdate();
+              },
+            },
+            ...debugMenuItems,
+            { type: 'separator' },
+            { role: 'services' },
+            { type: 'separator' },
+            { role: 'hide' },
+            { role: 'hideOthers' },
+            { role: 'unhide' },
+            { type: 'separator' },
+            { role: 'quit' },
+          ],
+        } satisfies MenuItemConstructorOptions]
+      : []),
     { role: 'fileMenu' },
     { role: 'editMenu' },
     { role: 'viewMenu' },
@@ -78,19 +107,19 @@ function setupAppMenu(options: {
     {
       role: 'help',
       submenu: [
-        {
-          label: options.checkForUpdatesLabel,
-          click: () => {
-            options.onCheckUpdate();
-          },
-        },
-        {
-          label: options.resetSkippedUpdateLabel,
-          click: () => {
-            options.onResetSkippedUpdate();
-          },
-        },
-        ...debugMenuItems,
+        ...(process.platform !== 'darwin'
+          ? [{
+              label: options.checkForUpdatesLabel,
+              click: () => {
+                options.onCheckUpdate();
+              },
+            }, {
+              label: options.resetSkippedUpdateLabel,
+              click: () => {
+                options.onResetSkippedUpdate();
+              },
+            }, ...debugMenuItems]
+          : []),
         { type: 'separator' },
         {
           label: options.openLogLabel,
@@ -150,6 +179,9 @@ if (!gotLock) {
 
   app.whenReady().then(() => {
     log('[electron] app ready');
+    log('[electron] version:', app.getVersion());
+    log('[electron] execPath:', process.execPath);
+    log('[electron] appPath:', app.getAppPath());
     const { locale, t } = createMainI18n();
     log('[electron] locale:', locale);
     registerProtocolClient(PROTOCOL, log);

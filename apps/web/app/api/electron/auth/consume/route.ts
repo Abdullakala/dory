@@ -59,7 +59,7 @@ async function createLocalSession(user: TicketUser) {
         return NextResponse.json({ error: 'failed_to_create_session' }, { status: 500 });
     }
 
-    const maxAge = ctx.sessionConfig?.expiresIn ?? ctx.options.session?.expiresIn;
+    const maxAge = ctx.sessionConfig?.expiresIn;
     const baseAttrs = ctx.authCookies.sessionToken.attributes;
     const adjustedAttrs = {
         ...baseAttrs,

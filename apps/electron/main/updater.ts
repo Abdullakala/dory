@@ -569,7 +569,34 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
     currentLocale = locale;
     const updateConfigPath = path.join(process.resourcesPath, 'app-update.yml');
     const hasUpdateConfig = fs.existsSync(updateConfigPath);
-    if (!hasUpdateConfig) {
+    const devUpdateConfigPath = (() => {
+        if (!isDev) return null;
+        const candidates = [
+            path.resolve(process.cwd(), 'dev-app-update.yml'),
+            path.join(app.getAppPath(), 'dev-app-update.yml'),
+            path.resolve(__dirname, '..', 'dev-app-update.yml'),
+        ];
+        for (const candidate of candidates) {
+            if (fs.existsSync(candidate)) return candidate;
+        }
+        return null;
+    })();
+    const hasDevUpdateConfig = Boolean(devUpdateConfigPath);
+    if (hasDevUpdateConfig && devUpdateConfigPath) {
+        autoUpdater.forceDevUpdateConfig = true;
+        autoUpdater.updateConfigPath = devUpdateConfigPath;
+        log('[updater] dev update config enabled:', devUpdateConfigPath);
+    }
+    const devFeedUrl = isDev ? (process.env.ELECTRON_UPDATER_URL || '').trim() : '';
+    if (devFeedUrl && !hasDevUpdateConfig) {
+        try {
+            autoUpdater.setFeedURL({ provider: 'generic', url: devFeedUrl });
+            log('[updater] dev feed URL set:', devFeedUrl);
+        } catch (error) {
+            logWarn('[updater] failed to set dev feed URL:', error);
+        }
+    }
+    if (!hasUpdateConfig && !hasDevUpdateConfig && !devFeedUrl) {
         logWarn('[updater] app-update.yml not found, updater disabled:', updateConfigPath);
     }
 
@@ -662,7 +689,7 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
         return true;
     });
 
-    if (!hasUpdateConfig) {
+    if (!hasUpdateConfig && !hasDevUpdateConfig && !devFeedUrl) {
         return {
             checkForUpdatesFromMenu: async () => {
                 debugPreviewMode = false;
@@ -710,6 +737,10 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
 
         if (compareVersions(info.version, app.getVersion()) <= 0) {
             logWarn('[updater] ignored non-newer version:', info.version, 'current:', app.getVersion());
+            updateRendererUpdaterState({
+                readyToInstall: false,
+                version: null,
+            });
             closeAllDialogs();
             isManualCheck = false;
             return;
@@ -757,6 +788,10 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
         debugPreviewMode = false;
         log('[updater] update-not-available:', info.version);
         checkInProgress = false;
+        updateRendererUpdaterState({
+            readyToInstall: false,
+            version: null,
+        });
         closeAllDialogs();
         if (isManualCheck) {
             showNoUpdateDialog(t);

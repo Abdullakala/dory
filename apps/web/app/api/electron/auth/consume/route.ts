@@ -111,7 +111,7 @@ async function consumeTicketLocally(ticket: string) {
     }
 
     if (verification.expiresAt < new Date()) {
-        await ctx.internalAdapter.deleteVerificationValue(verification.id);
+        await ctx.internalAdapter.deleteVerificationByIdentifier(ticket);
         return NextResponse.json({ error: 'ticket_expired' }, { status: 401 });
     }
 
@@ -124,11 +124,11 @@ async function consumeTicketLocally(ticket: string) {
 
     const user = parsed?.user;
     if (!user) {
-        await ctx.internalAdapter.deleteVerificationValue(verification.id);
+        await ctx.internalAdapter.deleteVerificationByIdentifier(ticket);
         return NextResponse.json({ error: 'invalid_ticket_payload' }, { status: 400 });
     }
 
-    await ctx.internalAdapter.deleteVerificationValue(verification.id);
+    await ctx.internalAdapter.deleteVerificationByIdentifier(ticket);
     return NextResponse.json({ user });
 }
 

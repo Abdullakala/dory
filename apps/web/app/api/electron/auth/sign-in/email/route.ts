@@ -60,7 +60,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'failed_to_create_session' }, { status: 500 });
     }
 
-    const maxAge = ctx.sessionConfig?.expiresIn ?? ctx.options.session?.expiresIn;
+    const maxAge = ctx.sessionConfig?.expiresIn;
     const cookie = await serializeSignedCookie(
         ctx.authCookies.sessionToken.name,
         session.token,

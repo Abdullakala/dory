@@ -338,8 +338,11 @@ async function handleChatRequest(req: NextRequest) {
         toolChoice: 'auto',
         temperature: preset.temperature,
         maxSteps: 1,
-        model: providerModelName,
+        // Desktop runtime proxies to cloud. In that path, do not forward
+        // client-selected local model names (e.g. gpt-4o); let cloud env resolve.
+        model: useCloud ? null : providerModelName,
     };
+    const forwardedModel = baseCloudPayload.model ?? null;
 
     let initialCloudResponse: Awaited<
         ReturnType<typeof fetchCloudUiMessageStream>
@@ -348,7 +351,7 @@ async function handleChatRequest(req: NextRequest) {
     try {
         console.info(useCloud ? '[chat] cloud request start' : '[chat] local request start', {
             url: cloudUrl,
-            model: providerModelName,
+            model: forwardedModel,
             messageCount: modelMessages.length,
         });
         initialCloudResponse = await fetchCloudUiMessageStream({

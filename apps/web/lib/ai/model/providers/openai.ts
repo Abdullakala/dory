@@ -7,13 +7,19 @@ export type OpenAIProviderOptions = {
     project?: string;
 };
 
+function normalizeBaseURL(baseURL: string) {
+    const trimmed = baseURL.trim().replace(/\/+$/, '');
+    return trimmed.replace(/\/chat\/completions$/i, '');
+}
+
 export function createOpenAIProvider(options: OpenAIProviderOptions = {}) {
     const apiKey = options.apiKey ?? process.env.DORY_AI_API_KEY;
     if (!apiKey) {
         throw new Error('DORY_AI_API_KEY is required');
     }
 
-    const baseURL = options.baseURL ?? process.env.DORY_AI_URL;
+    const rawBaseURL = options.baseURL ?? process.env.DORY_AI_URL;
+    const baseURL = rawBaseURL ? normalizeBaseURL(rawBaseURL) : undefined;
 
     const organization = options.organization;
     const project = options.project;

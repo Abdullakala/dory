@@ -5,13 +5,16 @@ export type CloudflareGatewayOptions = {
     accountId?: string;
     gateway?: string;
     apiKey?: string;
+    cfAigToken?: string;
     defaultProvider?: string;
+    baseURL?: string;
 };
 
 type CloudflareGatewayConfig = {
     accountId: string;
     gateway: string;
     token: string;
+    defaultProvider: string;
 };
 
 function parseGatewayUrl(baseURL?: string | null) {
@@ -38,11 +41,13 @@ function resolveConfig(options: CloudflareGatewayOptions): CloudflareGatewayConf
     const accountId =
         options.accountId ??
         process.env.DORY_AI_CF_ACCOUNT_ID ??
+        process.env.DORY_AI_CLOUDFLARE_ACCOUNT_ID ??
         parsed?.accountId ??
         '';
     const gateway =
         options.gateway ??
         process.env.DORY_AI_CF_GATEWAY ??
+        process.env.DORY_AI_CLOUDFLARE_GATEWAY ??
         parsed?.gateway ??
         '';
     const token =
@@ -51,6 +56,10 @@ function resolveConfig(options: CloudflareGatewayOptions): CloudflareGatewayConf
         process.env.DORY_AI_CF_AIG_TOKEN ??
         process.env.DORY_AI_API_KEY ??
         '';
+    const defaultProvider =
+        options.defaultProvider ??
+        process.env.DORY_AI_CLOUDFLARE_DEFAULT_PROVIDER ??
+        'openai';
 
     if (!accountId) {
         throw new Error('DORY_AI_CF_ACCOUNT_ID is required (or set DORY_AI_URL with /v1/{account}/{gateway}/compat)');
@@ -62,30 +71,15 @@ function resolveConfig(options: CloudflareGatewayOptions): CloudflareGatewayConf
         throw new Error('DORY_AI_CF_AIG_TOKEN is required');
     }
 
-    return { accountId, gateway, token };
+    return { accountId, gateway, token, defaultProvider };
 }
 
 export function createCloudflareGatewayProvider(options: CloudflareGatewayOptions = {}) {
-    const accountId = options.accountId ?? process.env.DORY_AI_CLOUDFLARE_ACCOUNT_ID;
-    if (!accountId) {
-        throw new Error('DORY_AI_CLOUDFLARE_ACCOUNT_ID is required');
-    }
-
-    const gateway = options.gateway ?? process.env.DORY_AI_CLOUDFLARE_GATEWAY;
-    if (!gateway) {
-        throw new Error('DORY_AI_CLOUDFLARE_GATEWAY is required');
-    }
-
-    const apiKey = options.apiKey ?? process.env.DORY_AI_CF_AIG_TOKEN;
-    if (!apiKey) {
-        throw new Error('DORY_AI_CF_AIG_TOKEN is required');
-    }
-
-    const defaultProvider = options.defaultProvider ?? process.env.DORY_AI_CLOUDFLARE_DEFAULT_PROVIDER ?? 'openai';
+    const { accountId, gateway, token, defaultProvider } = resolveConfig(options);
     const aiGateway = createAiGateway({
         accountId,
         gateway,
-        apiKey,
+        apiKey: token,
     });
     const unified = createUnified();
 

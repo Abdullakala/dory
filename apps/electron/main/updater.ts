@@ -65,6 +65,7 @@ let checkInProgress = false;
 let downloadInProgress = false;
 let downloadCanceledByUser = false;
 let shouldAutoInstallAfterDownload = false;
+let showDownloadProgressDialog = false;
 let availableVersion: string | null = null;
 let currentLocale = 'en-US';
 let debugPreviewMode = false;
@@ -496,6 +497,7 @@ function handleUpdateAction(log: LogFn, t: MainTranslator, action: UpdateAction)
             log('[updater] download requested by user');
             downloadCanceledByUser = false;
             shouldAutoInstallAfterDownload = true;
+            showDownloadProgressDialog = true;
             showDownloadPending(currentLocale, t);
             closeAvailableDialog();
             if (debugPreviewMode) {
@@ -513,6 +515,7 @@ function handleUpdateAction(log: LogFn, t: MainTranslator, action: UpdateAction)
             log('[updater] user clicked cancel download');
             downloadCanceledByUser = true;
             shouldAutoInstallAfterDownload = false;
+            showDownloadProgressDialog = false;
             if (debugPreviewMode) {
                 stopDebugProgressTimer();
             } else {
@@ -770,18 +773,21 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
 
         const autoDownloadInstall = updaterPreferenceStore.get('autoDownloadInstall');
         if (autoDownloadInstall) {
-            log('[updater] autoDownloadInstall enabled, start download immediately');
-            shouldAutoInstallAfterDownload = true;
+            log('[updater] autoDownloadInstall enabled, start silent background download');
+            shouldAutoInstallAfterDownload = false;
+            showDownloadProgressDialog = false;
             downloadInProgress = true;
             autoUpdater.downloadUpdate().catch((error: unknown) => {
                 downloadInProgress = false;
                 shouldAutoInstallAfterDownload = false;
+                showDownloadProgressDialog = false;
                 showUpdateError(logError, error);
             });
             return;
         }
 
         shouldAutoInstallAfterDownload = false;
+        showDownloadProgressDialog = false;
         closeAllDialogs();
         log('[updater] auto check found update, suppress available dialog until manual check');
     });
@@ -809,7 +815,9 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
         if (!downloadInProgress) {
             downloadInProgress = true;
         }
-        showDownloading(locale, t, progress);
+        if (showDownloadProgressDialog) {
+            showDownloading(locale, t, progress);
+        }
     });
 
     autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
@@ -821,6 +829,7 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
         updaterPreferenceStore.set('remindLaterUntil', 0);
         const autoInstallNow = shouldAutoInstallAfterDownload && !downloadCanceledByUser;
         shouldAutoInstallAfterDownload = false;
+        showDownloadProgressDialog = false;
         downloadCanceledByUser = false;
         markUpdateReadyToInstall(log, info);
         if (autoInstallNow) {
@@ -836,6 +845,7 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
         downloadInProgress = false;
         downloadCanceledByUser = false;
         shouldAutoInstallAfterDownload = false;
+        showDownloadProgressDialog = false;
         isManualCheck = false;
         availableVersion = null;
         closeAllDialogs();
@@ -870,6 +880,7 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
             downloadInProgress = false;
             downloadCanceledByUser = false;
             shouldAutoInstallAfterDownload = false;
+            showDownloadProgressDialog = false;
             isManualCheck = false;
             availableVersion = null;
             closeAllDialogs();

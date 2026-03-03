@@ -612,32 +612,18 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
             return;
         }
 
-        const remindLaterUntil = updaterPreferenceStore.get('remindLaterUntil');
-        if (!isManualCheck && remindLaterUntil > Date.now()) {
-            log('[updater] remind-later active, suppress prompt until:', new Date(remindLaterUntil).toISOString());
-            closeAllDialogs();
-            return;
-        }
-
-        const autoDownloadInstall = updaterPreferenceStore.get('autoDownloadInstall');
-        if (autoDownloadInstall) {
-            log('[updater] autoDownloadInstall enabled, start silent background download');
-            shouldAutoInstallAfterDownload = false;
-            showDownloadProgressDialog = false;
-            downloadInProgress = true;
-            autoUpdater.downloadUpdate().catch((error: unknown) => {
-                downloadInProgress = false;
-                shouldAutoInstallAfterDownload = false;
-                showDownloadProgressDialog = false;
-                showUpdateError(logError, error);
-            });
-            return;
-        }
-
+        // Auto checks should always fetch the update package in background so renderer can show
+        // "ready to install" state without extra user action.
+        log('[updater] auto check found update, start silent background download');
         shouldAutoInstallAfterDownload = false;
         showDownloadProgressDialog = false;
-        closeAllDialogs();
-        log('[updater] auto check found update, suppress available dialog until manual check');
+        downloadInProgress = true;
+        autoUpdater.downloadUpdate().catch((error: unknown) => {
+            downloadInProgress = false;
+            shouldAutoInstallAfterDownload = false;
+            showDownloadProgressDialog = false;
+            showUpdateError(logError, error);
+        });
     });
 
     autoUpdater.on('update-not-available', (info: UpdateInfo) => {

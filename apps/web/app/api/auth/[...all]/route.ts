@@ -3,6 +3,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 import { getAuth } from '@/lib/auth';
+import { proxyAuthRequest, shouldProxyAuthRequest } from '@/lib/auth/auth-proxy';
 
 function getSetCookies(headers: Headers): string[] {
     const anyHeaders = headers as unknown as { getSetCookie?: () => string[] };
@@ -18,14 +19,22 @@ function getSetCookies(headers: Headers): string[] {
 function rewriteSetCookie(value: string, isSecureRequest: boolean): string {
     const parts = value.split(';');
     const [nameValue, ...attrs] = parts;
+    const normalizedAttrs = attrs.map(attr => attr.trim());
+    const isClearingCookie =
+        /=\s*$/.test(nameValue) ||
+        normalizedAttrs.some(attr => /^max-age=0$/i.test(attr)) ||
+        normalizedAttrs.some(attr => /^expires=/i.test(attr));
 
     let rewrittenNameValue = nameValue;
     if (!isSecureRequest && /^__Secure-/i.test(nameValue)) {
+        // Avoid turning secure-cookie cleanup into non-secure cleanup on localhost/http.
+        if (isClearingCookie) {
+            return '';
+        }
         rewrittenNameValue = nameValue.replace(/^__Secure-/i, '');
     }
 
-    const rewritten = attrs
-        .map(attr => attr.trim())
+    const rewritten = normalizedAttrs
         .filter(attr => !/^domain=/i.test(attr))
         .map(attr => {
             if (!isSecureRequest && /^secure$/i.test(attr)) {
@@ -63,12 +72,18 @@ function rewriteAuthResponse(req: Request, res: Response): Response {
 }
 
 export async function GET(req: Request) {
+    if (shouldProxyAuthRequest()) {
+        return proxyAuthRequest(req);
+    }
     const auth = await getAuth();
     const res = await auth.handler(req);
     return rewriteAuthResponse(req, res);
 }
 
 export async function POST(req: Request) {
+    if (shouldProxyAuthRequest()) {
+        return proxyAuthRequest(req);
+    }
     const auth = await getAuth();
     const res = await auth.handler(req);
     return rewriteAuthResponse(req, res);

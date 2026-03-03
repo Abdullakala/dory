@@ -32,5 +32,9 @@ export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}
         }
     }
 
-    return fetch(resolvedInput, { ...init, headers });
+    return fetch(resolvedInput, {
+        ...init,
+        headers,
+        credentials: init.credentials ?? 'include',
+    });
 }

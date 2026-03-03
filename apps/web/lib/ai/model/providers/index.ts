@@ -44,12 +44,21 @@ function getProvider(providerKey: string): ChatProvider {
 function resolveProviderAndModel(modelName: string) {
     const trimmed = modelName.trim();
     const [prefix, rest] = trimmed.split('/', 2);
+    const envProvider = (process.env.DORY_AI_PROVIDER ?? 'openai').toLowerCase();
+    const isCloudflareProvider =
+        envProvider === 'cloudflare' || envProvider === 'cloudflare-gateway';
+
     if (rest && providerFactories[prefix.toLowerCase()]) {
+        // For Cloudflare Gateway, model prefixes like "openai/gpt-4o-mini"
+        // are upstream model IDs, not local provider selectors.
+        if (isCloudflareProvider && prefix.toLowerCase() !== 'cloudflare' && prefix.toLowerCase() !== 'cloudflare-gateway') {
+            return { providerKey: envProvider, model: trimmed };
+        }
         return { providerKey: prefix, model: rest };
     }
 
     return {
-        providerKey: process.env.DORY_AI_PROVIDER ?? 'openai',
+        providerKey: envProvider,
         model: trimmed || process.env.DORY_AI_MODEL || trimmed,
     };
 }

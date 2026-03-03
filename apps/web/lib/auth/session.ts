@@ -36,6 +36,8 @@ export async function getSessionFromRequest(req?: NextRequest) {
     const proxied = shouldProxyAuthRequest();
     const strictProxyOnly = proxied && process.env.DORY_AUTH_PROXY_STRICT !== '0';
     const cookieNames = getCookieNamesFromHeader(reqHeaders.get('cookie'));
+    const requestHost = reqHeaders.get('host');
+    const requestUrl = req?.url ?? null;
 
     if (proxied) {
         const sessionUrl = getCloudAuthSessionUrl();
@@ -50,6 +52,8 @@ export async function getSessionFromRequest(req?: NextRequest) {
                     hasCloudBase: Boolean(cloudBase),
                     status: res.status,
                     ok: res.ok,
+                    requestHost,
+                    requestUrl,
                     cookieNames,
                 });
                 if (res.ok) {
@@ -59,6 +63,8 @@ export async function getSessionFromRequest(req?: NextRequest) {
                             runtime,
                             hasCloudBase: Boolean(cloudBase),
                             status: res.status,
+                            requestHost,
+                            requestUrl,
                             cookieNames,
                         });
                         return session;
@@ -67,6 +73,8 @@ export async function getSessionFromRequest(req?: NextRequest) {
                         runtime,
                         hasCloudBase: Boolean(cloudBase),
                         status: res.status,
+                        requestHost,
+                        requestUrl,
                         cookieNames,
                     });
                 } else {
@@ -74,6 +82,8 @@ export async function getSessionFromRequest(req?: NextRequest) {
                         runtime,
                         hasCloudBase: Boolean(cloudBase),
                         status: res.status,
+                        requestHost,
+                        requestUrl,
                         cookieNames,
                     });
                 }
@@ -81,6 +91,8 @@ export async function getSessionFromRequest(req?: NextRequest) {
                 console.warn('[auth/session] cloud fetch threw', {
                     runtime,
                     hasCloudBase: Boolean(cloudBase),
+                    requestHost,
+                    requestUrl,
                     cookieNames,
                 });
             }
@@ -90,6 +102,8 @@ export async function getSessionFromRequest(req?: NextRequest) {
             console.warn('[auth/session] proxy mode enabled, skip local fallback (strict)', {
                 runtime,
                 hasCloudBase: Boolean(cloudBase),
+                requestHost,
+                requestUrl,
                 cookieNames,
             });
             return null;
@@ -98,6 +112,8 @@ export async function getSessionFromRequest(req?: NextRequest) {
         console.warn('[auth/session] cloud session unavailable, fallback to local auth', {
             runtime,
             hasCloudBase: Boolean(cloudBase),
+            requestHost,
+            requestUrl,
             cookieNames,
         });
     }
@@ -112,6 +128,8 @@ export async function getSessionFromRequest(req?: NextRequest) {
         console.info('[auth/session] resolved via local auth', {
             runtime,
             hasCloudBase: Boolean(cloudBase),
+            requestHost,
+            requestUrl,
             cookieNames,
         });
         return session;
@@ -121,6 +139,8 @@ export async function getSessionFromRequest(req?: NextRequest) {
         runtime,
         hasCloudBase: Boolean(cloudBase),
         proxied,
+        requestHost,
+        requestUrl,
         cookieNames,
     });
 

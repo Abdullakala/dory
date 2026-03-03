@@ -31,14 +31,23 @@ function getSetCookies(headers: Headers): string[] {
 function rewriteSetCookie(value: string, isSecureRequest: boolean): string {
     const parts = value.split(';');
     const [nameValue, ...attrs] = parts;
+    const normalizedAttrs = attrs.map(attr => attr.trim());
+    const isClearingCookie =
+        /=\s*$/.test(nameValue) ||
+        normalizedAttrs.some(attr => /^max-age=0$/i.test(attr)) ||
+        normalizedAttrs.some(attr => /^expires=/i.test(attr));
 
     let rewrittenNameValue = nameValue;
     if (!isSecureRequest && /^__Secure-/i.test(nameValue)) {
+        // Do not convert "__Secure-foo=; Max-Age=0" into "foo=; Max-Age=0",
+        // otherwise a secure-cookie cleanup would accidentally delete non-secure session.
+        if (isClearingCookie) {
+            return '';
+        }
         rewrittenNameValue = nameValue.replace(/^__Secure-/i, '');
     }
 
-    const rewritten = attrs
-        .map(attr => attr.trim())
+    const rewritten = normalizedAttrs
         .filter(attr => !/^domain=/i.test(attr))
         .map(attr => {
             if (!isSecureRequest && /^secure$/i.test(attr)) {

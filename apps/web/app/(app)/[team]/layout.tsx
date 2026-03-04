@@ -44,7 +44,7 @@ export default async function TeamLayout({ children, params }: { children: React
                 } as React.CSSProperties
             }
         >
-            <AppSidebar variant="inset" collapsible="icon" />
+            <AppSidebar variant="inset" collapsible="icon" initialUser={session.user as any} />
             <SidebarInset className="flex flex-col h-screen min-h-0" style={{ height: 'calc(100vh - 1rem)', width: 'calc(100% - 248px)' }}>
                 <AppContentShell>{children}</AppContentShell>
             </SidebarInset>

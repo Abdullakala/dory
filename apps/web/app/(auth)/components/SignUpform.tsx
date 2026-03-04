@@ -33,9 +33,10 @@ export function SignUpForm({ className, ...props }: React.ComponentProps<'div'>)
             const email = String(fd.get('email') ?? '').trim();
             const password = String(fd.get('password') ?? '');
             const name = String(fd.get('name') ?? (email.split('@')[0] || ''));
+            const callbackURL = window.authBridge?.openExternal ? 'dory://auth-complete' : '/';
 
             const { error } = await authClient.signUp.email(
-                { name, email, password, callbackURL: '/' },
+                { name, email, password, callbackURL },
                 {
                     onError(ctx) {
                         //The error message of better-auth is presented directly

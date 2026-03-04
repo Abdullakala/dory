@@ -29,10 +29,11 @@ export function VerifyEmailPanel(props: {
         setMsg(null);
         setLoading(true);
         try {
+            const callbackURL = window.authBridge?.openExternal ? 'dory://auth-complete' : '/';
             const res = await authFetch('/api/auth/resend-verification', {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ email }),
+                body: JSON.stringify({ email, callbackURL }),
             });
             const data = await res.json();
             if (!res.ok) {

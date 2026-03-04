@@ -10,8 +10,7 @@ import { v7 as uuidv7 } from 'uuid';
 import { getClient } from './database/postgres/client';
 import { getServerLocale } from './i18n/server-locale';
 import { translate } from './i18n/i18n';
-
-let _authPromise: ReturnType<typeof createAuth> | null = null;
+import { createCachedAsyncFactory } from '@dory/auth-core';
 
 // User type with defaultTeamId, used for narrowing in hooks
 type UserWithDefaultTeam = {
@@ -252,7 +251,8 @@ function createAuth() {
     })();
 }
 
+const getCachedAuth = createCachedAsyncFactory(createAuth);
+
 export async function getAuth() {
-    if (!_authPromise) _authPromise = createAuth();
-    return _authPromise;
+    return getCachedAuth();
 }

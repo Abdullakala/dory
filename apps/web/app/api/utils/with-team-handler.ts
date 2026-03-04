@@ -14,13 +14,86 @@ type TeamHandlerContext = {
     teamId: string;
 };
 
+type UserHandlerContext = Omit<TeamHandlerContext, 'teamId'> & {
+    userId: string;
+};
+
 type UserTeamHandlerContext = Omit<TeamHandlerContext, 'userId'> & {
     userId: string;
 };
 
 type TeamHandlerFn = (ctx: TeamHandlerContext) => Promise<Response>;
+type UserHandlerFn = (ctx: UserHandlerContext) => Promise<Response>;
 type UserTeamHandlerFn = (ctx: UserTeamHandlerContext) => Promise<Response>;
+type PlatformAdminHandlerFn = (ctx: UserHandlerContext) => Promise<Response>;
 
+function parseCsvEnv(name: string): string[] {
+    const raw = process.env[name];
+    if (!raw) return [];
+    return raw
+        .split(',')
+        .map(v => v.trim())
+        .filter(Boolean);
+}
+
+function isPlatformAdmin(session: Awaited<ReturnType<typeof getSessionFromRequest>>): boolean {
+    const user = session?.user;
+    if (!user) return false;
+
+    const adminIds = new Set(parseCsvEnv('DORY_PLATFORM_ADMIN_IDS'));
+    const adminEmails = new Set(parseCsvEnv('DORY_PLATFORM_ADMIN_EMAILS').map(email => email.toLowerCase()));
+
+    if (user.id && adminIds.has(user.id)) return true;
+    if (user.email && adminEmails.has(user.email.toLowerCase())) return true;
+
+    return false;
+}
+
+async function withHandlerErrorBoundary(handler: () => Promise<Response>) {
+    const locale = await getApiLocale();
+
+    try {
+        return await handler();
+    } catch (err: any) {
+        return NextResponse.json(
+            ResponseUtil.error({
+                code: ErrorCodes.DATABASE_ERROR,
+                message: err?.message ?? translateApi('Api.Errors.InternalError', undefined, locale),
+                error: err,
+            }),
+            { status: 500 },
+        );
+    }
+}
+
+export function withUserHandler(handler: UserHandlerFn) {
+    return async function routeHandler(req: NextRequest): Promise<Response> {
+        const locale = await getApiLocale();
+        const session = await getSessionFromRequest(req);
+        const userId = session?.user?.id ?? null;
+
+        if (!userId) {
+            return NextResponse.json(
+                ResponseUtil.error({
+                    code: ErrorCodes.UNAUTHORIZED,
+                    message: translateApi('Api.Errors.Unauthorized', undefined, locale),
+                }),
+                { status: 401 },
+            );
+        }
+
+        const db = await getDBService();
+
+        return withHandlerErrorBoundary(async () => {
+            return handler({
+                req,
+                db,
+                session,
+                userId,
+            });
+        });
+    };
+}
 
 export function withTeamHandler(handler: TeamHandlerFn) {
     return async function routeHandler(req: NextRequest): Promise<Response> {
@@ -41,28 +114,17 @@ export function withTeamHandler(handler: TeamHandlerFn) {
 
         const db = await getDBService();
 
-        try {
-            return await handler({
+        return withHandlerErrorBoundary(async () => {
+            return handler({
                 req,
                 db,
                 session,
                 userId,
                 teamId,
             });
-        } catch (err: any) {
-            
-            return NextResponse.json(
-                ResponseUtil.error({
-                    code: ErrorCodes.DATABASE_ERROR,
-                    message: err?.message ?? translateApi('Api.Errors.InternalError', undefined, locale),
-                    error: err,
-                }),
-                { status: 500 },
-            );
-        }
+        });
     };
 }
-
 
 export function withUserAndTeamHandler(handler: UserTeamHandlerFn) {
     return async function routeHandler(req: NextRequest): Promise<Response> {
@@ -93,23 +155,53 @@ export function withUserAndTeamHandler(handler: UserTeamHandlerFn) {
 
         const db = await getDBService();
 
-        try {
-            return await handler({
+        return withHandlerErrorBoundary(async () => {
+            return handler({
                 req,
                 db,
                 session,
-                userId: userId as string,
+                userId,
                 teamId,
             });
-        } catch (err: any) {
+        });
+    };
+}
+
+export function withPlatformAdminHandler(handler: PlatformAdminHandlerFn) {
+    return async function routeHandler(req: NextRequest): Promise<Response> {
+        const locale = await getApiLocale();
+        const session = await getSessionFromRequest(req);
+        const userId = session?.user?.id ?? null;
+
+        if (!userId) {
             return NextResponse.json(
                 ResponseUtil.error({
-                    code: ErrorCodes.DATABASE_ERROR,
-                    message: err?.message ?? translateApi('Api.Errors.InternalError', undefined, locale),
-                    error: err,
+                    code: ErrorCodes.UNAUTHORIZED,
+                    message: translateApi('Api.Errors.Unauthorized', undefined, locale),
                 }),
-                { status: 500 },
+                { status: 401 },
             );
         }
+
+        if (!isPlatformAdmin(session)) {
+            return NextResponse.json(
+                ResponseUtil.error({
+                    code: ErrorCodes.FORBIDDEN,
+                    message: 'Forbidden',
+                }),
+                { status: 403 },
+            );
+        }
+
+        const db = await getDBService();
+
+        return withHandlerErrorBoundary(async () => {
+            return handler({
+                req,
+                db,
+                session,
+                userId,
+            });
+        });
     };
 }

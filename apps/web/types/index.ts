@@ -9,3 +9,4 @@ export * from "./chat";
 export * from "./connector";
 export * from "./assistant";
 export * from "./ai-schema-cache";
+export * from "./ai-usage";

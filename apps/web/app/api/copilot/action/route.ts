@@ -10,7 +10,7 @@ import { withUserAndTeamHandler } from '@/app/api/utils/with-team-handler';
 import { isMissingAiEnvError } from '@/lib/ai/errors';
 import { USE_CLOUD_AI } from '@/app/config/app';
 
-export const POST = withUserAndTeamHandler(async ({ req }) => {
+export const POST = withUserAndTeamHandler(async ({ req, teamId, userId }) => {
     const locale = await getServerLocale();
     try {
         const body = (await req.json()) as { intent?: ActionIntent; input?: CopilotFixInput; model?: string | null };
@@ -57,7 +57,11 @@ export const POST = withUserAndTeamHandler(async ({ req }) => {
             return new NextResponse(translate(locale, 'SqlConsole.Copilot.Errors.InvalidRequest'), { status: 400 });
         }
 
-        const result = await runQuickActionServer(body.intent, { ...body.input, model: requestedModel }, { locale });
+        const result = await runQuickActionServer(
+            body.intent,
+            { ...body.input, model: requestedModel },
+            { locale, teamId, userId },
+        );
         return NextResponse.json(result);
     } catch (e: any) {
         const rawMessage = typeof e?.message === 'string' ? e.message : '';

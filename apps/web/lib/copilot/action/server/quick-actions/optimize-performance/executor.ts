@@ -27,6 +27,11 @@ export async function executeOptimizePerformance(ctx: ActionContext): Promise<Ac
             temperature: 0.1,
             maxRetries: 1,
             model: ctx.model,
+            context: {
+                teamId: ctx.teamId,
+                userId: ctx.userId,
+                feature: 'copilot_action_optimize_performance',
+            },
         });
 
         const fixedSql = out.fixedSql?.trim() || ctx.sql;

@@ -9,6 +9,7 @@ import { compileSystemPrompt } from '@/lib/ai/model/compile-system';
 
 type GetColumnTagsWithCacheOptions = {
     teamId: string;
+    userId?: string | null;
     connectionId: string;
     columns: ColumnInput[];
 
@@ -27,6 +28,7 @@ type GetColumnTagsWithCacheOptions = {
 export async function getColumnTagsWithCache(options: GetColumnTagsWithCacheOptions) {
     const {
         teamId,
+        userId,
         connectionId,
         columns,
         dbType,
@@ -76,6 +78,14 @@ export async function getColumnTagsWithCache(options: GetColumnTagsWithCacheOpti
         tableName: table ?? null,
         promptVersion,
         algoVersion,
+        context: {
+            teamId,
+            userId: userId ?? null,
+            feature,
+            model: providerModelName,
+            promptVersion,
+            algoVersion,
+        },
         normalize: (savedPayload) => {
             if (savedPayload?.columns) return savedPayload.columns;
             return heuristicTagging(columns, locale);
@@ -91,6 +101,7 @@ export async function getColumnTagsWithCache(options: GetColumnTagsWithCacheOpti
                 topP: 1,
                 context: {
                     teamId,
+                    userId: userId ?? null,
                     feature,
                     model: providerModelName,
                     promptVersion,

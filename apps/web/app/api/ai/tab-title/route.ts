@@ -7,7 +7,7 @@ import { withUserAndTeamHandler } from '@/app/api/utils/with-team-handler';
 import { USE_CLOUD_AI } from '@/app/config/app';
 import { proxyAiRouteIfNeeded } from '@/app/api/utils/cloud-ai-proxy';
 
-export const POST = withUserAndTeamHandler(async ({ req }) => {
+export const POST = withUserAndTeamHandler(async ({ req, teamId, userId }) => {
     try {
         const locale = await getApiLocale();
         const body = (await req.json()) as {
@@ -42,8 +42,11 @@ export const POST = withUserAndTeamHandler(async ({ req }) => {
             prompt,
             temperature: preset.temperature,
             context: {
+                teamId,
+                userId,
                 feature: 'tab_title',
                 model: providerModelName,
+                provider: (process.env.DORY_AI_PROVIDER ?? '').trim().toLowerCase() || null,
             },
         });
 

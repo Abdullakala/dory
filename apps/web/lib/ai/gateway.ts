@@ -8,6 +8,8 @@ import {
 } from 'ai';
 import { runAiWithCache as runAiWithCacheBase, type RunAiWithCacheOptions, type RunAiWithCacheResult } from './runtime/runAiWithCache';
 
+type AiUsageStatus = 'ok' | 'error' | 'aborted';
+
 export type AiDebugInput = {
     system?: string | SystemModelMessage | Array<SystemModelMessage> | null;
     prompt?: string | null;
@@ -35,6 +37,11 @@ export type AiGatewayContext = {
     algoVersion?: number;
     requestId?: string;
     connectionId?: string | null;
+    gateway?: string | null;
+    provider?: string | null;
+    traceId?: string | null;
+    spanId?: string | null;
+    costMicros?: number | null;
 };
 
 export type RedactionOptions = {
@@ -53,6 +60,7 @@ export type AiDebugOptions = {
 export type AiMeteringOptions = {
     enabled?: boolean;
     onWrite?: (record: AiUsageRecord) => Promise<void> | void;
+    onTrace?: (record: AiTraceRecord) => Promise<void> | void;
 };
 
 export type AiUsageRecord = {
@@ -66,6 +74,28 @@ export type AiUsageRecord = {
     usage?: LanguageModelUsage;
     latencyMs?: number;
     fromCache?: boolean;
+    status?: AiUsageStatus;
+    errorCode?: string | null;
+    errorMessage?: string | null;
+    gateway?: string | null;
+    provider?: string | null;
+    costMicros?: number | null;
+    traceId?: string | null;
+    spanId?: string | null;
+    usageJson?: Record<string, unknown> | null;
+};
+
+export type AiTraceRecord = {
+    requestId: string;
+    teamId?: string | null;
+    userId?: string | null;
+    feature?: string;
+    model?: string;
+    inputText?: string | null;
+    outputText?: string | null;
+    inputJson?: Record<string, unknown> | null;
+    outputJson?: Record<string, unknown> | null;
+    redacted?: boolean;
 };
 
 type GenerateTextOptions = Parameters<typeof sdkGenerateText>[0] & {
@@ -101,6 +131,8 @@ const DEFAULT_PROTECTED_KEYS = [
 const DEFAULT_MAX_STRING_LENGTH = 2000;
 const DEFAULT_MAX_ARRAY_LENGTH = 50;
 const DEFAULT_MAX_DEPTH = 6;
+const DEFAULT_ERROR_MESSAGE_LENGTH = 600;
+const DEFAULT_TRACE_TEXT_LENGTH = 12000;
 
 function createRequestId(): string {
     if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -178,14 +210,229 @@ function buildDebugInput(
 async function writeAiUsage(
     record: AiUsageRecord,
     meter?: AiMeteringOptions,
+    trace?: AiTraceRecord,
 ): Promise<void> {
     if (meter?.enabled === false) return;
     if (meter?.onWrite) {
         await meter.onWrite(record);
-        return;
+    } else {
+        await writeAiUsageToDatabase(record);
     }
+
+    if (trace) {
+        if (meter?.onTrace) {
+            await meter.onTrace(trace);
+        } else {
+            await writeAiTraceToDatabase(trace);
+        }
+    }
+
     if (typeof process !== 'undefined' && process.env.AI_USAGE_LOG === '1') {
         console.info('[ai][usage]', JSON.stringify(record));
+    }
+}
+
+function extractUsageFields(usage?: LanguageModelUsage) {
+    return {
+        inputTokens: usage?.inputTokens ?? null,
+        outputTokens: usage?.outputTokens ?? null,
+        reasoningTokens: usage?.reasoningTokens ?? null,
+        cachedInputTokens: usage?.cachedInputTokens ?? null,
+        totalTokens: usage?.totalTokens ?? null,
+    };
+}
+
+function inferGateway(context?: AiGatewayContext): string | null {
+    if (context?.gateway) return context.gateway;
+    if (typeof process === 'undefined') return null;
+    const envBaseUrl = (process.env.DORY_AI_URL ?? '').trim().toLowerCase();
+    if (!envBaseUrl) return null;
+    if (envBaseUrl.includes('gateway.ai.cloudflare.com')) return 'cloudflare';
+    return 'direct';
+}
+
+function inferProvider(context?: AiGatewayContext): string | null {
+    if (context?.provider) return context.provider;
+    if (typeof process === 'undefined') return null;
+    const provider = (process.env.DORY_AI_PROVIDER ?? '').trim().toLowerCase();
+    return provider || null;
+}
+
+function toUsageJson(usage?: LanguageModelUsage): Record<string, unknown> | null {
+    if (!usage) return null;
+    return sanitizeForDebug(
+        usage,
+        {
+            maxStringLength: DEFAULT_MAX_STRING_LENGTH,
+            maxArrayLength: DEFAULT_MAX_ARRAY_LENGTH,
+            maxDepth: DEFAULT_MAX_DEPTH,
+            protectedKeys: DEFAULT_PROTECTED_KEYS,
+        },
+    ) as Record<string, unknown>;
+}
+
+function toErrorParts(error: unknown): { code: string | null; message: string | null } {
+    if (!error) return { code: null, message: null };
+
+    if (typeof error === 'string') {
+        return {
+            code: null,
+            message: truncateString(error, DEFAULT_ERROR_MESSAGE_LENGTH),
+        };
+    }
+
+    if (typeof error === 'object') {
+        const errObj = error as {
+            code?: string | number;
+            message?: string;
+            error?: { code?: string | number; message?: string };
+        };
+        const code = errObj.code ?? errObj.error?.code;
+        const message = errObj.message ?? errObj.error?.message;
+        return {
+            code: code !== undefined && code !== null ? String(code) : null,
+            message: message ? truncateString(message, DEFAULT_ERROR_MESSAGE_LENGTH) : null,
+        };
+    }
+
+    return { code: null, message: null };
+}
+
+function buildTraceRecord(args: {
+    requestId: string;
+    context?: AiGatewayContext;
+    debugInput: AiDebugInput;
+    outputText?: string | null;
+    outputJson?: Record<string, unknown> | null;
+}): AiTraceRecord {
+    const { requestId, context, debugInput, outputText, outputJson } = args;
+    const prompt = typeof debugInput.prompt === 'string' ? debugInput.prompt : null;
+    const messagesText = debugInput.messages ? JSON.stringify(debugInput.messages) : null;
+    const systemText = debugInput.system ? JSON.stringify(debugInput.system) : null;
+    const mergedInputText = [prompt, systemText, messagesText]
+        .filter((part): part is string => !!part && part.length > 0)
+        .join('\n\n');
+
+    return {
+        requestId,
+        teamId: context?.teamId ?? null,
+        userId: context?.userId ?? null,
+        feature: context?.feature,
+        model: context?.model,
+        inputText: mergedInputText ? truncateString(mergedInputText, DEFAULT_TRACE_TEXT_LENGTH) : null,
+        outputText: outputText ? truncateString(outputText, DEFAULT_TRACE_TEXT_LENGTH) : null,
+        inputJson: sanitizeForDebug(
+            debugInput,
+            {
+                maxStringLength: DEFAULT_TRACE_TEXT_LENGTH,
+                maxArrayLength: DEFAULT_MAX_ARRAY_LENGTH,
+                maxDepth: DEFAULT_MAX_DEPTH,
+                protectedKeys: DEFAULT_PROTECTED_KEYS,
+            },
+        ) as Record<string, unknown>,
+        outputJson: outputJson ?? null,
+        redacted: true,
+    };
+}
+
+let aiUsageDepsPromise: Promise<{
+    getClient: () => Promise<unknown>;
+    aiUsageEvents: unknown;
+    aiUsageTraces: unknown;
+}> | null = null;
+
+async function getAiUsageDeps() {
+    if (!aiUsageDepsPromise) {
+        aiUsageDepsPromise = Promise.all([
+            import('@/lib/database/postgres/client'),
+            import('@/lib/database/postgres/schemas'),
+        ]).then(([clientModule, schemaModule]) => ({
+            getClient: clientModule.getClient,
+            aiUsageEvents: schemaModule.aiUsageEvents,
+            aiUsageTraces: schemaModule.aiUsageTraces,
+        }));
+    }
+    return aiUsageDepsPromise;
+}
+
+async function writeAiUsageToDatabase(record: AiUsageRecord): Promise<void> {
+    try {
+        const { getClient, aiUsageEvents } = await getAiUsageDeps();
+        const db = (await getClient()) as {
+            insert: (table: unknown) => {
+                values: (value: Record<string, unknown>) => {
+                    onConflictDoUpdate: (args: { target: unknown; set: Record<string, unknown> }) => Promise<void>;
+                };
+            };
+        };
+        const usage = extractUsageFields(record.usage);
+        const setValues = {
+            teamId: record.teamId ?? null,
+            userId: record.userId ?? null,
+            feature: record.feature ?? null,
+            model: record.model ?? null,
+            promptVersion: record.promptVersion ?? null,
+            algoVersion: record.algoVersion ?? null,
+            status: record.status ?? 'ok',
+            errorCode: record.errorCode ?? null,
+            errorMessage: record.errorMessage ? truncateString(record.errorMessage, DEFAULT_ERROR_MESSAGE_LENGTH) : null,
+            gateway: record.gateway ?? null,
+            provider: record.provider ?? null,
+            costMicros: record.costMicros ?? null,
+            traceId: record.traceId ?? null,
+            spanId: record.spanId ?? null,
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+            reasoningTokens: usage.reasoningTokens,
+            cachedInputTokens: usage.cachedInputTokens,
+            totalTokens: usage.totalTokens,
+            usageJson: record.usageJson ?? toUsageJson(record.usage),
+            latencyMs: record.latencyMs ?? null,
+            fromCache: record.fromCache ?? false,
+        };
+
+        await db.insert(aiUsageEvents).values({
+            requestId: record.requestId,
+            ...setValues,
+        }).onConflictDoUpdate({
+            target: (aiUsageEvents as { requestId: unknown }).requestId,
+            set: setValues,
+        });
+    } catch (error) {
+        console.error('[ai][usage] failed to write ai_usage_events', error);
+    }
+}
+
+async function writeAiTraceToDatabase(record: AiTraceRecord): Promise<void> {
+    try {
+        const { getClient, aiUsageTraces } = await getAiUsageDeps();
+        const db = (await getClient()) as {
+            insert: (table: unknown) => {
+                values: (value: Record<string, unknown>) => {
+                    onConflictDoUpdate: (args: { target: unknown; set: Record<string, unknown> }) => Promise<void>;
+                };
+            };
+        };
+        const setValues = {
+            teamId: record.teamId ?? null,
+            userId: record.userId ?? null,
+            feature: record.feature ?? null,
+            model: record.model ?? null,
+            inputText: record.inputText ?? null,
+            outputText: record.outputText ?? null,
+            inputJson: record.inputJson ?? null,
+            outputJson: record.outputJson ?? null,
+            redacted: record.redacted ?? true,
+        };
+        await db.insert(aiUsageTraces).values({
+            requestId: record.requestId,
+            ...setValues,
+        }).onConflictDoUpdate({
+            target: (aiUsageTraces as { requestId: unknown }).requestId,
+            set: setValues,
+        });
+    } catch (error) {
+        console.error('[ai][usage] failed to write ai_usage_traces', error);
     }
 }
 
@@ -222,37 +469,85 @@ export async function generateText(
         debugOptions?.redaction,
     );
 
-    const result = await sdkGenerateText(callOptions);
-    const usage = result.usage;
-    const debug: AiDebugInfo = {
-        requestId,
-        feature: context?.feature,
-        model: context?.model,
-        promptVersion,
-        algoVersion,
-        usage,
-        latencyMs: Date.now() - startedAt,
-        input: debugInput,
-    };
-
-    emitDebug(debug, debugOptions);
-    await writeAiUsage(
-        {
+    try {
+        const result = await sdkGenerateText(callOptions);
+        const usage = result.usage;
+        const debug: AiDebugInfo = {
             requestId,
-            teamId: context?.teamId ?? null,
-            userId: context?.userId ?? null,
             feature: context?.feature,
             model: context?.model,
             promptVersion,
             algoVersion,
             usage,
-            latencyMs: debug.latencyMs,
-            fromCache: false,
-        },
-        meter,
-    );
+            latencyMs: Date.now() - startedAt,
+            input: debugInput,
+        };
 
-    return Object.assign(result, { debug });
+        emitDebug(debug, debugOptions);
+        await writeAiUsage(
+            {
+                requestId,
+                teamId: context?.teamId ?? null,
+                userId: context?.userId ?? null,
+                feature: context?.feature,
+                model: context?.model,
+                promptVersion,
+                algoVersion,
+                usage,
+                usageJson: toUsageJson(usage),
+                latencyMs: debug.latencyMs,
+                fromCache: false,
+                status: 'ok',
+                gateway: inferGateway(context),
+                provider: inferProvider(context),
+                costMicros: context?.costMicros ?? null,
+                traceId: context?.traceId ?? null,
+                spanId: context?.spanId ?? null,
+            },
+            meter,
+            buildTraceRecord({
+                requestId,
+                context,
+                debugInput,
+                outputText: typeof result.text === 'string' ? result.text : null,
+                outputJson: { text: typeof result.text === 'string' ? result.text : null },
+            }),
+        );
+
+        return Object.assign(result, { debug });
+    } catch (error) {
+        const err = toErrorParts(error);
+        await writeAiUsage(
+            {
+                requestId,
+                teamId: context?.teamId ?? null,
+                userId: context?.userId ?? null,
+                feature: context?.feature,
+                model: context?.model,
+                promptVersion,
+                algoVersion,
+                latencyMs: Date.now() - startedAt,
+                fromCache: false,
+                status: 'error',
+                errorCode: err.code,
+                errorMessage: err.message,
+                gateway: inferGateway(context),
+                provider: inferProvider(context),
+                costMicros: context?.costMicros ?? null,
+                traceId: context?.traceId ?? null,
+                spanId: context?.spanId ?? null,
+            },
+            meter,
+            buildTraceRecord({
+                requestId,
+                context,
+                debugInput,
+                outputText: null,
+                outputJson: err.message ? { error: err.message, code: err.code } : null,
+            }),
+        );
+        throw error;
+    }
 }
 
 export function streamText<TOOLS extends ToolSet>(
@@ -287,10 +582,23 @@ export function streamText<TOOLS extends ToolSet>(
         input: debugInput,
     };
 
-    const wrappedOnFinish = async (event: Parameters<NonNullable<typeof callOptions.onFinish>>[0]) => {
-        debug.usage = event.totalUsage;
-        debug.latencyMs = Date.now() - startedAt;
+    let finalized = false;
+    const finalize = async (args: {
+        status: AiUsageStatus;
+        usage?: LanguageModelUsage;
+        outputText?: string | null;
+        outputJson?: Record<string, unknown> | null;
+        error?: unknown;
+    }) => {
+        if (finalized) return;
+        finalized = true;
+
+        const err = args.error ? toErrorParts(args.error) : { code: null, message: null };
+        const latencyMs = Date.now() - startedAt;
+        debug.usage = args.usage ?? debug.usage;
+        debug.latencyMs = latencyMs;
         emitDebug(debug, debugOptions);
+
         await writeAiUsage(
             {
                 requestId,
@@ -300,21 +608,68 @@ export function streamText<TOOLS extends ToolSet>(
                 model: context?.model,
                 promptVersion,
                 algoVersion,
-                usage: debug.usage,
-                latencyMs: debug.latencyMs,
+                usage: args.usage ?? debug.usage,
+                usageJson: toUsageJson(args.usage ?? debug.usage),
+                latencyMs,
                 fromCache: false,
+                status: args.status,
+                errorCode: err.code,
+                errorMessage: err.message,
+                gateway: inferGateway(context),
+                provider: inferProvider(context),
+                costMicros: context?.costMicros ?? null,
+                traceId: context?.traceId ?? null,
+                spanId: context?.spanId ?? null,
             },
             meter,
+            buildTraceRecord({
+                requestId,
+                context,
+                debugInput,
+                outputText: args.outputText ?? null,
+                outputJson: args.outputJson ?? null,
+            }),
         );
+
         resolveDebugReady(debug);
+    };
+
+    const wrappedOnFinish = async (event: Parameters<NonNullable<typeof callOptions.onFinish>>[0]) => {
+        const finishReason = (event as { finishReason?: string }).finishReason ?? null;
+        const isAborted = (event as { isAborted?: boolean }).isAborted === true || finishReason === 'abort';
+        const text = (event as { text?: string }).text ?? null;
+        await finalize({
+            status: isAborted ? 'aborted' : 'ok',
+            usage: event.totalUsage,
+            outputText: text,
+            outputJson: {
+                finishReason,
+                text,
+            },
+        });
         if (callOptions.onFinish) {
             await callOptions.onFinish(event);
+        }
+    };
+
+    const wrappedOnError = async (event: Parameters<NonNullable<typeof callOptions.onError>>[0]) => {
+        await finalize({
+            status: 'error',
+            error: event,
+            outputJson: {
+                error: toErrorParts(event).message,
+                code: toErrorParts(event).code,
+            },
+        });
+        if (callOptions.onError) {
+            await callOptions.onError(event);
         }
     };
 
     const result = sdkStreamText({
         ...callOptions,
         onFinish: wrappedOnFinish,
+        onError: wrappedOnError,
     });
 
     return Object.assign(result, { debug, debugReady });
@@ -326,13 +681,35 @@ export async function runAiWithCache<TNormalized, TPayload>(
     },
 ): Promise<RunAiWithCacheResult<TNormalized, TPayload>> {
     const { context, ...cacheOptions } = options;
+    const requestId = context?.requestId ?? createRequestId();
     const promptVersion = cacheOptions.promptVersion ?? context?.promptVersion ?? 1;
     const algoVersion = cacheOptions.algoVersion ?? context?.algoVersion;
 
-
-    return runAiWithCacheBase({
+    const result = await runAiWithCacheBase({
         ...cacheOptions,
         promptVersion,
         algoVersion,
     });
+
+    if (result.fromCache) {
+        await writeAiUsage({
+            requestId,
+            teamId: context?.teamId ?? cacheOptions.teamId ?? null,
+            userId: context?.userId ?? null,
+            feature: context?.feature ?? cacheOptions.feature,
+            model: context?.model ?? cacheOptions.model,
+            promptVersion,
+            algoVersion,
+            fromCache: true,
+            status: 'ok',
+            gateway: inferGateway(context),
+            provider: inferProvider(context),
+            costMicros: context?.costMicros ?? null,
+            traceId: context?.traceId ?? null,
+            spanId: context?.spanId ?? null,
+            usageJson: null,
+        });
+    }
+
+    return result;
 }

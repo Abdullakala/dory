@@ -19,6 +19,7 @@ import { resolveModelName } from '@/lib/ai/model/presets';
 
 type GetTableSummaryOptions = {
     teamId: string;
+    userId?: string | null;
     connectionId: string;
     columns: ColumnInput[];
 
@@ -39,6 +40,7 @@ type GetTableSummaryOptions = {
 export async function getTableSummaryWithCache(options: GetTableSummaryOptions) {
     const {
         teamId,
+        userId,
         connectionId,
         columns,
         properties,
@@ -106,6 +108,14 @@ export async function getTableSummaryWithCache(options: GetTableSummaryOptions) 
         promptVersion,
         algoVersion,
         ignoreCache,
+        context: {
+            teamId,
+            userId: userId ?? null,
+            feature,
+            model: providerModelName,
+            promptVersion,
+            algoVersion,
+        },
         normalize: (savedPayload) =>
             normalizeTableSummary({
                 payload: savedPayload,
@@ -134,6 +144,7 @@ export async function getTableSummaryWithCache(options: GetTableSummaryOptions) 
                 maxOutputTokens: preset.maxOutputTokens ?? 512,
                 context: {
                     teamId,
+                    userId: userId ?? null,
                     feature,
                     model: providerModelName,
                     promptVersion,

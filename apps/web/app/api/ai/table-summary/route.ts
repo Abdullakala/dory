@@ -44,7 +44,7 @@ function createTimer(label: string) {
     return { stamp, end };
 }
 
-export const POST = withUserAndTeamHandler(async ({ req, teamId }) => {
+export const POST = withUserAndTeamHandler(async ({ req, teamId, userId }) => {
     const proxied = await proxyAiRouteIfNeeded(req, '/api/ai/table-summary');
     if (proxied) return proxied;
 
@@ -97,6 +97,7 @@ export const POST = withUserAndTeamHandler(async ({ req, teamId }) => {
 
         const result = await provider.getTableSummaryWithCache({
             teamId,
+            userId,
             connectionId,
             columns: colList,
             properties: properties ?? null,

@@ -11,7 +11,7 @@ import { withUserAndTeamHandler } from '@/app/api/utils/with-team-handler';
 
 export const runtime = 'nodejs';
 
-export const POST = withUserAndTeamHandler(async ({ req }) => {
+export const POST = withUserAndTeamHandler(async ({ req, teamId, userId }) => {
     try {
         const proxied = await proxyAiRouteIfNeeded(req, '/api/ai/stream');
         if (proxied) return proxied;
@@ -70,6 +70,14 @@ export const POST = withUserAndTeamHandler(async ({ req }) => {
             toolChoice: body.toolChoice ?? 'auto',
             stopWhen: stepCountIs(Math.max(1, body.maxSteps ?? 1)),
             temperature: body.temperature ?? preset.temperature,
+            context: {
+                teamId,
+                userId,
+                feature: 'chat_stream',
+                model: providerModelName,
+                gateway: isCloudflareGatewayUrl ? 'cloudflare' : 'direct',
+                provider: envProvider || null,
+            },
         });
 
         return result.toUIMessageStreamResponse({

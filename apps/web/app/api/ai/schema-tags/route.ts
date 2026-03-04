@@ -30,7 +30,7 @@ const schemaTagRequestSchema = z.object({
 
 type SchemaTagRequest = z.infer<typeof schemaTagRequestSchema>;
 
-export const POST = withUserAndTeamHandler(async ({ req, teamId }) => {
+export const POST = withUserAndTeamHandler(async ({ req, teamId, userId }) => {
     const proxied = await proxyAiRouteIfNeeded(req, '/api/ai/schema-tags');
     if (proxied) return proxied;
 
@@ -67,6 +67,7 @@ export const POST = withUserAndTeamHandler(async ({ req, teamId }) => {
     try {
         const result = await provider.getColumnTagsWithCache({
             teamId,
+            userId,
             connectionId,
             columns,
             dbType,

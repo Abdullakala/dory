@@ -27,6 +27,11 @@ export async function executeToAggregation(ctx: ActionContext): Promise<ActionRe
             temperature: 0.25,
             maxRetries: 1,
             model: ctx.model,
+            context: {
+                teamId: ctx.teamId,
+                userId: ctx.userId,
+                feature: 'copilot_action_to_aggregation',
+            },
         });
 
         const fixedSql = out.fixedSql?.trim() || ctx.sql;

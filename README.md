@@ -11,6 +11,7 @@ It combines intelligent SQL editing, context-aware AI assistance, conversational
 
 <p align="center">
   <a href="https://app.getdory.dev"><b>🚀 Try Live Demo</b></a> &nbsp; • &nbsp;
+  <a href="https://github.com/dorylab/dory/releases"><b>🍎 Download for macOS</b></a> &nbsp; • &nbsp;
   <a href="#quick-start"><b>📦 Quick Start</b></a> &nbsp; • &nbsp;
   <a href="https://github.com/dorylab/dory/stargazers"><b>⭐ Star</b></a>
 </p>
@@ -165,7 +166,7 @@ Native ClickHouse user and role management UI.
 ## 🚀 Getting Started
 
 > Docker one-click deployment
-> Desktop client (Mac) coming soon  
+> Desktop client (macOS): https://github.com/dorylab/dory/releases  
 
 ---
 

@@ -1,4 +1,8 @@
-# Dory
+<p align="center">
+  <img src="./public/app.png" alt="Dory Logo" width="120" />
+</p>
+
+<h1 align="center">Dory</h1>
 
 
 **Dory is an AI-native SQL Studio for modern databases.**  

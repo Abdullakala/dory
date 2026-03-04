@@ -1,4 +1,8 @@
-export default function Page() {
+import { getTranslations } from 'next-intl/server';
+
+export default async function Page() {
+  const t = await getTranslations('Admin');
+
   return (
     <main
       style={{
@@ -18,12 +22,12 @@ export default function Page() {
           padding: '28px',
         }}
       >
-        <p style={{ color: 'var(--muted)', margin: 0 }}>Dory</p>
+        <p style={{ color: 'var(--muted)', margin: 0 }}>{t('Brand')}</p>
         <h1 style={{ margin: '10px 0 8px', fontSize: '32px', lineHeight: 1.2 }}>
-          Admin 运营管理后台
+          {t('HomeTitle')}
         </h1>
         <p style={{ margin: 0, color: 'var(--muted)', lineHeight: 1.7 }}>
-          这里是全局运营管理应用入口。你可以在此基础上添加用户管理、内容审核、配置中心和审计报表等模块。
+          {t('HomeDescription')}
         </p>
       </section>
     </main>

@@ -37,7 +37,12 @@
     "electron:dev:app": "yarn workspace dory run dev:app",
     "electron:standalone": "yarn workspace dory run electron:standalone",
     "electron:build": "yarn workspace dory run build",
-    "electron:build:apple": "yarn run electron:standalone && yarn workspace dory run electron:build:apple"
+    "electron:build:apple": "yarn run electron:standalone && yarn workspace dory run electron:build:apple",
+    "admin:dev": "yarn workspace admin run dev",
+    "admin:build": "yarn workspace admin run build",
+    "admin:start": "yarn workspace admin run start",
+    "admin:lint": "yarn workspace admin run lint",
+    "admin:typecheck": "yarn workspace admin run typecheck"
   },
   "workspaces": [
     "apps/*",

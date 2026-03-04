@@ -1,0 +1,7 @@
+{
+  "Admin": {
+    "Brand": "Dory",
+    "HomeTitle": "Admin Operations Console",
+    "HomeDescription": "This is the entry point for global operations. You can add user management, content moderation, configuration center, and audit reports from here."
+  }
+}

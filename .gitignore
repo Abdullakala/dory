@@ -50,3 +50,5 @@ apps/web/next-env.d.ts
 # pglite
 localdata
 scan-symbol.cjs
+
+apps/admin/.next/

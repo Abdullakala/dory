@@ -6,7 +6,9 @@ import { PostgresTeamsRepository } from './postgres/impl/team';
 import { PostgresConnectionsRepository } from './postgres/impl/connections';
 import { PostgresAiSchemaCacheRepository } from './postgres/impl/ai-schema-cache';
 import { PostgresSavedQueriesRepository } from './postgres/impl/sql-console/save-queries';
+import { PostgresAiUsageRepository } from './postgres/impl/ai-usage';
 import { translateDatabase } from './i18n';
+import type { AiUsageRepository } from '@/types';
 
 /**
  * Service bundle for Postgres
@@ -20,6 +22,7 @@ export type PostgresDBService = {
     connections: PostgresConnectionsRepository;
     aiSchemaCache: PostgresAiSchemaCacheRepository;
     savedQueries: PostgresSavedQueriesRepository;
+    aiUsage: AiUsageRepository;
 };
 
 /**
@@ -59,6 +62,9 @@ export async function getDBService(): Promise<DBService> {
             const savedQueriesRepo = new PostgresSavedQueriesRepository();
             await savedQueriesRepo.init();
 
+            const aiUsageRepo = new PostgresAiUsageRepository();
+            await aiUsageRepo.init();
+
             instance = {
                 tabState: tabStateRepo,
                 chat: chatRepo,
@@ -67,6 +73,7 @@ export async function getDBService(): Promise<DBService> {
                 connections: connectionsRepo,
                 aiSchemaCache: aiSchemaCacheRepo,
                 savedQueries: savedQueriesRepo,
+                aiUsage: aiUsageRepo,
             };
             break;
         }

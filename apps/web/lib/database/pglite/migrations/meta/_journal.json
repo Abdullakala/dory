@@ -8,6 +8,13 @@
       "when": 1771057082961,
       "tag": "0000_opposite_baron_strucker",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1772614617846,
+      "tag": "0001_black_darkhawk",
+      "breakpoints": true
     }
   ]
 }

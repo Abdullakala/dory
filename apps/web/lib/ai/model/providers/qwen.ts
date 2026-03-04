@@ -21,5 +21,8 @@ export function createQwenProvider(opts: QwenOptions = {}) {
         baseURL,
         name: 'qwen',
         apiKey,
+        // For OpenAI-compatible streaming responses, usage is only returned
+        // when stream_options.include_usage is enabled.
+        includeUsage: true,
     });
 }

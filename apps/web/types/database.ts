@@ -5,6 +5,7 @@ import { ConnectionItem } from './connections';
 import { TabPayload } from './tabs';
 import { ChatRepository } from './chat';
 import { IAuditService } from './audit';
+import { AiUsageRepository } from './ai-usage';
 
 export interface ConnectionRepository {
     init(): Promise<void>;
@@ -34,6 +35,7 @@ export type DBClient = PostgresDBClient;
 export interface IDBService<State = unknown, ResultMeta = unknown> {
     tabState: TabStateRepository<State, ResultMeta>;
     chat: ChatRepository;
+    aiUsage: AiUsageRepository;
     audit: IAuditService;
     dsRepo: any;
 }

@@ -4,6 +4,8 @@ import { Locale } from '@/lib/i18n/routing';
 export type ActionIntent = 'fix-sql-error' | 'optimize-performance' | 'rewrite-sql' | 'to-aggregation';
 
 export type ActionContext = {
+    teamId?: string;
+    userId?: string;
     dialect: ConnectionDialect;
     sql: string;
     database?: string;

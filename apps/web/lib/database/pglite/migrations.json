@@ -56,5 +56,24 @@
     "bps": true,
     "folderMillis": 1771057082961,
     "hash": "822b3b44502688cea81a6e15f204216c8af6263d6d862f87e1c6ac30f845058b"
+  },
+  {
+    "sql": [
+      "CREATE TABLE \"ai_usage_events\" (\n\t\"id\" text PRIMARY KEY NOT NULL,\n\t\"request_id\" text NOT NULL,\n\t\"team_id\" text,\n\t\"user_id\" text,\n\t\"feature\" text,\n\t\"model\" text,\n\t\"prompt_version\" integer,\n\t\"algo_version\" integer,\n\t\"status\" text DEFAULT 'ok' NOT NULL,\n\t\"error_code\" text,\n\t\"error_message\" text,\n\t\"gateway\" text,\n\t\"provider\" text,\n\t\"cost_micros\" integer,\n\t\"trace_id\" text,\n\t\"span_id\" text,\n\t\"input_tokens\" integer,\n\t\"output_tokens\" integer,\n\t\"reasoning_tokens\" integer,\n\t\"cached_input_tokens\" integer,\n\t\"total_tokens\" integer,\n\t\"usage_json\" jsonb,\n\t\"latency_ms\" integer,\n\t\"from_cache\" boolean DEFAULT false NOT NULL,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\tCONSTRAINT \"ck_ai_usage_events_status\" CHECK (\"ai_usage_events\".\"status\" in ('ok', 'error', 'aborted'))\n);\n",
+      "\nCREATE TABLE \"ai_usage_traces\" (\n\t\"id\" text PRIMARY KEY NOT NULL,\n\t\"request_id\" text NOT NULL,\n\t\"team_id\" text,\n\t\"user_id\" text,\n\t\"feature\" text,\n\t\"model\" text,\n\t\"input_text\" text,\n\t\"output_text\" text,\n\t\"input_json\" jsonb,\n\t\"output_json\" jsonb,\n\t\"redacted\" boolean DEFAULT true NOT NULL,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\t\"expires_at\" timestamp with time zone DEFAULT now() + interval '180 days' NOT NULL\n);\n",
+      "\nCREATE UNIQUE INDEX \"uidx_ai_usage_events_request_id\" ON \"ai_usage_events\" USING btree (\"request_id\");",
+      "\nCREATE INDEX \"idx_ai_usage_events_team_created\" ON \"ai_usage_events\" USING btree (\"team_id\",\"created_at\");",
+      "\nCREATE INDEX \"idx_ai_usage_events_team_created_total\" ON \"ai_usage_events\" USING btree (\"team_id\",\"created_at\",\"total_tokens\");",
+      "\nCREATE INDEX \"idx_ai_usage_events_team_user_created\" ON \"ai_usage_events\" USING btree (\"team_id\",\"user_id\",\"created_at\");",
+      "\nCREATE INDEX \"idx_ai_usage_events_feature_created\" ON \"ai_usage_events\" USING btree (\"feature\",\"created_at\");",
+      "\nCREATE INDEX \"idx_ai_usage_events_team_feature_created\" ON \"ai_usage_events\" USING btree (\"team_id\",\"feature\",\"created_at\");",
+      "\nCREATE UNIQUE INDEX \"uidx_ai_usage_traces_request_id\" ON \"ai_usage_traces\" USING btree (\"request_id\");",
+      "\nCREATE INDEX \"idx_ai_usage_traces_team_created\" ON \"ai_usage_traces\" USING btree (\"team_id\",\"created_at\");",
+      "\nCREATE INDEX \"idx_ai_usage_traces_team_user_created\" ON \"ai_usage_traces\" USING btree (\"team_id\",\"user_id\",\"created_at\");",
+      "\nCREATE INDEX \"idx_ai_usage_traces_expires_at\" ON \"ai_usage_traces\" USING btree (\"expires_at\");"
+    ],
+    "bps": true,
+    "folderMillis": 1772614617846,
+    "hash": "64e895b86dcce556ba88cbfcf8866f33a6905f3a71cb6de7f694f7984a97978b"
   }
 ]

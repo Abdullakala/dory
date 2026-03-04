@@ -33,7 +33,7 @@ const QUICK_ACTION_MAP: Record<ActionIntent, QuickActionServer> = QUICK_ACTIONS.
 export async function runQuickActionServer(
     intent: ActionIntent,
     input: CopilotFixInput,
-    options?: { locale?: Locale },
+    options?: { locale?: Locale; teamId?: string; userId?: string },
 ): Promise<ActionResult> {
     const locale = options?.locale ?? routing.defaultLocale;
     const action = QUICK_ACTION_MAP[intent];
@@ -41,7 +41,10 @@ export async function runQuickActionServer(
         throw new Error(translate(locale, 'SqlConsole.Copilot.Errors.UnknownAction', { intent }));
     }
 
-    const ctx = toActionContext(input, locale);
+    const ctx = toActionContext(input, locale, {
+        teamId: options?.teamId,
+        userId: options?.userId,
+    });
 
     if (action.requiresError && !ctx.error?.message) {
         throw new Error(translate(locale, 'SqlConsole.Copilot.Errors.RequiresError'));

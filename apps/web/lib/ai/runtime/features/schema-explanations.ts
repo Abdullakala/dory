@@ -14,6 +14,7 @@ import { compileSystemPrompt } from '@/lib/ai/model/compile-system';
 
 type GetColumnExplanationsOptions = {
     teamId: string;
+    userId?: string | null;
     connectionId: string;
 
     dbType?: string | null;
@@ -35,6 +36,7 @@ export async function getColumnExplanationsWithCache(
 ): Promise<{ columns: SchemaExplanationResponse['columns']; raw?: string; fromCache: boolean }> {
     const {
         teamId,
+        userId,
         connectionId,
         dbType,
         catalog,
@@ -91,6 +93,14 @@ export async function getColumnExplanationsWithCache(
         tableName: table ?? null,
         promptVersion,
         algoVersion,
+        context: {
+            teamId,
+            userId: userId ?? null,
+            feature,
+            model: providerModelName,
+            promptVersion,
+            algoVersion,
+        },
         normalize: (savedPayload) => normalizeSchemaExplanationPayload(columns, savedPayload, locale).columns,
         run: async () => {
             const prompt = buildSchemaExplanationPrompt({ columns, dbType, database, table, locale });
@@ -103,6 +113,7 @@ export async function getColumnExplanationsWithCache(
                 topP: 1,
                 context: {
                     teamId,
+                    userId: userId ?? null,
                     feature,
                     model: providerModelName,
                     promptVersion,

@@ -12,8 +12,13 @@ export async function runLLMJson<T extends z.ZodTypeAny>(args: {
     temperature?: number;
     maxRetries?: number;
     model?: string | null;
+    context?: {
+        teamId?: string | null;
+        userId?: string | null;
+        feature?: string;
+    };
 }) {
-    const { prompt, schema, temperature = 0, maxRetries = 1, model: requestedModel } = args;
+    const { prompt, schema, temperature = 0, maxRetries = 1, model: requestedModel, context } = args;
 
     let lastErr: unknown = null;
 
@@ -27,7 +32,9 @@ export async function runLLMJson<T extends z.ZodTypeAny>(args: {
                 prompt,
                 temperature: temperature ?? preset.temperature,
                 context: {
-                    feature: 'copilot_action',
+                    teamId: context?.teamId ?? null,
+                    userId: context?.userId ?? null,
+                    feature: context?.feature ?? 'copilot_action',
                     model: providerModelName,
                 },
             });

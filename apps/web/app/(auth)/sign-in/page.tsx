@@ -2,7 +2,7 @@ import localFont from 'next/font/local';
 
 import { cn } from '@/lib/utils';
 import { SignInForm } from '../components/SignInForm';
-import { BubbleBackground } from '@/components/animate-ui/components/backgrounds/bubble';
+// import { BubbleBackground } from '@/components/animate-ui/components/backgrounds/bubble';
 import { HeroBackground } from '../components/bg';
 import { RuntimeHint } from '../components/runtime-hint';
 

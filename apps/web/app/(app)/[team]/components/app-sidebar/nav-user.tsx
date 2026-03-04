@@ -1,6 +1,6 @@
 'use client';
 
-import { IconCreditCard, IconDotsVertical, IconLogout, IconNotification, IconUserCircle } from '@tabler/icons-react';
+import { IconChartBar, IconCreditCard, IconDotsVertical, IconLogout, IconNotification, IconUserCircle } from '@tabler/icons-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/registry/new-york-v4/ui/avatar';
 import BoringAvatar from 'boring-avatars';
@@ -15,7 +15,7 @@ import {
 } from '@/registry/new-york-v4/ui/dropdown-menu';
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarTrigger, useSidebar } from '@/registry/new-york-v4/ui/sidebar';
 import { signOut } from '@/lib/auth-client';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { ModeToggle } from '@/components/mode-toggle';
 import { User } from 'better-auth';
 
@@ -26,7 +26,9 @@ export function NavUser({
     user: User | null
 }) {
     const { isMobile, state } = useSidebar();
+    const params = useParams<{ team: string }>();
     const router = useRouter();
+    const team = params.team;
     const collapsed = state === 'collapsed';
     if (collapsed) {
         return (
@@ -76,6 +78,19 @@ export function NavUser({
                                 Notifications
                             </DropdownMenuItem>
                         </DropdownMenuGroup> */}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuGroup>
+                            <DropdownMenuItem
+                                onClick={e => {
+                                    e.preventDefault();
+                                    if (!team) return;
+                                    router.push(`/${team}/ai-usage`);
+                                }}
+                            >
+                                <IconChartBar />
+                                AI Usage
+                            </DropdownMenuItem>
+                        </DropdownMenuGroup>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                             onClick={async e => {

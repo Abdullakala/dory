@@ -31,6 +31,11 @@ export async function executeFixSqlError(ctx: ActionContext): Promise<ActionResu
             temperature: 0,
             maxRetries: 1,
             model: ctx.model,
+            context: {
+                teamId: ctx.teamId,
+                userId: ctx.userId,
+                feature: 'copilot_action_fix_sql_error',
+            },
         });
 
         const fixedSql = out.fixedSql?.trim() || ctx.sql;

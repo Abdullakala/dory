@@ -31,7 +31,7 @@ const schemaExplanationRequestSchema = z.object({
 
 type SchemaExplanationRequest = z.infer<typeof schemaExplanationRequestSchema>;
 
-export const POST = withUserAndTeamHandler(async ({ req, teamId }) => {
+export const POST = withUserAndTeamHandler(async ({ req, teamId, userId }) => {
     const proxied = await proxyAiRouteIfNeeded(req, '/api/ai/schema-explanations');
     if (proxied) return proxied;
 
@@ -64,6 +64,7 @@ export const POST = withUserAndTeamHandler(async ({ req, teamId }) => {
     try {
         const result = await provider.getColumnExplanationsWithCache({
             teamId,
+            userId,
             connectionId,
             dbType,
             catalog,

@@ -7,6 +7,7 @@ import * as teamMemberSchema from './teams/team-members';
 import * as connectionsSchema from './connections';
 import * as aiSchemaCache from './ai-schema-cache';
 import * as savedQueriesSchema from './saved-queries';
+import * as aiUsageSchema from './ai-usage';
 
 
 export * from './tabs';
@@ -18,6 +19,7 @@ export * from './teams/teams';
 export * from './connections';
 export * from './ai-schema-cache';
 export * from './saved-queries';
+export * from './ai-usage';
 
 export const schema = {
     ...tabsSchema,
@@ -29,6 +31,7 @@ export const schema = {
     ...connectionsSchema,
     ...aiSchemaCache,
     ...savedQueriesSchema,
+    ...aiUsageSchema,
 };
 
 export type DBSchema = typeof schema;

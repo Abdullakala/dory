@@ -15,10 +15,16 @@ import { Separator } from '@/registry/new-york-v4/ui/separator';
 import { DoryLogo } from '@/components/@dory/ui/logo';
 import { ConnectionDialogRoot } from '../../connections/components/connection-dialog-root';
 import { Badge } from '@/registry/new-york-v4/ui/badge';
+import type { User } from 'better-auth';
 
-export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
+type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
+    initialUser?: User | null;
+};
+
+export function AppSidebar({ initialUser = null, ...props }: AppSidebarProps) {
     const params = useParams<{ team: string; connectionId?: string }>();
     const { data: session } = authClient.useSession();
+    const resolvedUser = (session?.user as User | undefined) ?? initialUser ?? null;
     const t = useTranslations('AppSidebar');
     const team = params.team;
     const connectionId = params.connectionId;
@@ -170,7 +176,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
             <Separator />
 
             <SidebarFooter>
-                <NavUser user={session?.user as any} />
+                <NavUser user={resolvedUser as any} />
             </SidebarFooter>
         </Sidebar>
     );

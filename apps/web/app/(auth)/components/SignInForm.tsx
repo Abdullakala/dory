@@ -18,6 +18,7 @@ import { useTranslations } from 'next-intl';
 export function SignInForm({ className, imageUrl, ...props }: React.ComponentProps<'div'> & { imageUrl?: string }) {
     const t = useTranslations('Auth');
     const router = useRouter();
+    const isDesktopRuntime = (process.env.NEXT_PUBLIC_DORY_RUNTIME?.trim() ?? '') === 'desktop';
     const [loading, setLoading] = useState(false);
     const [demoLoading, setDemoLoading] = useState(false);
     const [email, setEmail] = useState('');
@@ -261,9 +262,11 @@ export function SignInForm({ className, imageUrl, ...props }: React.ComponentPro
                                 {loading ? t('SignIn.Submitting') : t('SignIn.Submit')}
                             </Button>
 
-                            <Button type="button" className="w-full" variant="secondary" disabled={loading || demoLoading} onClick={onDemoSignIn}>
-                                {demoLoading ? t('SignIn.Submitting') : t('SignIn.DemoEnter')}
-                            </Button>
+                            {!isDesktopRuntime ? (
+                                <Button type="button" className="w-full" variant="secondary" disabled={loading || demoLoading} onClick={onDemoSignIn}>
+                                    {demoLoading ? t('SignIn.Submitting') : t('SignIn.DemoEnter')}
+                                </Button>
+                            ) : null}
 
                             <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
                                 <span className="bg-background text-muted-foreground relative z-10 px-2">{t('SignIn.OrContinueWith')}</span>

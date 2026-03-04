@@ -161,19 +161,6 @@ export function NavUser({
                                 </DropdownMenuItem>
                             </DropdownMenuGroup> */}
                             <DropdownMenuSeparator />
-                            <DropdownMenuGroup>
-                                <DropdownMenuItem
-                                    onClick={e => {
-                                        e.preventDefault();
-                                        if (!team) return;
-                                        router.push(`/${team}/ai-usage`);
-                                    }}
-                                >
-                                    <IconChartBar />
-                                    AI Usage
-                                </DropdownMenuItem>
-                            </DropdownMenuGroup>
-                            <DropdownMenuSeparator />
                             <DropdownMenuItem
                                 onClick={async e => {
                                     e.preventDefault();

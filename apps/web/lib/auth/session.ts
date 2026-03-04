@@ -20,10 +20,34 @@ const resolveSession = createSessionResolver({
     getRuntime: () => process.env.NEXT_PUBLIC_DORY_RUNTIME?.trim() ?? null,
 });
 
+function normalizeSessionCookieHeader(headers: Headers): Headers {
+    const next = new Headers(headers);
+    const cookie = next.get('cookie');
+    if (!cookie) return next;
+
+    const parts = cookie
+        .split(';')
+        .map(part => part.trim())
+        .filter(Boolean);
+    const hasPlain = parts.some(part => part.startsWith('better-auth.session_token='));
+    const hasSecure = parts.some(part => part.startsWith('__Secure-better-auth.session_token='));
+
+    if (hasPlain && !hasSecure) {
+        const plain = parts.find(part => part.startsWith('better-auth.session_token='));
+        if (plain) {
+            parts.push(plain.replace('better-auth.session_token=', '__Secure-better-auth.session_token='));
+            next.set('cookie', parts.join('; '));
+        }
+    }
+
+    return next;
+}
+
 export async function getSessionFromRequest(req?: NextRequest) {
     const reqHeaders = req ? req.headers : await headers();
+    const normalizedHeaders = normalizeSessionCookieHeader(reqHeaders);
     return resolveSession({
-        headers: reqHeaders,
+        headers: normalizedHeaders,
         url: req?.url ?? null,
     });
 }

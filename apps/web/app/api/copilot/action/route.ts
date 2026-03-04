@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { runQuickActionServer } from '@/lib/copilot/action/server/runQuickActionServer';
 import type { ActionIntent } from '@/lib/copilot/action/types';
 import type { CopilotFixInput } from '@/app/(app)/[team]/[connectionId]/chatbot/copilot/types/copilot-fix-input';
@@ -9,6 +9,7 @@ import { translate } from '@/lib/i18n/i18n';
 import { withUserAndTeamHandler } from '@/app/api/utils/with-team-handler';
 import { isMissingAiEnvError } from '@/lib/ai/errors';
 import { USE_CLOUD_AI } from '@/app/config/app';
+import { buildCloudForwardHeaders } from '@/app/api/utils/cloud-ai-proxy';
 
 export const POST = withUserAndTeamHandler(async ({ req, teamId, userId }) => {
     const locale = await getServerLocale();
@@ -30,13 +31,7 @@ export const POST = withUserAndTeamHandler(async ({ req, teamId, userId }) => {
             const url = new URL('/api/copilot/action', cloudBaseUrl).toString();
             const upstream = await fetch(url, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(req.headers.get('cookie') ? { cookie: req.headers.get('cookie') as string } : {}),
-                    ...(req.headers.get('authorization')
-                        ? { authorization: req.headers.get('authorization') as string }
-                        : {}),
-                },
+                headers: buildCloudForwardHeaders(req, cloudBaseUrl),
                 body: JSON.stringify({
                     ...body,
                     model: null,

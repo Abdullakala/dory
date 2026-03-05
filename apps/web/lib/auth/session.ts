@@ -5,6 +5,7 @@ import type { NextRequest } from 'next/server';
 import { createSessionResolver } from '@dory/auth-core';
 import { getAuth } from '../auth';
 import { createAuthProxyHeaders, shouldProxyAuthRequest } from './auth-proxy';
+import { getRuntimeForServer } from '@/lib/runtime/runtime';
 
 function getCloudApiBaseUrl(): string | null {
     const cloudUrl = process.env.DORY_CLOUD_API_URL ?? process.env.NEXT_PUBLIC_DORY_CLOUD_API_URL;
@@ -17,7 +18,7 @@ const resolveSession = createSessionResolver({
     shouldProxyAuthRequest,
     createAuthProxyHeaders,
     getCloudApiBaseUrl,
-    getRuntime: () => process.env.NEXT_PUBLIC_DORY_RUNTIME?.trim() ?? null,
+    getRuntime: getRuntimeForServer,
 });
 
 function normalizeSessionCookieHeader(headers: Headers): Headers {

@@ -11,6 +11,7 @@ import { getClient } from './database/postgres/client';
 import { getServerLocale } from './i18n/server-locale';
 import { translate } from './i18n/i18n';
 import { createCachedAsyncFactory } from '@dory/auth-core';
+import { isDesktopRuntime } from './runtime/runtime';
 
 // User type with defaultTeamId, used for narrowing in hooks
 type UserWithDefaultTeam = {
@@ -24,8 +25,7 @@ function createAuth() {
     return (async () => {
         const db = (await getClient()) as PostgresDBClient;
         const provider = getDatabaseProvider() === 'pglite' ? 'pg' : 'pg';
-        const runtime = process.env.NEXT_PUBLIC_DORY_RUNTIME?.trim();
-        const isDesktop = runtime === 'desktop';
+        const isDesktop = isDesktopRuntime();
         const desktopOrigin =
             process.env.DORY_ELECTRON_ORIGIN?.trim() ||
             process.env.NEXT_PUBLIC_DORY_ELECTRON_ORIGIN?.trim() ||

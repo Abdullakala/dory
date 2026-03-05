@@ -14,11 +14,12 @@ import { authClient, signInViaGithub, signInViaGoogle } from '@/lib/auth-client'
 import { InputPassword } from '@/components/originui/input-password';
 import { authFetch } from '@/lib/client/auth-fetch';
 import { useTranslations } from 'next-intl';
+import { runtime, isDesktopRuntime } from '@/lib/runtime/runtime';
 
 export function SignInForm({ className, imageUrl, ...props }: React.ComponentProps<'div'> & { imageUrl?: string }) {
     const t = useTranslations('Auth');
     const router = useRouter();
-    const isDesktopRuntime = (process.env.NEXT_PUBLIC_DORY_RUNTIME?.trim() ?? '') === 'desktop';
+    const isDesktop = isDesktopRuntime();
     const [loading, setLoading] = useState(false);
     const [demoLoading, setDemoLoading] = useState(false);
     const [email, setEmail] = useState('');
@@ -170,7 +171,7 @@ export function SignInForm({ className, imageUrl, ...props }: React.ComponentPro
                 email,
                 origin: window.location.origin,
                 redirectTo,
-                runtime: process.env.NEXT_PUBLIC_DORY_RUNTIME,
+                runtime,
                 cloudApi: process.env.NEXT_PUBLIC_DORY_CLOUD_API_URL,
             });
             const res = await authFetch('/api/auth/request-password-reset', {
@@ -262,7 +263,7 @@ export function SignInForm({ className, imageUrl, ...props }: React.ComponentPro
                                 {loading ? t('SignIn.Submitting') : t('SignIn.Submit')}
                             </Button>
 
-                            {!isDesktopRuntime ? (
+                            {!isDesktop ? (
                                 <Button type="button" className="w-full" variant="secondary" disabled={loading || demoLoading} onClick={onDemoSignIn}>
                                     {demoLoading ? t('SignIn.Submitting') : t('SignIn.DemoEnter')}
                                 </Button>

@@ -6,6 +6,7 @@ import { DatabaseError } from '@/lib/errors/DatabaseError';
 import { decrypt, encrypt } from '@/lib/utils/crypto';
 import type { PostgresDBClient } from '@/types';
 import { translateDatabase } from '@/lib/database/i18n';
+import { isDesktopRuntime } from '@/lib/runtime/runtime';
 
 import type {
     ConnectionIdentitySecret,
@@ -56,10 +57,14 @@ export class PostgresConnectionsRepository {
             }
             this.db = client as PostgresDBClient;
 
-            if (process.env.NEXT_PUBLIC_DORY_RUNTIME?.trim() === 'desktop') {
-                await this.db.execute(
-                    sql`ALTER TABLE "connections" DROP CONSTRAINT IF EXISTS "connections_created_by_user_id_user_id_fk"`,
-                );
+            if (isDesktopRuntime()) {
+                try {
+                    await this.db.execute(
+                        sql`ALTER TABLE "connections" DROP CONSTRAINT IF EXISTS "connections_created_by_user_id_user_id_fk"`,
+                    );
+                } catch (error) {
+                    console.warn('[db:init] skipped legacy desktop constraint cleanup:', error);
+                }
             }
         } catch (e) {
             console.error(translateDatabase('Database.Logs.InitFailed'), e);

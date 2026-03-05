@@ -1,8 +1,9 @@
+import { isDesktopRuntime } from '@/lib/runtime/runtime';
+
 export function getAuthBaseUrl(): string | null {
-    const runtime = process.env.NEXT_PUBLIC_DORY_RUNTIME?.trim() || '';
     const cloudUrl = process.env.NEXT_PUBLIC_DORY_CLOUD_API_URL?.trim() || '';
 
-    if (runtime === 'desktop') return null;
+    if (isDesktopRuntime()) return null;
     return cloudUrl || null;
 }
 

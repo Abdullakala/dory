@@ -51,16 +51,22 @@ jobs:
 
       - name: Resolve release tag
         id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ github.ref_name }}"
           if [ "${{ github.event_name }}" = "release" ]; then
             TAG="${{ github.event.release.tag_name }}"
-          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
-            git fetch --tags --force
-            TAG="$(git tag --points-at HEAD | grep '^v' | sort -V | tail -n 1)"
           elif [ -n "${{ inputs.release_tag }}" ]; then
             TAG="${{ inputs.release_tag }}"
+          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+            git fetch --tags --force
+            TAG="$(git tag --points-at "${{ github.event.workflow_run.head_sha }}" | grep '^v' | sort -V | tail -n 1 || true)"
+            if [ -z "$TAG" ]; then
+              TAG="$(gh release list --limit 20 --json tagName,isDraft,createdAt --jq 'map(select(.isDraft == false)) | sort_by(.createdAt) | last | .tagName' || true)"
+            fi
           fi
+          echo "Resolved release tag: ${TAG:-<empty>}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Extract metadata (tags, labels)

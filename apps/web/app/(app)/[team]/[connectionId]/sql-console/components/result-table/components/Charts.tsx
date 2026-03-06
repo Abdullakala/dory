@@ -5,14 +5,10 @@ import { BarChart3, Sparkles } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 
 import { Button } from '@/registry/new-york-v4/ui/button';
-import {
-    ChartContainer,
-    ChartTooltip,
-    ChartTooltipContent,
-    type ChartConfig,
-} from '@/registry/new-york-v4/ui/chart';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/registry/new-york-v4/ui/chart';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/registry/new-york-v4/ui/select';
 import { cn } from '@/registry/new-york-v4/lib/utils';
+import { AISparkIcon } from '@/components/@dory/ui/ai-spark-icon';
 
 type ChartType = 'bar' | 'line';
 type MetricKind = 'count' | 'sum';
@@ -207,9 +203,9 @@ export function Charts({ rows, columnsRaw, className }: ChartsProps) {
     return (
         <div className={cn('flex min-h-0 flex-1 flex-col', className)}>
             <div className="flex min-h-0 flex-1 flex-col px-3 py-3">
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border-none border-border/60 bg-muted/10">
-                    <div className="border-none border-border/60 px-3 py-2">
-                        <div className="flex flex-wrap items-center gap-1.5">
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-muted/10">
+                    <div className="px-3 pb-1.5 pt-2 flex justify-between items-center">
+                        <div className="flex flex-wrap items-center gap-4">
                             <ChartSelect
                                 label="Chart"
                                 value={chartType}
@@ -247,22 +243,22 @@ export function Charts({ rows, columnsRaw, className }: ChartsProps) {
                                 ]}
                                 disabled={columnNames.length === 0}
                             />
-                            <Button
-                                type="button"
-                                size="sm"
-                                variant={chartStateIsAuto ? 'secondary' : 'outline'}
-                                className="h-7 px-2.5 text-xs"
-                                onClick={() => {
-                                    setChartType(suggestedState.chartType);
-                                    setXKey(suggestedState.xKey);
-                                    setYKey(suggestedState.yKey);
-                                    setGroupKey(suggestedState.groupKey);
-                                }}
-                            >
-                                <Sparkles className="h-3 w-3" />
-                                Auto
-                            </Button>
                         </div>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className={cn('h-7 px-2 text-[11px] font-normal text-muted-foreground hover:text-foreground', chartStateIsAuto && 'bg-background/60 text-foreground')}
+                            onClick={() => {
+                                setChartType(suggestedState.chartType);
+                                setXKey(suggestedState.xKey);
+                                setYKey(suggestedState.yKey);
+                                setGroupKey(suggestedState.groupKey);
+                            }}
+                        >
+                            <AISparkIcon className="h-3 w-3" />
+                            Auto
+                        </Button>
                     </div>
 
                     <div className="flex min-h-0 flex-1 items-center justify-center p-4">
@@ -278,7 +274,14 @@ export function Charts({ rows, columnsRaw, className }: ChartsProps) {
                                     {chartType === 'line' ? (
                                         <LineChart accessibilityLayer data={aggregated.data} margin={{ left: 8, right: 8, top: 8 }}>
                                             <CartesianGrid vertical={false} />
-                                            <XAxis dataKey="xLabel" tickLine={false} axisLine={false} tickMargin={10} minTickGap={24} tickFormatter={value => String(value).slice(0, 18)} />
+                                            <XAxis
+                                                dataKey="xLabel"
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tickMargin={10}
+                                                minTickGap={24}
+                                                tickFormatter={value => String(value).slice(0, 18)}
+                                            />
                                             <YAxis tickLine={false} axisLine={false} width={56} />
                                             <ChartTooltip content={<ChartTooltipContent />} />
                                             {aggregated.series.map(series => (
@@ -288,7 +291,14 @@ export function Charts({ rows, columnsRaw, className }: ChartsProps) {
                                     ) : (
                                         <BarChart accessibilityLayer data={aggregated.data} margin={{ left: 8, right: 8, top: 8 }}>
                                             <CartesianGrid vertical={false} />
-                                            <XAxis dataKey="xLabel" tickLine={false} axisLine={false} tickMargin={10} minTickGap={24} tickFormatter={value => String(value).slice(0, 18)} />
+                                            <XAxis
+                                                dataKey="xLabel"
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tickMargin={10}
+                                                minTickGap={24}
+                                                tickFormatter={value => String(value).slice(0, 18)}
+                                            />
                                             <YAxis tickLine={false} axisLine={false} width={56} />
                                             <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
                                             {aggregated.series.map(series => (
@@ -307,11 +317,6 @@ export function Charts({ rows, columnsRaw, className }: ChartsProps) {
                         )}
                     </div>
                 </div>
-
-                <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Based on {rows.length.toLocaleString()} filtered rows</span>
-                    <span>{hasRenderableData ? `${aggregated.data.length.toLocaleString()} chart buckets` : effectiveGroupKey === NONE_VALUE ? 'Ungrouped' : `Grouped by ${effectiveGroupKey}`}</span>
-                </div>
             </div>
         </div>
     );
@@ -321,10 +326,13 @@ function ChartSelect(props: { label: string; value: string; onValueChange: (valu
     const { label, value, onValueChange, options, disabled = false } = props;
 
     return (
-        <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">{label}:</span>
+        <div className="flex items-center gap-1">
+            <span className="text-[11px] font-medium text-muted-foreground/80 mr-1">{label}</span>
             <Select value={value} onValueChange={onValueChange} disabled={disabled}>
-                <SelectTrigger size="sm" className="h-7 min-w-[112px] justify-between text-xs">
+                <SelectTrigger
+                    size="sm"
+                    className="h-7 min-w-[104px] justify-between border bg-background/50 px-2 text-[11px] text-muted-foreground shadow-none hover:bg-background/70"
+                >
                     <SelectValue placeholder={label} />
                 </SelectTrigger>
                 <SelectContent align="start">

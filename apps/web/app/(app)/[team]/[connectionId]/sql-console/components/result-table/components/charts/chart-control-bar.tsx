@@ -61,9 +61,9 @@ export function ChartControlBar(props: {
                 {bucketHint ? <div className="text-[11px] text-muted-foreground">{bucketHint}</div> : null}
                 <Button
                     type="button"
-                    size="sm"
+                    size="control"
                     variant="ghost"
-                    className={cn('h-7 px-2 text-[11px] font-normal text-muted-foreground hover:text-foreground', chartStateIsAuto && 'bg-background/60 text-foreground')}
+                    className={cn('text-muted-foreground hover:text-foreground', chartStateIsAuto && 'bg-background/60 text-foreground')}
                     onClick={onResetAuto}
                 >
                     <AISparkIcon className="h-3 w-3" />
@@ -260,11 +260,11 @@ function MetricComboboxSubmenu(props: {
                     <Button
                         type="button"
                         variant="outline"
-                        size="sm"
+                        size="control"
                         role="combobox"
                         aria-expanded={open}
                         disabled={disabled}
-                        className="h-7 min-w-[104px] justify-between border bg-background/50 px-2 text-[11px] font-normal text-muted-foreground shadow-none hover:bg-background/70"
+                        className="min-w-[104px] justify-between border bg-background/50 text-muted-foreground shadow-none hover:bg-background/70"
                     >
                         <span className="truncate">{selectedMetric?.label ?? 'Y'}</span>
                         <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-80" />

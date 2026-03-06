@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { useTheme } from 'next-themes';
 
 import { type ChartConfig } from '@/registry/new-york-v4/ui/chart';
 import { cn } from '@/registry/new-york-v4/lib/utils';
 import { ChartView } from './chart-view';
-import { type AggregatedChartData, ALL_SERIES_KEY, CHART_COLORS, type ChartRow, type ChartState, type ChartType, type MetricOption, NONE_VALUE } from './chart-shared';
+import { type AggregatedChartData, ALL_SERIES_KEY, CHART_COLOR_PRESETS, type ChartColorPreset, type ChartRow, type ChartState, type ChartType, type MetricOption, NONE_VALUE } from './chart-shared';
 import { buildEqualsFilterFromCell } from '../../vtable/filter';
 import { type ColumnFilter } from '../../vtable/type';
 
@@ -17,6 +18,7 @@ type ChartsProps = {
     stateKey?: string;
     initialState?: Partial<ChartState>;
     onStateChange?: (state: ChartState) => void;
+    stateSyncEnabled?: boolean;
 };
 
 type ColumnKind = 'date' | 'numeric' | 'category';
@@ -841,21 +843,41 @@ function mergeChartState(suggestedState: SuggestedChartState, initialState?: Par
         xKey: initialState?.xKey ?? suggestedState.xKey,
         yKey: initialState?.yKey ?? suggestedState.yKey,
         groupKey: initialState?.groupKey ?? suggestedState.groupKey,
+        chartColorPreset: initialState?.chartColorPreset ?? 'blue',
     };
 }
 
-export function Charts({ rows, columnsRaw, className, onApplyFilters, stateKey, initialState, onStateChange }: ChartsProps) {
+function isMetricKeyCompatibleWithColumns(metricKey: string, columnNames: string[]) {
+    if (metricKey === 'count') {
+        return true;
+    }
+
+    const separatorIndex = metricKey.indexOf(':');
+    if (separatorIndex < 0) {
+        return true;
+    }
+
+    const column = metricKey.slice(separatorIndex + 1);
+    return column ? columnNames.includes(column) : true;
+}
+
+export function Charts({ rows, columnsRaw, className, onApplyFilters, stateKey, initialState, onStateChange, stateSyncEnabled = true }: ChartsProps) {
+    const { resolvedTheme } = useTheme();
     const columnNames = useMemo(() => getColumnNames(columnsRaw, rows), [columnsRaw, rows]);
     const columnProfiles = useMemo(() => analyzeColumns(columnNames, rows), [columnNames, rows]);
     const suggestedState = useMemo(() => getSuggestedState(columnProfiles), [columnProfiles]);
     const mergedInitialState = useMemo(() => mergeChartState(suggestedState, initialState), [initialState, suggestedState]);
+    const hasPersistedState = Boolean(initialState && (initialState.xKey || initialState.yKey || initialState.groupKey || initialState.chartType));
     const lastAppliedStateKeyRef = React.useRef<string | undefined>(stateKey);
+    const previousStateKeyRef = React.useRef<string | undefined>(stateKey);
+    const skipNextStateEmitRef = React.useRef(false);
 
     const [chartType, setChartType] = useState<ChartType>(() => mergedInitialState.chartType);
     const [xKey, setXKey] = useState(() => mergedInitialState.xKey);
     const [yKey, setYKey] = useState(() => mergedInitialState.yKey);
     const [groupKey, setGroupKey] = useState(() => mergedInitialState.groupKey);
     const [timelineSliderEnabled, setTimelineSliderEnabled] = useState(false);
+    const [chartColorPreset, setChartColorPreset] = useState<ChartColorPreset>(() => (mergedInitialState.chartColorPreset as ChartColorPreset | undefined) ?? 'blue');
 
     const metricOptions = useMemo<MetricOption[]>(() => buildMetricOptions(columnProfiles), [columnProfiles]);
 
@@ -863,6 +885,13 @@ export function Charts({ rows, columnsRaw, className, onApplyFilters, stateKey, 
 
     const effectiveXKey = columnNames.includes(xKey) ? xKey : suggestedState.xKey;
     const effectiveGroupKey = groupKey !== NONE_VALUE && columnNames.includes(groupKey) ? groupKey : NONE_VALUE;
+
+    useEffect(() => {
+        if (previousStateKeyRef.current !== stateKey) {
+            skipNextStateEmitRef.current = true;
+            previousStateKeyRef.current = stateKey;
+        }
+    }, [stateKey]);
 
     useEffect(() => {
         if (lastAppliedStateKeyRef.current === stateKey) {
@@ -874,35 +903,62 @@ export function Charts({ rows, columnsRaw, className, onApplyFilters, stateKey, 
         setXKey(mergedInitialState.xKey);
         setYKey(mergedInitialState.yKey);
         setGroupKey(mergedInitialState.groupKey);
+        setChartColorPreset((mergedInitialState.chartColorPreset as ChartColorPreset | undefined) ?? 'blue');
         setTimelineSliderEnabled(false);
-    }, [mergedInitialState.chartType, mergedInitialState.groupKey, mergedInitialState.xKey, mergedInitialState.yKey, stateKey]);
+    }, [mergedInitialState.chartColorPreset, mergedInitialState.chartType, mergedInitialState.groupKey, mergedInitialState.xKey, mergedInitialState.yKey, stateKey]);
 
     useEffect(() => {
+        if (!stateSyncEnabled || hasPersistedState) {
+            return;
+        }
+        if (columnNames.length === 0) {
+            return;
+        }
         if (!columnNames.includes(xKey)) {
             setXKey(suggestedState.xKey);
         }
-    }, [columnNames, suggestedState.xKey, xKey]);
+    }, [columnNames, hasPersistedState, stateSyncEnabled, suggestedState.xKey, xKey]);
 
     useEffect(() => {
-        if (!metricOptions.some(option => option.key === yKey)) {
+        if (!stateSyncEnabled || hasPersistedState) {
+            return;
+        }
+        if (columnNames.length === 0) {
+            return;
+        }
+        if (!isMetricKeyCompatibleWithColumns(yKey, columnNames)) {
             setYKey(suggestedState.yKey);
         }
-    }, [metricOptions, suggestedState.yKey, yKey]);
+    }, [columnNames, hasPersistedState, stateSyncEnabled, suggestedState.yKey, yKey]);
 
     useEffect(() => {
+        if (!stateSyncEnabled || hasPersistedState) {
+            return;
+        }
+        if (columnNames.length === 0) {
+            return;
+        }
         if (groupKey !== NONE_VALUE && !columnNames.includes(groupKey)) {
             setGroupKey(suggestedState.groupKey);
         }
-    }, [columnNames, groupKey, suggestedState.groupKey]);
+    }, [columnNames, groupKey, hasPersistedState, stateSyncEnabled, suggestedState.groupKey]);
 
     useEffect(() => {
+        if (!stateSyncEnabled) {
+            return;
+        }
+        if (skipNextStateEmitRef.current) {
+            skipNextStateEmitRef.current = false;
+            return;
+        }
         onStateChange?.({
             chartType,
             xKey,
             yKey,
             groupKey,
+            chartColorPreset,
         });
-    }, [chartType, groupKey, onStateChange, xKey, yKey]);
+    }, [chartColorPreset, chartType, groupKey, onStateChange, stateSyncEnabled, xKey, yKey]);
 
     const chartStateIsAuto = chartType === suggestedState.chartType && xKey === suggestedState.xKey && yKey === suggestedState.yKey && groupKey === suggestedState.groupKey;
 
@@ -920,18 +976,27 @@ export function Charts({ rows, columnsRaw, className, onApplyFilters, stateKey, 
         });
     }, [columnProfiles, effectiveGroupKey, effectiveXKey, rows, selectedMetric]);
 
+    const activeColorPreset = useMemo(
+        () => CHART_COLOR_PRESETS.find(preset => preset.value === chartColorPreset) ?? CHART_COLOR_PRESETS[0],
+        [chartColorPreset],
+    );
+    const chartColors = useMemo(() => {
+        const isDark = resolvedTheme === 'dark';
+        return isDark ? activeColorPreset.colors.dark : activeColorPreset.colors.light;
+    }, [activeColorPreset, resolvedTheme]);
+
     const chartConfig = useMemo<ChartConfig>(() => {
         const config: ChartConfig = {};
 
         aggregated.series.forEach((series, index) => {
             config[series.key] = {
                 label: series.label === ALL_SERIES_KEY ? (selectedMetric?.label ?? 'Value') : series.label,
-                color: CHART_COLORS[index % CHART_COLORS.length],
+                color: chartColors[index % chartColors.length],
             };
         });
 
         return config;
-    }, [aggregated.series, selectedMetric]);
+    }, [aggregated.series, chartColors, selectedMetric]);
 
     const pickFallbackGroupKey = React.useCallback(
         (nextXKey: string) => {
@@ -1000,6 +1065,13 @@ export function Charts({ rows, columnsRaw, className, onApplyFilters, stateKey, 
                     effectiveXKey={effectiveXKey}
                     effectiveYLabel={selectedMetric?.label ?? yKey}
                     effectiveGroupKey={effectiveGroupKey}
+                    chartColorPreset={chartColorPreset}
+                    chartColorPresetOptions={CHART_COLOR_PRESETS.map(option => ({
+                        value: option.value,
+                        label: option.label,
+                        preview: (resolvedTheme === 'dark' ? option.colors.dark : option.colors.light).slice(0, 3),
+                    }))}
+                    chartColors={chartColors}
                     aggregated={aggregated}
                     chartConfig={chartConfig}
                     emptyMessage={emptyMessage}
@@ -1027,6 +1099,12 @@ export function Charts({ rows, columnsRaw, className, onApplyFilters, stateKey, 
                     onXKeyChange={setXKey}
                     onYKeyChange={setYKey}
                     onGroupKeyChange={setGroupKey}
+                    onChartColorPresetChange={value => {
+                        const matched = CHART_COLOR_PRESETS.find(option => option.value === value);
+                        if (matched) {
+                            setChartColorPreset(matched.value);
+                        }
+                    }}
                     onTimelineSliderEnabledChange={setTimelineSliderEnabled}
                     onResetAuto={() => {
                         setChartType(suggestedState.chartType);

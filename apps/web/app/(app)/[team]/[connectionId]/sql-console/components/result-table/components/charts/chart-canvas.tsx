@@ -6,7 +6,7 @@ import { Bar, BarChart, Brush, CartesianGrid, Cell, Line, LineChart, Pie, PieCha
 import { Button } from '@/registry/new-york-v4/ui/button';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/registry/new-york-v4/ui/chart';
 
-import { AggregatedChartData, ALL_SERIES_KEY, CHART_COLORS, ChartEmptyState, ChartType, NONE_VALUE } from './chart-shared';
+import { AggregatedChartData, ALL_SERIES_KEY, ChartEmptyState, ChartType, NONE_VALUE } from './chart-shared';
 
 function toFiniteNumber(value: unknown) {
     if (typeof value === 'number') {
@@ -26,6 +26,7 @@ export function ChartCanvas(props: {
     chartConfig: ChartConfig;
     aggregated: AggregatedChartData;
     effectiveGroupKey: string;
+    chartColors: string[];
     xAxisLabel: string;
     yAxisLabel: string;
     emptyMessage: string | null;
@@ -35,7 +36,8 @@ export function ChartCanvas(props: {
         mode?: { append?: boolean },
     ) => void;
 }) {
-    const { chartType, chartConfig, aggregated, effectiveGroupKey, xAxisLabel, yAxisLabel, emptyMessage, timelineSliderEnabled, onApplyChartFilter } = props;
+    const { chartType, chartConfig, aggregated, effectiveGroupKey, chartColors, xAxisLabel, yAxisLabel, emptyMessage, timelineSliderEnabled, onApplyChartFilter } = props;
+    const primaryChartColor = chartColors[0] ?? 'var(--primary)';
     const clickFilterEnabled = chartType !== 'line';
     const supportsTimeline = chartType === 'line' || chartType === 'bar' || chartType === 'histogram';
     const [brushSelection, setBrushSelection] = React.useState<{ startIndex: number; endIndex: number } | null>(null);
@@ -359,7 +361,7 @@ export function ChartCanvas(props: {
                                 <ChartTooltip cursor={false} content={<ChartFilterTooltipContent filterEnabled={clickFilterEnabled} chartConfig={chartConfig} xAxisLabel={xAxisLabel} yAxisLabel={yAxisLabel} />} />
                                 <Bar
                                     dataKey="__histValue"
-                                    fill="var(--primary)"
+                                    fill={primaryChartColor}
                                     radius={4}
                                     className="cursor-pointer"
                                     onClick={(data, _index, event) =>
@@ -409,7 +411,7 @@ export function ChartCanvas(props: {
                                     }
                                 >
                                     {pieData.map((datum, index) => (
-                                        <Cell key={`${String((datum as Record<string, unknown>).xLabel ?? index)}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                                        <Cell key={`${String((datum as Record<string, unknown>).xLabel ?? index)}`} fill={chartColors[index % chartColors.length] ?? primaryChartColor} />
                                     ))}
                                 </Pie>
                             </PieChart>
@@ -424,7 +426,7 @@ export function ChartCanvas(props: {
                                 <ChartTooltip content={<ScatterTooltipContent yAxisLabel={yAxisLabel} />} />
                                 <Scatter
                                     data={scatterData}
-                                    fill="var(--primary)"
+                                    fill={primaryChartColor}
                                     className="cursor-pointer"
                                     onClick={(data, _index, event) =>
                                         handleDatumClick(
@@ -464,7 +466,7 @@ export function ChartCanvas(props: {
                                                     key={`${String(datum.xLabel)}-${series.key}`}
                                                     type="button"
                                                     className="h-8 rounded-sm border border-border/40 text-[11px] tabular-nums text-foreground"
-                                                    style={{ backgroundColor: `color-mix(in oklab, var(--primary) ${Math.round(alpha * 100)}%, transparent)` }}
+                                                    style={{ backgroundColor: `color-mix(in oklab, ${primaryChartColor} ${Math.round(alpha * 100)}%, transparent)` }}
                                                     onClick={event =>
                                                         handleDatumClick(
                                                             datum as Record<string, unknown>,

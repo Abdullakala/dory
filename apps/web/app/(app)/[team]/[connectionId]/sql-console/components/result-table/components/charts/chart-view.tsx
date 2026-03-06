@@ -14,6 +14,9 @@ export function ChartView(props: {
     effectiveXKey: string;
     effectiveYLabel: string;
     effectiveGroupKey: string;
+    chartColorPreset: string;
+    chartColorPresetOptions: Array<{ value: string; label: string; preview: string[] }>;
+    chartColors: string[];
     aggregated: AggregatedChartData;
     chartConfig: ChartConfig;
     emptyMessage: string | null;
@@ -26,6 +29,7 @@ export function ChartView(props: {
     onXKeyChange: (value: string) => void;
     onYKeyChange: (value: string) => void;
     onGroupKeyChange: (value: string) => void;
+    onChartColorPresetChange: (value: string) => void;
     onTimelineSliderEnabledChange: (value: boolean) => void;
     onResetAuto: () => void;
 }) {
@@ -37,6 +41,9 @@ export function ChartView(props: {
         effectiveXKey,
         effectiveYLabel,
         effectiveGroupKey,
+        chartColorPreset,
+        chartColorPresetOptions,
+        chartColors,
         aggregated,
         chartConfig,
         emptyMessage,
@@ -46,6 +53,7 @@ export function ChartView(props: {
         onXKeyChange,
         onYKeyChange,
         onGroupKeyChange,
+        onChartColorPresetChange,
         onTimelineSliderEnabledChange,
         onResetAuto,
     } = props;
@@ -59,11 +67,14 @@ export function ChartView(props: {
                 metricOptions={metricOptions}
                 effectiveXKey={effectiveXKey}
                 bucketHint={aggregated.bucketHint}
+                chartColorPreset={chartColorPreset}
+                chartColorPresetOptions={chartColorPresetOptions}
                 timelineSliderEnabled={timelineSliderEnabled}
                 onChartTypeChange={onChartTypeChange}
                 onXKeyChange={onXKeyChange}
                 onYKeyChange={onYKeyChange}
                 onGroupKeyChange={onGroupKeyChange}
+                onChartColorPresetChange={onChartColorPresetChange}
                 onTimelineSliderEnabledChange={onTimelineSliderEnabledChange}
                 onResetAuto={onResetAuto}
             />
@@ -72,6 +83,7 @@ export function ChartView(props: {
                 chartConfig={chartConfig}
                 aggregated={aggregated}
                 effectiveGroupKey={effectiveGroupKey}
+                chartColors={chartColors}
                 xAxisLabel={effectiveXKey}
                 yAxisLabel={effectiveYLabel}
                 emptyMessage={emptyMessage}

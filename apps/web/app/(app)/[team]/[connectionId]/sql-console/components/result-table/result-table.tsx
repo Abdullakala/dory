@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Activity, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Download, MoreHorizontal, RefreshCw } from 'lucide-react';
 
 import VTable from './vtable';
@@ -20,6 +20,7 @@ import { debugModeAtom, uiRowBudgetAtom } from './stores/prefs.atoms';
 import { Badge } from '@/registry/new-york-v4/ui/badge';
 import { OverviewTable } from './OverviewTable';
 import { currentSessionMetaAtom } from './stores/result-table.atoms';
+import { chartStatesByKeyAtom, viewModesByTabAtom } from './components/charts/stores/chart-state.atoms';
 import { ResultStatusBar } from './ResultStatusBar';
 import { DebugPanel, DebugPayload } from './components/DebugPanel';
 import { makeSetUserPickedAtom, makeActiveSetAtom, makeAutoSetActiveSetAtom, makeSetActiveSetAtom, makeUserPickedAtom } from './stores/active-set.atoms';
@@ -32,7 +33,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from '@/registry/new-york-v4/ui/button';
 import { useVTableFilters, VTableFilters } from './vtable/VTableFilters';
 import { Tabs, TabsList, TabsTrigger } from '@/registry/new-york-v4/ui/tabs';
-import type { ChartState } from './components/charts/chart-shared';
 /* =================================== constants =================================== */
 
 const MAX_ROWS_HINT = 5_000_000; // UI hint only
@@ -42,7 +42,8 @@ const OVERVIEW_SET = -1;
 
 export function ResultTable() {
     const t = useTranslations('SqlConsole');
-    const [viewModesByKey, setViewModesByKey] = useState<Record<string, 'table' | 'charts'>>({});
+    const [viewModesByKey, setViewModesByKey] = useAtom(viewModesByTabAtom);
+    const [currentViewMode, setCurrentViewMode] = useState<'table' | 'charts'>('table');
     const [inspectorOpen, setInspectorOpen] = useState(false);
     const [inspectorMode, setInspectorMode] = useState<'cell' | 'row' | null>(null);
     const [inspectorPayload, setInspectorPayload] = useState<any>(null);
@@ -110,6 +111,8 @@ export function ResultTable() {
     useSessionMeta({ dbReady, tabId, sessionId, activeSet, dataVersion, getSession, setMeta, sessionStatus });
 
     const storageKey = useMemo(() => (tabId && sessionId ? `${tabId}:${sessionId}#${activeSet}` : 'unknown'), [tabId, sessionId, activeSet]);
+    const viewModeKey = useMemo(() => (tabId && activeSet >= 0 ? `tab:${tabId}:set:${activeSet}` : 'unknown'), [activeSet, tabId]);
+    const chartStateKey = useMemo(() => (tabId && activeSet >= 0 ? `tab:${tabId}:set:${activeSet}` : 'unknown'), [activeSet, tabId]);
 
     const showEmpty = !localDataLoading[tabId] && results.length === 0;
     const noSessionId = !sessionId;
@@ -121,10 +124,26 @@ export function ResultTable() {
     const shouldShowLimitNotice = isResult && limited;
 
     const [query, setQuery] = useState('');
-    const [chartStatesByKey, setChartStatesByKey] = useState<Record<string, ChartState>>({});
+    const [chartStatesByKey, setChartStatesByKey] = useAtom(chartStatesByKeyAtom);
+    const [chartStateVersionByTab, setChartStateVersionByTab] = useState<Record<string, number>>({});
+    const [chartSnapshotsBySet, setChartSnapshotsBySet] = useState<Record<number, { rows: Array<{ rowData: Record<string, unknown> }>; columnsRaw?: unknown }>>({});
     const rowCount = results.length;
-    const currentViewMode = viewModesByKey[storageKey] ?? 'table';
-    const currentChartState = useMemo(() => chartStatesByKey[storageKey], [chartStatesByKey, storageKey]);
+
+    useEffect(() => {
+        setCurrentViewMode(viewModesByKey[viewModeKey] ?? 'table');
+    }, [viewModeKey, viewModesByKey]);
+
+    const chartSetIndices = useMemo(() => {
+        const indicesFromSnapshot = Object.keys(chartSnapshotsBySet)
+            .map(value => Number(value))
+            .filter(value => Number.isFinite(value) && value >= 0);
+
+        if (activeSet >= 0 && !indicesFromSnapshot.includes(activeSet)) {
+            indicesFromSnapshot.push(activeSet);
+        }
+
+        return indicesFromSnapshot.sort((a, b) => a - b);
+    }, [activeSet, chartSnapshotsBySet]);
 
     const setUserPickedFalse = useSetAtom(useMemo(() => makeSetUserPickedAtom(tabId, sessionId), [tabId, sessionId]));
 
@@ -226,6 +245,23 @@ export function ResultTable() {
         results: filteredResults,
         storageKey,
     });
+
+    useEffect(() => {
+        if (activeSet < 0) {
+            return;
+        }
+        if (localDataLoading[tabId]) {
+            return;
+        }
+
+        setChartSnapshotsBySet(prev => ({
+            ...prev,
+            [activeSet]: {
+                rows: columnFilteredResults as Array<{ rowData: Record<string, unknown> }>,
+                columnsRaw: sessionMetas.columns,
+            },
+        }));
+    }, [activeSet, columnFilteredResults, localDataLoading, sessionMetas.columns, tabId]);
 
     const stats = useMemo(
         () => ({
@@ -691,24 +727,52 @@ export function ResultTable() {
                             value={currentViewMode}
                             onValueChange={value => {
                                 if (value === 'table' || value === 'charts') {
+                                    setCurrentViewMode(value);
                                     setViewModesByKey(prev => {
-                                        if (prev[storageKey] === value) return prev;
+                                        if (prev[viewModeKey] === value) return prev;
                                         return {
                                             ...prev,
-                                            [storageKey]: value,
+                                            [viewModeKey]: value,
                                         };
                                     });
                                 }
                             }}
                         >
-                            <TabsList className="h-7 p-[2px]" aria-label="Result view">
-                                <TabsTrigger value="table" className="h-6 px-3 text-xs cursor-pointer">
-                                    Table
-                                </TabsTrigger>
-                                <TabsTrigger value="charts" className="h-6 px-3 text-xs cursor-pointer">
-                                    Charts
-                                </TabsTrigger>
-                            </TabsList>
+                            <div className="flex items-center gap-2">
+                                <TabsList className="h-7 p-[2px]" aria-label="Result view">
+                                    <TabsTrigger value="table" className="h-6 px-3 text-xs cursor-pointer">
+                                        Table
+                                    </TabsTrigger>
+                                    <TabsTrigger value="charts" className="h-6 px-3 text-xs cursor-pointer">
+                                        Charts
+                                    </TabsTrigger>
+                                </TabsList>
+                                {currentViewMode === 'charts' ? (
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 px-2 text-xs"
+                                        onClick={() => {
+                                            setChartStatesByKey(prev => {
+                                                if (!prev[chartStateKey]) {
+                                                    return prev;
+                                                }
+
+                                                const next = { ...prev };
+                                                delete next[chartStateKey];
+                                                return next;
+                                            });
+                                            setChartStateVersionByTab(prev => ({
+                                                ...prev,
+                                                [chartStateKey]: (prev[chartStateKey] ?? 0) + 1,
+                                            }));
+                                        }}
+                                    >
+                                        Reset Chart State
+                                    </Button>
+                                ) : null}
+                            </div>
                         </Tabs>
                         <div className="flex min-w-0 flex-1 flex-row">
                             <VTableSearchBar
@@ -783,39 +847,65 @@ export function ResultTable() {
                         />
                     </>
                 ) : (
-                    <Charts
-                        rows={columnFilteredResults}
-                        columnsRaw={sessionMetas.columns}
-                        stateKey={storageKey}
-                        initialState={currentChartState}
-                        onStateChange={nextState => {
-                            setChartStatesByKey(prev => {
-                                const current = prev[storageKey];
-                                if (
-                                    current?.chartType === nextState.chartType &&
-                                    current?.xKey === nextState.xKey &&
-                                    current?.yKey === nextState.yKey &&
-                                    current?.groupKey === nextState.groupKey
-                                ) {
-                                    return prev;
-                                }
-
-                                return {
-                                    ...prev,
-                                    [storageKey]: nextState,
-                                };
-                            });
-                        }}
-                        onApplyFilters={(filters, options) => {
-                            if (!options?.append) {
-                                clearAllFilters();
+                    <div className="flex min-h-0 flex-1">
+                        {chartSetIndices.map(setIndex => {
+                            const setChartStateKey = tabId ? `tab:${tabId}:set:${setIndex}` : 'unknown';
+                            const snapshot = chartSnapshotsBySet[setIndex] ?? (setIndex === activeSet ? { rows: columnFilteredResults, columnsRaw: sessionMetas.columns } : undefined);
+                            if (!snapshot) {
+                                return null;
                             }
 
-                            filters.forEach(filter => {
-                                setColumnFilter(filter);
-                            });
-                        }}
-                    />
+                            const setVersion = chartStateVersionByTab[setChartStateKey] ?? 0;
+                            const setInitialState = setChartStateKey !== 'unknown' ? chartStatesByKey[setChartStateKey] : undefined;
+                            const visible = setIndex === activeSet;
+
+                            return (
+                                <Activity key={setChartStateKey} mode={visible ? 'visible' : 'hidden'}>
+                                    <div className={`flex min-h-0 flex-1 flex-col ${visible ? '' : 'hidden'}`}>
+                                        <Charts
+                                            key={`${setChartStateKey}:${setVersion}`}
+                                            rows={snapshot.rows}
+                                            columnsRaw={snapshot.columnsRaw}
+                                            stateKey={setChartStateKey}
+                                            initialState={setInitialState}
+                                            stateSyncEnabled={visible ? !localDataLoading[tabId] : false}
+                                            onStateChange={nextState => {
+                                                setChartStatesByKey(prev => {
+                                                    const current = prev[setChartStateKey];
+                                                    if (
+                                                        current?.chartType === nextState.chartType &&
+                                                        current?.xKey === nextState.xKey &&
+                                                        current?.yKey === nextState.yKey &&
+                                                        current?.groupKey === nextState.groupKey &&
+                                                        current?.chartColorPreset === nextState.chartColorPreset
+                                                    ) {
+                                                        return prev;
+                                                    }
+
+                                                    return {
+                                                        ...prev,
+                                                        [setChartStateKey]: nextState,
+                                                    };
+                                                });
+                                            }}
+                                            onApplyFilters={(filters, options) => {
+                                                if (!visible) {
+                                                    return;
+                                                }
+                                                if (!options?.append) {
+                                                    clearAllFilters();
+                                                }
+
+                                                filters.forEach(filter => {
+                                                    setColumnFilter(filter);
+                                                });
+                                            }}
+                                        />
+                                    </div>
+                                </Activity>
+                            );
+                        })}
+                    </div>
                 )}
             </div>
         );

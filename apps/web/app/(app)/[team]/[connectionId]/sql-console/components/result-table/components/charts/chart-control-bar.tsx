@@ -16,11 +16,14 @@ export function ChartControlBar(props: {
     metricOptions: MetricOption[];
     effectiveXKey: string;
     bucketHint?: string | null;
+    chartColorPreset: string;
+    chartColorPresetOptions: Array<{ value: string; label: string; preview: string[] }>;
     timelineSliderEnabled: boolean;
     onChartTypeChange: (value: string) => void;
     onXKeyChange: (value: string) => void;
     onYKeyChange: (value: string) => void;
     onGroupKeyChange: (value: string) => void;
+    onChartColorPresetChange: (value: string) => void;
     onTimelineSliderEnabledChange: (value: boolean) => void;
     onResetAuto: () => void;
 }) {
@@ -30,11 +33,14 @@ export function ChartControlBar(props: {
         metricOptions,
         effectiveXKey,
         bucketHint,
+        chartColorPreset,
+        chartColorPresetOptions,
         timelineSliderEnabled,
         onChartTypeChange,
         onXKeyChange,
         onYKeyChange,
         onGroupKeyChange,
+        onChartColorPresetChange,
         onTimelineSliderEnabledChange,
     } = props;
 
@@ -105,7 +111,7 @@ export function ChartControlBar(props: {
                             <Settings2 className="h-3.5 w-3.5" />
                         </Button>
                     </PopoverTrigger>
-                    <PopoverContent align="end" className="w-[260px]">
+                    <PopoverContent align="end" className="w-[300px]">
                         {supportsTimelineSlider ? (
                             <div className="flex items-start justify-between gap-3">
                                 <div className="space-y-0.5">
@@ -120,6 +126,31 @@ export function ChartControlBar(props: {
                                 <p className="text-[11px] text-muted-foreground">This chart type does not support DataZoom timeline.</p>
                             </div>
                         )}
+                        <div className="my-3 h-px bg-border" />
+                        <div className="space-y-1.5">
+                            <p className="text-xs font-medium">Chart color</p>
+                            <div className="grid grid-cols-2 gap-2">
+                                {chartColorPresetOptions.map(option => {
+                                    const selected = option.value === chartColorPreset;
+                                    return (
+                                        <Button
+                                            key={option.value}
+                                            type="button"
+                                            variant={selected ? 'default' : 'outline'}
+                                            className={cn('h-8 justify-start gap-2 px-2 text-xs', !selected && 'bg-background')}
+                                            onClick={() => onChartColorPresetChange(option.value)}
+                                        >
+                                            <span className="flex items-center gap-1">
+                                                {option.preview.slice(0, 3).map((color, index) => (
+                                                    <span key={`${option.value}-${index}`} className="h-2.5 w-2.5 rounded-full border border-border/60" style={{ backgroundColor: color }} />
+                                                ))}
+                                            </span>
+                                            <span className="truncate">{option.label}</span>
+                                        </Button>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </PopoverContent>
                 </Popover>
             </div>

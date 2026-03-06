@@ -21,7 +21,7 @@ export type ChartSeries = {
 };
 
 export type AggregatedChartData = {
-    data: Array<Record<string, number | string>>;
+    data: Array<Record<string, unknown>>;
     series: ChartSeries[];
     bucketHint?: string | null;
 };

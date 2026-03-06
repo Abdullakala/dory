@@ -5,12 +5,18 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { type ChartConfig } from '@/registry/new-york-v4/ui/chart';
 import { cn } from '@/registry/new-york-v4/lib/utils';
 import { ChartView } from './chart-view';
-import { type AggregatedChartData, ALL_SERIES_KEY, CHART_COLORS, type ChartRow, type ChartType, type MetricOption, NONE_VALUE } from './chart-shared';
+import { type AggregatedChartData, ALL_SERIES_KEY, CHART_COLORS, type ChartRow, type ChartState, type ChartType, type MetricOption, NONE_VALUE } from './chart-shared';
+import { buildEqualsFilterFromCell } from '../../vtable/filter';
+import { type ColumnFilter } from '../../vtable/type';
 
 type ChartsProps = {
     rows: ChartRow[];
     columnsRaw?: unknown;
     className?: string;
+    onApplyFilters?: (filters: ColumnFilter[], options?: { append?: boolean }) => void;
+    stateKey?: string;
+    initialState?: Partial<ChartState>;
+    onStateChange?: (state: ChartState) => void;
 };
 
 type ColumnKind = 'date' | 'numeric' | 'category';
@@ -31,9 +37,30 @@ type SuggestedChartState = {
     groupKey: string;
 };
 
+type ChartFilterSpec =
+    | {
+          col: string;
+          kind: 'exact';
+          raw: unknown;
+      }
+    | {
+          col: string;
+          kind: 'range';
+          from: string;
+          to: string;
+          valueType: 'number' | 'date';
+          label: string;
+      };
+
+type ChartApplyMode = {
+    append?: boolean;
+};
+
 type BucketStrategy = {
     getBucketLabel: (value: unknown) => string;
     getSortValue: (value: unknown) => number;
+    getFilterSpec: (value: unknown) => ChartFilterSpec | null;
+    getBrushFilterSpec: (value: unknown) => Extract<ChartFilterSpec, { kind: 'range' }> | null;
     bucketHint: string | null;
 };
 
@@ -226,6 +253,49 @@ function getColumnNames(columnsRaw: unknown, rows: ChartRow[]) {
     }
 
     return [];
+}
+
+function getColumnType(columnsRaw: unknown, columnName: string) {
+    if (!Array.isArray(columnsRaw)) {
+        return null;
+    }
+
+    const matched = columnsRaw.find(column => column && typeof column === 'object' && 'name' in column && String((column as { name?: unknown }).name ?? '') === columnName) as
+        | { type?: unknown }
+        | undefined;
+
+    return matched?.type == null ? null : String(matched.type);
+}
+
+function inferSingleValueRange(value: unknown, valueType: 'number' | 'date') {
+    if (valueType === 'number') {
+        const numericValue = toNumericValue(value);
+        if (numericValue == null) return null;
+        return {
+            from: String(numericValue),
+            to: String(numericValue + Number.EPSILON),
+        };
+    }
+
+    if (value instanceof Date) {
+        const from = value.getTime();
+        return {
+            from: new Date(from).toISOString(),
+            to: new Date(from + 1).toISOString(),
+        };
+    }
+
+    const raw = String(value ?? '');
+    const parsed = parseDateValue(raw);
+    if (parsed == null) return null;
+    const next = new Date(parsed);
+    if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(raw.trim())) next.setUTCDate(next.getUTCDate() + 1);
+    else if (/^\d{4}-\d{1,2}-\d{1,2}\s+\d{1,2}:\d{2}$/.test(raw.trim())) next.setUTCMinutes(next.getUTCMinutes() + 1);
+    else next.setUTCMilliseconds(next.getUTCMilliseconds() + 1);
+    return {
+        from: new Date(parsed).toISOString(),
+        to: next.toISOString(),
+    };
 }
 
 function buildMetricOptions(columnProfiles: ColumnProfile[]) {
@@ -434,11 +504,26 @@ function buildBucketStrategy(props: {
     const rawDistinctCount = getRawDistinctCount(rows, effectiveXKey);
 
     if (!xProfile || rawDistinctCount <= MAX_BUCKETS) {
+        const valueType = xProfile?.kind === 'date' ? 'date' : xProfile?.kind === 'numeric' ? 'number' : null;
         return {
             getBucketLabel: value => toDimensionLabel(value),
             getSortValue: value => {
                 const timestamp = parseDateValue(value);
                 return timestamp ?? Number.MAX_SAFE_INTEGER;
+            },
+            getFilterSpec: value => ({ col: effectiveXKey, kind: 'exact', raw: value }),
+            getBrushFilterSpec: value => {
+                if (!valueType) return null;
+                const range = inferSingleValueRange(value, valueType);
+                if (!range) return null;
+                return {
+                    col: effectiveXKey,
+                    kind: 'range',
+                    from: range.from,
+                    to: range.to,
+                    valueType,
+                    label: toDimensionLabel(value),
+                };
             },
             bucketHint: null,
         };
@@ -464,6 +549,46 @@ function buildBucketStrategy(props: {
                 const timestamp = parseDateValue(value);
                 return timestamp == null ? Number.MAX_SAFE_INTEGER : getDateBucketStart(timestamp, granularity);
             },
+            getFilterSpec: value => {
+                const timestamp = parseDateValue(value);
+                if (timestamp == null) return null;
+                const from = getDateBucketStart(timestamp, granularity);
+                const next = new Date(from);
+
+                if (granularity === 'minute') next.setUTCMinutes(next.getUTCMinutes() + 1);
+                else if (granularity === 'hour') next.setUTCHours(next.getUTCHours() + 1);
+                else if (granularity === 'day') next.setUTCDate(next.getUTCDate() + 1);
+                else if (granularity === 'week') next.setUTCDate(next.getUTCDate() + 7);
+                else next.setUTCMonth(next.getUTCMonth() + 1);
+
+                return {
+                    col: effectiveXKey,
+                    kind: 'range',
+                    from: new Date(from).toISOString(),
+                    to: next.toISOString(),
+                    valueType: 'date',
+                    label: formatDateBucketLabel(from, granularity),
+                };
+            },
+            getBrushFilterSpec: value => {
+                const timestamp = parseDateValue(value);
+                if (timestamp == null) return null;
+                const from = getDateBucketStart(timestamp, granularity);
+                const next = new Date(from);
+                if (granularity === 'minute') next.setUTCMinutes(next.getUTCMinutes() + 1);
+                else if (granularity === 'hour') next.setUTCHours(next.getUTCHours() + 1);
+                else if (granularity === 'day') next.setUTCDate(next.getUTCDate() + 1);
+                else if (granularity === 'week') next.setUTCDate(next.getUTCDate() + 7);
+                else next.setUTCMonth(next.getUTCMonth() + 1);
+                return {
+                    col: effectiveXKey,
+                    kind: 'range',
+                    from: new Date(from).toISOString(),
+                    to: next.toISOString(),
+                    valueType: 'date',
+                    label: formatDateBucketLabel(from, granularity),
+                };
+            },
             bucketHint: `Auto-bucketed to ${bucketStarts.size} groups`,
         };
     }
@@ -474,6 +599,8 @@ function buildBucketStrategy(props: {
             return {
                 getBucketLabel: value => toDimensionLabel(value),
                 getSortValue: () => Number.MAX_SAFE_INTEGER,
+                getFilterSpec: value => ({ col: effectiveXKey, kind: 'exact', raw: value }),
+                getBrushFilterSpec: () => null,
                 bucketHint: null,
             };
         }
@@ -499,6 +626,51 @@ function buildBucketStrategy(props: {
                 if (numericValue == null || min === max) return min;
                 const rawIndex = Math.floor((numericValue - min) / binSize);
                 return Math.min(binCount - 1, Math.max(0, rawIndex));
+            },
+            getFilterSpec: value => {
+                const numericValue = toNumericValue(value);
+                if (numericValue == null) return null;
+                if (min === max) {
+                    return { col: effectiveXKey, kind: 'exact', raw: numericValue };
+                }
+                const rawIndex = Math.floor((numericValue - min) / binSize);
+                const index = Math.min(binCount - 1, Math.max(0, rawIndex));
+                const start = min + binSize * index;
+                const end = index === binCount - 1 ? max + Number.EPSILON : start + binSize;
+                return {
+                    col: effectiveXKey,
+                    kind: 'range',
+                    from: String(start),
+                    to: String(end),
+                    valueType: 'number',
+                    label: `${formatNumberLabel(start)}-${formatNumberLabel(index === binCount - 1 ? max : start + binSize)}`,
+                };
+            },
+            getBrushFilterSpec: value => {
+                const numericValue = toNumericValue(value);
+                if (numericValue == null) return null;
+                if (min === max) {
+                    return {
+                        col: effectiveXKey,
+                        kind: 'range',
+                        from: String(min),
+                        to: String(min + Number.EPSILON),
+                        valueType: 'number',
+                        label: formatNumberLabel(min),
+                    };
+                }
+                const rawIndex = Math.floor((numericValue - min) / binSize);
+                const index = Math.min(binCount - 1, Math.max(0, rawIndex));
+                const start = min + binSize * index;
+                const end = index === binCount - 1 ? max + Number.EPSILON : start + binSize;
+                return {
+                    col: effectiveXKey,
+                    kind: 'range',
+                    from: String(start),
+                    to: String(end),
+                    valueType: 'number',
+                    label: `${formatNumberLabel(start)}-${formatNumberLabel(index === binCount - 1 ? max : start + binSize)}`,
+                };
             },
             bucketHint: `Auto-bucketed to ${binCount} groups`,
         };
@@ -529,6 +701,12 @@ function buildBucketStrategy(props: {
             if (label === OTHERS_SERIES_LABEL || !topBuckets.has(label)) return TOP_CATEGORY_BUCKETS;
             return [...topBuckets].indexOf(label);
         },
+        getFilterSpec: value => {
+            const label = toDimensionLabel(value);
+            if (!topBuckets.has(label)) return null;
+            return { col: effectiveXKey, kind: 'exact', raw: value };
+        },
+        getBrushFilterSpec: () => null,
         bucketHint: `Auto-bucketed to ${Math.min(TOP_CATEGORY_BUCKETS, topBuckets.size) + (bucketTotals.size > TOP_CATEGORY_BUCKETS ? 1 : 0)} groups`,
     };
 }
@@ -549,7 +727,7 @@ function aggregateByDimension(props: {
         selectedMetric,
     });
     const groupTotals = new Map<string, number>();
-    const dataMap = new Map<string, Record<string, number | string>>();
+    const dataMap = new Map<string, Record<string, unknown>>();
     const sortMap = new Map<string, number>();
     const seriesMap = new Map<string, string>();
     const avgState = new Map<string, { sum: number; count: number }>();
@@ -586,7 +764,11 @@ function aggregateByDimension(props: {
 
         let datum = dataMap.get(xLabel);
         if (!datum) {
-            datum = { xLabel };
+            datum = {
+                xLabel,
+                __xFilter: bucketStrategy.getFilterSpec(rawXValue),
+                __xBrushFilter: bucketStrategy.getBrushFilterSpec(rawXValue),
+            };
             dataMap.set(xLabel, datum);
         }
 
@@ -654,15 +836,26 @@ function aggregateByDimension(props: {
     };
 }
 
-export function Charts({ rows, columnsRaw, className }: ChartsProps) {
+function mergeChartState(suggestedState: SuggestedChartState, initialState?: Partial<ChartState>): ChartState {
+    return {
+        chartType: initialState?.chartType ?? suggestedState.chartType,
+        xKey: initialState?.xKey ?? suggestedState.xKey,
+        yKey: initialState?.yKey ?? suggestedState.yKey,
+        groupKey: initialState?.groupKey ?? suggestedState.groupKey,
+    };
+}
+
+export function Charts({ rows, columnsRaw, className, onApplyFilters, stateKey, initialState, onStateChange }: ChartsProps) {
     const columnNames = useMemo(() => getColumnNames(columnsRaw, rows), [columnsRaw, rows]);
     const columnProfiles = useMemo(() => analyzeColumns(columnNames, rows), [columnNames, rows]);
     const suggestedState = useMemo(() => getSuggestedState(columnProfiles), [columnProfiles]);
+    const mergedInitialState = useMemo(() => mergeChartState(suggestedState, initialState), [initialState, suggestedState]);
+    const lastAppliedStateKeyRef = React.useRef<string | undefined>(stateKey);
 
-    const [chartType, setChartType] = useState<ChartType>(suggestedState.chartType);
-    const [xKey, setXKey] = useState(suggestedState.xKey);
-    const [yKey, setYKey] = useState(suggestedState.yKey);
-    const [groupKey, setGroupKey] = useState(suggestedState.groupKey);
+    const [chartType, setChartType] = useState<ChartType>(() => mergedInitialState.chartType);
+    const [xKey, setXKey] = useState(() => mergedInitialState.xKey);
+    const [yKey, setYKey] = useState(() => mergedInitialState.yKey);
+    const [groupKey, setGroupKey] = useState(() => mergedInitialState.groupKey);
 
     const metricOptions = useMemo<MetricOption[]>(() => buildMetricOptions(columnProfiles), [columnProfiles]);
 
@@ -670,6 +863,19 @@ export function Charts({ rows, columnsRaw, className }: ChartsProps) {
 
     const effectiveXKey = columnNames.includes(xKey) ? xKey : suggestedState.xKey;
     const effectiveGroupKey = groupKey !== NONE_VALUE && columnNames.includes(groupKey) ? groupKey : NONE_VALUE;
+
+    useEffect(() => {
+        if (lastAppliedStateKeyRef.current === stateKey) {
+            return;
+        }
+
+        lastAppliedStateKeyRef.current = stateKey;
+        setChartType(mergedInitialState.chartType);
+        setXKey(mergedInitialState.xKey);
+        setYKey(mergedInitialState.yKey);
+        setGroupKey(mergedInitialState.groupKey);
+    }, [mergedInitialState.chartType, mergedInitialState.groupKey, mergedInitialState.xKey, mergedInitialState.yKey, stateKey]);
+
     useEffect(() => {
         if (!columnNames.includes(xKey)) {
             setXKey(suggestedState.xKey);
@@ -687,6 +893,15 @@ export function Charts({ rows, columnsRaw, className }: ChartsProps) {
             setGroupKey(suggestedState.groupKey);
         }
     }, [columnNames, groupKey, suggestedState.groupKey]);
+
+    useEffect(() => {
+        onStateChange?.({
+            chartType,
+            xKey,
+            yKey,
+            groupKey,
+        });
+    }, [chartType, groupKey, onStateChange, xKey, yKey]);
 
     const chartStateIsAuto = chartType === suggestedState.chartType && xKey === suggestedState.xKey && yKey === suggestedState.yKey && groupKey === suggestedState.groupKey;
 
@@ -717,6 +932,41 @@ export function Charts({ rows, columnsRaw, className }: ChartsProps) {
         return config;
     }, [aggregated.series, selectedMetric]);
 
+    const handleChartFilter = (filters: ChartFilterSpec[], mode?: ChartApplyMode) => {
+        if (!onApplyFilters) {
+            return;
+        }
+
+        const nextFilters: ColumnFilter[] = [];
+        for (const filter of filters) {
+            if (filter.kind === 'exact') {
+                nextFilters.push(
+                    buildEqualsFilterFromCell({
+                        colName: filter.col,
+                        colType: getColumnType(columnsRaw, filter.col),
+                        raw: filter.raw,
+                    }),
+                );
+                continue;
+            }
+
+            nextFilters.push({
+                col: filter.col,
+                kind: 'range',
+                op: 'range',
+                value: filter.from,
+                valueTo: filter.to,
+                rangeValueType: filter.valueType,
+                label: filter.label,
+                caseSensitive: false,
+            });
+        }
+
+        if (nextFilters.length > 0) {
+            onApplyFilters(nextFilters, mode);
+        }
+    };
+
     const hasRenderableData = aggregated.data.length > 0 && aggregated.series.length > 0;
     const emptyMessage = getChartEmptyMessage({
         columnNames,
@@ -738,6 +988,7 @@ export function Charts({ rows, columnsRaw, className }: ChartsProps) {
                     aggregated={aggregated}
                     chartConfig={chartConfig}
                     emptyMessage={emptyMessage}
+                    onApplyChartFilter={handleChartFilter}
                     onChartTypeChange={value => {
                         if (value === 'bar' || value === 'line') {
                             setChartType(value);

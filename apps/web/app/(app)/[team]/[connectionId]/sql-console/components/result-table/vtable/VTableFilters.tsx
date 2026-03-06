@@ -24,6 +24,9 @@ type PopoverColumnMeta = { name: string; type: string };
 const MAX_VISIBLE_FILTERS = 3;
 
 function formatFilterSummary(filter: ColumnFilter, t: (key: string) => string) {
+    if (filter.label) {
+        return `${filter.col} = ${filter.label}`;
+    }
     const value = filter.value ? ` = ${filter.value}` : '';
     const caseSensitive = filter.kind === 'string' && filter.caseSensitive ? t('VTable.Filter.CaseSensitiveSuffix') : '';
     return `${filter.col}${value}${caseSensitive}`;
@@ -84,6 +87,30 @@ function testNumber(raw: any, op: NumOp, val?: string) {
     }
 }
 
+function testRange(raw: any, filter: ColumnFilter) {
+    if (!filter.value || !filter.valueTo || !filter.rangeValueType) {
+        return false;
+    }
+
+    if (filter.rangeValueType === 'date') {
+        const current = raw instanceof Date ? raw.getTime() : Date.parse(String(raw ?? ''));
+        const from = Date.parse(filter.value);
+        const to = Date.parse(filter.valueTo);
+        if (!Number.isFinite(current) || !Number.isFinite(from) || !Number.isFinite(to)) {
+            return false;
+        }
+        return current >= from && current < to;
+    }
+
+    const current = typeof raw === 'number' ? raw : Number(raw);
+    const from = Number(filter.value);
+    const to = Number(filter.valueTo);
+    if (!Number.isFinite(current) || !Number.isFinite(from) || !Number.isFinite(to)) {
+        return false;
+    }
+    return current >= from && current < to;
+}
+
 export function useVTableFilters({
     results,
     storageKey,
@@ -122,6 +149,8 @@ export function useVTableFilters({
                 const raw = row.rowData?.[filter.col];
                 if (filter.kind === 'string') {
                     if (!testString(raw, filter.op as StrOp, filter.value, filter.caseSensitive)) return false;
+                } else if (filter.kind === 'range') {
+                    if (!testRange(raw, filter)) return false;
                 } else if (!testNumber(raw, filter.op as NumOp, filter.value)) {
                     return false;
                 }
@@ -274,6 +303,9 @@ export function VTableFilters({
 
     const openFilterEditor = useCallback(
         (filter: ColumnFilter, anchor: HTMLElement) => {
+            if (filter.kind === 'range') {
+                return;
+            }
             setFilterDraft({
                 col: filter.col,
                 kind: filter.kind === 'number' ? 'number' : 'string',
@@ -399,9 +431,12 @@ function FilterPill({
         >
             <button
                 type="button"
-                className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden text-left cursor-pointer"
-                onClick={event => onOpen(filter, event.currentTarget)}
-                title={t('VTable.Filter.EditHint')}
+                className={cn('flex min-w-0 flex-1 items-center gap-1 overflow-hidden text-left', filter.kind === 'range' ? 'cursor-default' : 'cursor-pointer')}
+                onClick={event => {
+                    if (filter.kind === 'range') return;
+                    onOpen(filter, event.currentTarget);
+                }}
+                title={filter.kind === 'range' ? label : t('VTable.Filter.EditHint')}
             >
                 <Filter className="h-3 w-3 shrink-0 text-muted-foreground" />
                 <span className="truncate">{label}</span>

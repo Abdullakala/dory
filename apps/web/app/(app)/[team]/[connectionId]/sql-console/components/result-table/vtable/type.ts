@@ -32,8 +32,11 @@ export type StrOp = 'contains' | 'equals' | 'startsWith' | 'endsWith' | 'empty' 
 export type NumOp = 'eq' | 'ne' | 'gt' | 'ge' | 'lt' | 'le';
 export interface ColumnFilter {
     col: string;
-    kind: 'string' | 'number';
-    op: StrOp | NumOp;
+    kind: 'string' | 'number' | 'range';
+    op: StrOp | NumOp | 'range';
     value?: string; 
+    valueTo?: string;
+    rangeValueType?: 'number' | 'date';
+    label?: string;
     caseSensitive?: boolean;
 }

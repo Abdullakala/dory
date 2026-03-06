@@ -32,6 +32,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from '@/registry/new-york-v4/ui/button';
 import { useVTableFilters, VTableFilters } from './vtable/VTableFilters';
 import { Tabs, TabsList, TabsTrigger } from '@/registry/new-york-v4/ui/tabs';
+import type { ChartState } from './components/charts/chart-shared';
 /* =================================== constants =================================== */
 
 const MAX_ROWS_HINT = 5_000_000; // UI hint only
@@ -120,9 +121,9 @@ export function ResultTable() {
     const shouldShowLimitNotice = isResult && limited;
 
     const [query, setQuery] = useState('');
-    const [stats, setStats] = useState({ filteredCount: 0, totalCount: results.length });
-
+    const [chartStatesByKey, setChartStatesByKey] = useState<Record<string, ChartState>>({});
     const rowCount = results.length;
+    const currentChartState = useMemo(() => chartStatesByKey[storageKey], [chartStatesByKey, storageKey]);
 
     const setUserPickedFalse = useSetAtom(useMemo(() => makeSetUserPickedAtom(tabId, sessionId), [tabId, sessionId]));
 
@@ -225,18 +226,15 @@ export function ResultTable() {
         storageKey,
     });
 
-    const onStatsChange = useCallback(
-        (s: { filteredCount: number }) => {
-            setStats({ filteredCount: s.filteredCount, totalCount: results.length });
-        },
-        [results.length],
+    const stats = useMemo(
+        () => ({
+            filteredCount: columnFilteredResults.length,
+            totalCount: results.length,
+        }),
+        [columnFilteredResults.length, results.length],
     );
 
-    useEffect(() => {
-        if (filteredResults.length === 0) {
-            setStats({ filteredCount: 0, totalCount: results.length });
-        }
-    }, [filteredResults.length]);
+    const onStatsChange = useCallback(() => {}, []);
 
     /* ---------- Reset on Tab switch ---------- */
     useEffect(() => {
@@ -778,7 +776,39 @@ export function ResultTable() {
                         />
                     </>
                 ) : (
-                    <Charts rows={columnFilteredResults} columnsRaw={sessionMetas.columns} />
+                    <Charts
+                        rows={columnFilteredResults}
+                        columnsRaw={sessionMetas.columns}
+                        stateKey={storageKey}
+                        initialState={currentChartState}
+                        onStateChange={nextState => {
+                            setChartStatesByKey(prev => {
+                                const current = prev[storageKey];
+                                if (
+                                    current?.chartType === nextState.chartType &&
+                                    current?.xKey === nextState.xKey &&
+                                    current?.yKey === nextState.yKey &&
+                                    current?.groupKey === nextState.groupKey
+                                ) {
+                                    return prev;
+                                }
+
+                                return {
+                                    ...prev,
+                                    [storageKey]: nextState,
+                                };
+                            });
+                        }}
+                        onApplyFilters={(filters, options) => {
+                            if (!options?.append) {
+                                clearAllFilters();
+                            }
+
+                            filters.forEach(filter => {
+                                setColumnFilter(filter);
+                            });
+                        }}
+                    />
                 )}
             </div>
         );

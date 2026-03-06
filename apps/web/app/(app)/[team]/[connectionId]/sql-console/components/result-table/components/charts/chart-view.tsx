@@ -16,6 +16,10 @@ export function ChartView(props: {
     aggregated: AggregatedChartData;
     chartConfig: ChartConfig;
     emptyMessage: string | null;
+    onApplyChartFilter: (
+        filters: Array<{ col: string; kind: 'exact'; raw: unknown } | { col: string; kind: 'range'; from: string; to: string; valueType: 'number' | 'date'; label: string }>,
+        mode?: { append?: boolean },
+    ) => void;
     onChartTypeChange: (value: string) => void;
     onXKeyChange: (value: string) => void;
     onYKeyChange: (value: string) => void;
@@ -32,6 +36,7 @@ export function ChartView(props: {
         aggregated,
         chartConfig,
         emptyMessage,
+        onApplyChartFilter,
         onChartTypeChange,
         onXKeyChange,
         onYKeyChange,
@@ -60,6 +65,7 @@ export function ChartView(props: {
                 aggregated={aggregated}
                 effectiveGroupKey={effectiveGroupKey}
                 emptyMessage={emptyMessage}
+                onApplyChartFilter={onApplyChartFilter}
             />
         </div>
     );

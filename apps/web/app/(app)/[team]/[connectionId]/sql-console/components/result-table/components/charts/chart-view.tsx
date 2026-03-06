@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { toast } from 'sonner';
 
 import { ChartConfig } from '@/registry/new-york-v4/ui/chart';
 
@@ -153,7 +154,7 @@ export function ChartView(props: {
                 img.src = objectUrl;
             });
 
-            const scale = 2;
+            const scale = 4;
             const canvas = document.createElement('canvas');
             canvas.width = Math.max(1, Math.round(serialized.width * scale));
             canvas.height = Math.max(1, Math.round(serialized.height * scale));
@@ -181,6 +182,56 @@ export function ChartView(props: {
         }
     }, [buildFileName, downloadBlob, getSerializedSvg]);
 
+    const handleCopyPng = React.useCallback(async () => {
+        const serialized = getSerializedSvg();
+        if (!serialized || !navigator?.clipboard || typeof ClipboardItem === 'undefined') {
+            return;
+        }
+
+        const svgBlob = new Blob([serialized.svgText], { type: 'image/svg+xml;charset=utf-8' });
+        const objectUrl = URL.createObjectURL(svgBlob);
+
+        try {
+            const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = objectUrl;
+            });
+
+            const scale = 4;
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(serialized.width * scale));
+            canvas.height = Math.max(1, Math.round(serialized.height * scale));
+
+            const context = canvas.getContext('2d');
+            if (!context) {
+                return;
+            }
+
+            context.scale(scale, scale);
+            context.drawImage(image, 0, 0, serialized.width, serialized.height);
+
+            const pngBlob = await new Promise<Blob | null>(resolve => {
+                canvas.toBlob(blob => resolve(blob), 'image/png');
+            });
+            if (!pngBlob) {
+                return;
+            }
+
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    'image/png': pngBlob,
+                }),
+            ]);
+            toast.success('PNG copied to clipboard');
+        } catch {
+            // Ignore copy failures when clipboard APIs are unavailable or blocked.
+        } finally {
+            URL.revokeObjectURL(objectUrl);
+        }
+    }, [getSerializedSvg]);
+
     return (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-muted/10">
             <ChartControlBar
@@ -203,6 +254,9 @@ export function ChartView(props: {
                 canExportChart={canExportChart}
                 onExportPng={() => {
                     void handleExportPng();
+                }}
+                onCopyPng={() => {
+                    void handleCopyPng();
                 }}
                 onExportSvg={handleExportSvg}
             />

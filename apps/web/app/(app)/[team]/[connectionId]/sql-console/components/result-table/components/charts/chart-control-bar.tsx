@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/registry/new-york-v4/
 import { Switch } from '@/registry/new-york-v4/ui/switch';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/registry/new-york-v4/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/registry/new-york-v4/ui/tooltip';
-import { ChevronRight, ChevronsUpDown, Download, RotateCcw, Settings2 } from 'lucide-react';
+import { ChevronRight, ChevronsUpDown, Copy, Download, FileImage, RotateCcw, Settings2 } from 'lucide-react';
 
 import { ChartCombobox, ChartSelect, type ChartState, type MetricOption, NONE_VALUE } from './chart-shared';
 
@@ -30,6 +30,7 @@ export function ChartControlBar(props: {
     onResetAuto: () => void;
     canExportChart: boolean;
     onExportPng: () => void;
+    onCopyPng: () => void;
     onExportSvg: () => void;
 }) {
     const {
@@ -51,6 +52,7 @@ export function ChartControlBar(props: {
         onResetAuto,
         canExportChart,
         onExportPng,
+        onCopyPng,
         onExportSvg,
     } = props;
 
@@ -129,10 +131,16 @@ export function ChartControlBar(props: {
                             <TooltipContent side="top">Download</TooltipContent>
                         </Tooltip>
                         <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={onCopyPng} disabled={!canExportChart}>
+                                <Copy />
+                                Copy PNG
+                            </DropdownMenuItem>
                             <DropdownMenuItem onSelect={onExportPng} disabled={!canExportChart}>
+                                <FileImage />
                                 PNG
                             </DropdownMenuItem>
                             <DropdownMenuItem onSelect={onExportSvg} disabled={!canExportChart}>
+                                <FileImage />
                                 SVG
                             </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -170,47 +178,47 @@ export function ChartControlBar(props: {
                             </TooltipTrigger>
                             <TooltipContent side="top">Settings</TooltipContent>
                         </Tooltip>
-                    <PopoverContent align="end" className="w-[300px]">
-                        {supportsTimelineSlider ? (
-                            <div className="flex items-start justify-between gap-3">
-                                <div className="space-y-0.5">
-                                    <p className="text-xs font-medium">Enable timeline slider</p>
-                                    <p className="text-[11px] text-muted-foreground">Show DataZoom timeline, Reset Zoom, and Apply Brush Filter.</p>
+                        <PopoverContent align="end" className="w-[300px]">
+                            {supportsTimelineSlider ? (
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="space-y-0.5">
+                                        <p className="text-xs font-medium">Enable timeline slider</p>
+                                        <p className="text-[11px] text-muted-foreground">Show DataZoom timeline, Reset Zoom, and Apply Brush Filter.</p>
+                                    </div>
+                                    <Switch checked={timelineSliderEnabled} onCheckedChange={onTimelineSliderEnabledChange} />
                                 </div>
-                                <Switch checked={timelineSliderEnabled} onCheckedChange={onTimelineSliderEnabledChange} />
+                            ) : (
+                                <div className="space-y-0.5">
+                                    <p className="text-xs font-medium">Timeline slider unavailable</p>
+                                    <p className="text-[11px] text-muted-foreground">This chart type does not support DataZoom timeline.</p>
+                                </div>
+                            )}
+                            <div className="my-3 h-px bg-border" />
+                            <div className="space-y-1.5">
+                                <p className="text-xs font-medium">Chart color</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {chartColorPresetOptions.map(option => {
+                                        const selected = option.value === chartColorPreset;
+                                        return (
+                                            <Button
+                                                key={option.value}
+                                                type="button"
+                                                variant={selected ? 'default' : 'outline'}
+                                                className={cn('h-8 justify-start gap-2 px-2 text-xs', !selected && 'bg-background')}
+                                                onClick={() => onChartColorPresetChange(option.value)}
+                                            >
+                                                <span className="flex items-center gap-1">
+                                                    {option.preview.slice(0, 3).map((color, index) => (
+                                                        <span key={`${option.value}-${index}`} className="h-2.5 w-2.5 rounded-full border border-border/60" style={{ backgroundColor: color }} />
+                                                    ))}
+                                                </span>
+                                                <span className="truncate">{option.label}</span>
+                                            </Button>
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        ) : (
-                            <div className="space-y-0.5">
-                                <p className="text-xs font-medium">Timeline slider unavailable</p>
-                                <p className="text-[11px] text-muted-foreground">This chart type does not support DataZoom timeline.</p>
-                            </div>
-                        )}
-                        <div className="my-3 h-px bg-border" />
-                        <div className="space-y-1.5">
-                            <p className="text-xs font-medium">Chart color</p>
-                            <div className="grid grid-cols-2 gap-2">
-                                {chartColorPresetOptions.map(option => {
-                                    const selected = option.value === chartColorPreset;
-                                    return (
-                                        <Button
-                                            key={option.value}
-                                            type="button"
-                                            variant={selected ? 'default' : 'outline'}
-                                            className={cn('h-8 justify-start gap-2 px-2 text-xs', !selected && 'bg-background')}
-                                            onClick={() => onChartColorPresetChange(option.value)}
-                                        >
-                                            <span className="flex items-center gap-1">
-                                                {option.preview.slice(0, 3).map((color, index) => (
-                                                    <span key={`${option.value}-${index}`} className="h-2.5 w-2.5 rounded-full border border-border/60" style={{ backgroundColor: color }} />
-                                                ))}
-                                            </span>
-                                            <span className="truncate">{option.label}</span>
-                                        </Button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    </PopoverContent>
+                        </PopoverContent>
                     </Popover>
                 </TooltipProvider>
             </div>

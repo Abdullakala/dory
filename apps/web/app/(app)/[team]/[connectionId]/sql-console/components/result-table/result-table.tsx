@@ -42,7 +42,7 @@ const OVERVIEW_SET = -1;
 
 export function ResultTable() {
     const t = useTranslations('SqlConsole');
-    const [viewMode, setViewMode] = useState<'table' | 'charts'>('table');
+    const [viewModesByKey, setViewModesByKey] = useState<Record<string, 'table' | 'charts'>>({});
     const [inspectorOpen, setInspectorOpen] = useState(false);
     const [inspectorMode, setInspectorMode] = useState<'cell' | 'row' | null>(null);
     const [inspectorPayload, setInspectorPayload] = useState<any>(null);
@@ -123,6 +123,7 @@ export function ResultTable() {
     const [query, setQuery] = useState('');
     const [chartStatesByKey, setChartStatesByKey] = useState<Record<string, ChartState>>({});
     const rowCount = results.length;
+    const currentViewMode = viewModesByKey[storageKey] ?? 'table';
     const currentChartState = useMemo(() => chartStatesByKey[storageKey], [chartStatesByKey, storageKey]);
 
     const setUserPickedFalse = useSetAtom(useMemo(() => makeSetUserPickedAtom(tabId, sessionId), [tabId, sessionId]));
@@ -687,10 +688,16 @@ export function ResultTable() {
                 <div className="border-b bg-muted/30">
                     <div className="flex items-center justify-between gap-3 w-full px-2 py-1">
                         <Tabs
-                            value={viewMode}
+                            value={currentViewMode}
                             onValueChange={value => {
                                 if (value === 'table' || value === 'charts') {
-                                    setViewMode(value);
+                                    setViewModesByKey(prev => {
+                                        if (prev[storageKey] === value) return prev;
+                                        return {
+                                            ...prev,
+                                            [storageKey]: value,
+                                        };
+                                    });
                                 }
                             }}
                         >
@@ -746,7 +753,7 @@ export function ResultTable() {
                         </div>
                     </div>
                 </div>
-                {viewMode === 'table' ? (
+                {currentViewMode === 'table' ? (
                     <>
                         <div className="flex-1 min-h-0">
                             <VTable

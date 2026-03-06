@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/registry/new-york-v4/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/registry/new-york-v4/ui/select';
 import { cn } from '@/registry/new-york-v4/lib/utils';
 
-export type ChartType = 'bar' | 'line';
+export type ChartType = 'bar' | 'line' | 'pie' | 'scatter' | 'histogram' | 'heatmap';
 export type MetricKind = 'count' | 'count_true' | 'sum' | 'avg' | 'max' | 'min' | 'count_distinct';
 export type ChartRow = { rowData: Record<string, unknown> };
 

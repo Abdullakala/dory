@@ -764,12 +764,15 @@ function aggregateByDimension(props: {
 
         let datum = dataMap.get(xLabel);
         if (!datum) {
+            const sortValue = bucketStrategy.getSortValue(rawXValue);
             datum = {
                 xLabel,
+                __xSort: sortValue,
                 __xFilter: bucketStrategy.getFilterSpec(rawXValue),
                 __xBrushFilter: bucketStrategy.getBrushFilterSpec(rawXValue),
             };
             dataMap.set(xLabel, datum);
+            sortMap.set(xLabel, sortValue);
         }
 
         if (selectedMetric.kind === 'count') {
@@ -817,10 +820,6 @@ function aggregateByDimension(props: {
             seriesMap.set(seriesKey, seriesLabel);
         }
 
-        if (!sortMap.has(xLabel)) {
-            const sortValue = bucketStrategy.getSortValue(rawXValue);
-            sortMap.set(xLabel, sortValue);
-        }
     }
 
     return {
@@ -934,6 +933,19 @@ export function Charts({ rows, columnsRaw, className, onApplyFilters, stateKey, 
         return config;
     }, [aggregated.series, selectedMetric]);
 
+    const pickFallbackGroupKey = React.useCallback(
+        (nextXKey: string) => {
+            const category = columnProfiles.find(profile => profile.kind === 'category' && profile.name !== nextXKey);
+            if (category) {
+                return category.name;
+            }
+
+            const fallback = columnNames.find(columnName => columnName !== nextXKey);
+            return fallback ?? NONE_VALUE;
+        },
+        [columnNames, columnProfiles],
+    );
+
     const handleChartFilter = (filters: ChartFilterSpec[], mode?: ChartApplyMode) => {
         if (!onApplyFilters) {
             return;
@@ -986,6 +998,7 @@ export function Charts({ rows, columnsRaw, className, onApplyFilters, stateKey, 
                     columnNames={columnNames}
                     metricOptions={metricOptions}
                     effectiveXKey={effectiveXKey}
+                    effectiveYLabel={selectedMetric?.label ?? yKey}
                     effectiveGroupKey={effectiveGroupKey}
                     aggregated={aggregated}
                     chartConfig={chartConfig}
@@ -993,8 +1006,22 @@ export function Charts({ rows, columnsRaw, className, onApplyFilters, stateKey, 
                     timelineSliderEnabled={timelineSliderEnabled}
                     onApplyChartFilter={handleChartFilter}
                     onChartTypeChange={value => {
-                        if (value === 'bar' || value === 'line') {
+                        if (value === 'bar' || value === 'line' || value === 'pie' || value === 'scatter' || value === 'histogram' || value === 'heatmap') {
                             setChartType(value);
+                            if (value === 'pie' || value === 'scatter' || value === 'histogram') {
+                                setGroupKey(NONE_VALUE);
+                            }
+                            if (value === 'histogram') {
+                                setYKey('count');
+                            }
+                            if (value === 'heatmap') {
+                                setGroupKey(previous => {
+                                    if (previous !== NONE_VALUE && columnNames.includes(previous) && previous !== effectiveXKey) {
+                                        return previous;
+                                    }
+                                    return pickFallbackGroupKey(effectiveXKey);
+                                });
+                            }
                         }
                     }}
                     onXKeyChange={setXKey}

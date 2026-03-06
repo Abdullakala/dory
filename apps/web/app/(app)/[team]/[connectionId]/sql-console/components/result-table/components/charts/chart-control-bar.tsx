@@ -38,6 +38,10 @@ export function ChartControlBar(props: {
         onTimelineSliderEnabledChange,
     } = props;
 
+    const supportsTimelineSlider = chartState.chartType === 'line' || chartState.chartType === 'bar' || chartState.chartType === 'histogram';
+    const showMetric = chartState.chartType !== 'histogram';
+    const showGroup = chartState.chartType === 'bar' || chartState.chartType === 'line' || chartState.chartType === 'heatmap';
+
     return (
         <div className="flex items-center justify-between px-3 pb-1.5 pt-2">
             <div className="flex flex-wrap items-center gap-4">
@@ -48,6 +52,10 @@ export function ChartControlBar(props: {
                     options={[
                         { value: 'bar', label: 'Bar' },
                         { value: 'line', label: 'Line' },
+                        { value: 'pie', label: 'Pie' },
+                        { value: 'scatter', label: 'Scatter Plot' },
+                        { value: 'histogram', label: 'Histogram' },
+                        { value: 'heatmap', label: 'Heatmap' },
                     ]}
                 />
                 <ChartCombobox
@@ -58,18 +66,30 @@ export function ChartControlBar(props: {
                     disabled={columnNames.length === 0}
                     searchPlaceholder="Search columns..."
                 />
-                <MetricComboboxSubmenu value={chartState.yKey} columnNames={columnNames} metricOptions={metricOptions} onValueChange={onYKeyChange} disabled={metricOptions.length === 0} />
-                <ChartCombobox
-                    label="Group"
-                    value={chartState.groupKey}
-                    onValueChange={onGroupKeyChange}
-                    options={[
-                        { value: NONE_VALUE, label: 'None' },
-                        ...columnNames.filter(columnName => columnName !== effectiveXKey).map(columnName => ({ value: columnName, label: columnName })),
-                    ]}
-                    disabled={columnNames.length === 0}
-                    searchPlaceholder="Search columns..."
-                />
+                {showMetric ? (
+                    <MetricComboboxSubmenu
+                        value={chartState.yKey}
+                        columnNames={columnNames}
+                        metricOptions={metricOptions}
+                        onValueChange={onYKeyChange}
+                        disabled={metricOptions.length === 0}
+                    />
+                ) : (
+                    <div className="text-[11px] text-muted-foreground">Y = Count</div>
+                )}
+                {showGroup ? (
+                    <ChartCombobox
+                        label="Group"
+                        value={chartState.groupKey}
+                        onValueChange={onGroupKeyChange}
+                        options={[
+                            { value: NONE_VALUE, label: 'None' },
+                            ...columnNames.filter(columnName => columnName !== effectiveXKey).map(columnName => ({ value: columnName, label: columnName })),
+                        ]}
+                        disabled={columnNames.length === 0}
+                        searchPlaceholder="Search columns..."
+                    />
+                ) : null}
             </div>
             <div className="flex items-center gap-2">
                 {bucketHint ? <div className="text-[11px] text-muted-foreground">{bucketHint}</div> : null}
@@ -86,13 +106,20 @@ export function ChartControlBar(props: {
                         </Button>
                     </PopoverTrigger>
                     <PopoverContent align="end" className="w-[260px]">
-                        <div className="flex items-start justify-between gap-3">
-                            <div className="space-y-0.5">
-                                <p className="text-xs font-medium">Enable timeline slider</p>
-                                <p className="text-[11px] text-muted-foreground">Show DataZoom timeline, Reset Zoom, and Apply Brush Filter.</p>
+                        {supportsTimelineSlider ? (
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="space-y-0.5">
+                                    <p className="text-xs font-medium">Enable timeline slider</p>
+                                    <p className="text-[11px] text-muted-foreground">Show DataZoom timeline, Reset Zoom, and Apply Brush Filter.</p>
+                                </div>
+                                <Switch checked={timelineSliderEnabled} onCheckedChange={onTimelineSliderEnabledChange} />
                             </div>
-                            <Switch checked={timelineSliderEnabled} onCheckedChange={onTimelineSliderEnabledChange} />
-                        </div>
+                        ) : (
+                            <div className="space-y-0.5">
+                                <p className="text-xs font-medium">Timeline slider unavailable</p>
+                                <p className="text-[11px] text-muted-foreground">This chart type does not support DataZoom timeline.</p>
+                            </div>
+                        )}
                     </PopoverContent>
                 </Popover>
             </div>

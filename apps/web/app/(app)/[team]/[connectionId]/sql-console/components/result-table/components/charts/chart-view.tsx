@@ -12,6 +12,7 @@ export function ChartView(props: {
     columnNames: string[];
     metricOptions: MetricOption[];
     effectiveXKey: string;
+    effectiveYLabel: string;
     effectiveGroupKey: string;
     aggregated: AggregatedChartData;
     chartConfig: ChartConfig;
@@ -34,6 +35,7 @@ export function ChartView(props: {
         columnNames,
         metricOptions,
         effectiveXKey,
+        effectiveYLabel,
         effectiveGroupKey,
         aggregated,
         chartConfig,
@@ -70,6 +72,8 @@ export function ChartView(props: {
                 chartConfig={chartConfig}
                 aggregated={aggregated}
                 effectiveGroupKey={effectiveGroupKey}
+                xAxisLabel={effectiveXKey}
+                yAxisLabel={effectiveYLabel}
                 emptyMessage={emptyMessage}
                 timelineSliderEnabled={timelineSliderEnabled}
                 onApplyChartFilter={onApplyChartFilter}

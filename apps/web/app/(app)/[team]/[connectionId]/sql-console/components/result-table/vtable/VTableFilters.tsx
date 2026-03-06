@@ -118,14 +118,18 @@ export function useVTableFilters({
     results: ResultRow[];
     storageKey?: string;
 }) {
-    const [activeFilters, setActiveFilters] = useState<ColumnFilter[]>(() => {
-        if (typeof window !== 'undefined' && storageKey) {
+    const readStoredFilters = useCallback((key?: string) => {
+        if (typeof window !== 'undefined' && key) {
             try {
-                const raw = localStorage.getItem(`${storageKey}:filters`);
+                const raw = localStorage.getItem(`${key}:filters`);
                 if (raw) return JSON.parse(raw) as ColumnFilter[];
             } catch {}
         }
         return [];
+    }, []);
+
+    const [activeFilters, setActiveFilters] = useState<ColumnFilter[]>(() => {
+        return readStoredFilters(storageKey);
     });
     const [filterDraft, setFilterDraft] = useState<FilterDraft>({
         col: '',
@@ -134,6 +138,10 @@ export function useVTableFilters({
         value: '',
         cs: false,
     });
+
+    useEffect(() => {
+        setActiveFilters(readStoredFilters(storageKey));
+    }, [readStoredFilters, storageKey]);
 
     useEffect(() => {
         if (!storageKey) return;

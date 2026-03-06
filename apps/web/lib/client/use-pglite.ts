@@ -795,33 +795,13 @@ export function useDB() {
             }
 
             // 3) Paged row writes
-            // Align setIndex with queryResultSets: results[i] → setIndex = i
-            if (Array.isArray(payload.results)) {
-                for (let i = 0; i < payload.results.length; i++) {
-                    const rows = payload.results[i] ?? [];
-                    if (!rows.length) {
-                        // const { data, isGzip } = encodeRows([]);
-                        // await safeInsertPages([
-                        //     {
-                        //         session_id: s.sessionId,
-                        //         set_index: i,
-                        //         page_no: 0,
-                        //         first_row_index: 0,
-                        //         row_count: 0,
-                        //         rows_data: data,
-                        //         is_gzip: !!isGzip,
-                        //     },
-                        // ]);
-                        continue;
-                    }
-                    // rows are raw arrays (already row objects)
-                    if (Array.isArray(payload.results) && Array.isArray(payload.queryResultSets)) {
-                        for (let k = 0; k < payload.queryResultSets.length; k++) {
-                            const si = payload.queryResultSets[k]!.setIndex;
-                            const rows = payload.results[k] ?? []; // If backend keeps results aligned with queryResultSets
-                            if (rows.length) await insertResultRows(s.sessionId, si, rows);
-                        }
-                    }
+            // Keep 1:1 mapping between queryResultSets[k] and results[k].
+            if (Array.isArray(payload.results) && Array.isArray(payload.queryResultSets)) {
+                for (let k = 0; k < payload.queryResultSets.length; k++) {
+                    const si = payload.queryResultSets[k]!.setIndex;
+                    const rows = payload.results[k] ?? [];
+                    if (!rows.length) continue;
+                    await insertResultRows(s.sessionId, si, rows);
                 }
             }
 

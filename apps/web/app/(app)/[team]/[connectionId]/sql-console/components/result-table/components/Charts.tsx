@@ -206,104 +206,106 @@ export function Charts({ rows, columnsRaw, className }: ChartsProps) {
 
     return (
         <div className={cn('flex min-h-0 flex-1 flex-col', className)}>
-            <div className="border-b border-border/60 px-3 py-2">
-                <div className="flex flex-wrap items-center gap-2">
-                    <ChartSelect
-                        label="Chart"
-                        value={chartType}
-                        onValueChange={value => {
-                            if (value === 'bar' || value === 'line') {
-                                setChartType(value);
-                            }
-                        }}
-                        options={[
-                            { value: 'bar', label: 'Bar' },
-                            { value: 'line', label: 'Line' },
-                        ]}
-                    />
-                    <ChartSelect
-                        label="X"
-                        value={xKey}
-                        onValueChange={setXKey}
-                        options={columnNames.map(columnName => ({ value: columnName, label: columnName }))}
-                        disabled={columnNames.length === 0}
-                    />
-                    <ChartSelect
-                        label="Y"
-                        value={yKey}
-                        onValueChange={setYKey}
-                        options={metricOptions.map(option => ({ value: option.key, label: option.label }))}
-                        disabled={metricOptions.length === 0}
-                    />
-                    <ChartSelect
-                        label="Group"
-                        value={groupKey}
-                        onValueChange={setGroupKey}
-                        options={[
-                            { value: NONE_VALUE, label: 'None' },
-                            ...columnNames.filter(columnName => columnName !== effectiveXKey).map(columnName => ({ value: columnName, label: columnName })),
-                        ]}
-                        disabled={columnNames.length === 0}
-                    />
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant={chartStateIsAuto ? 'secondary' : 'outline'}
-                        className="h-8"
-                        onClick={() => {
-                            setChartType(suggestedState.chartType);
-                            setXKey(suggestedState.xKey);
-                            setYKey(suggestedState.yKey);
-                            setGroupKey(suggestedState.groupKey);
-                        }}
-                    >
-                        <Sparkles className="h-3.5 w-3.5" />
-                        Auto
-                    </Button>
-                </div>
-            </div>
-
             <div className="flex min-h-0 flex-1 flex-col px-3 py-3">
-                <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg border border-border/60 bg-muted/10 p-4">
-                    {columnNames.length === 0 ? (
-                        <EmptyState message="No columns available for charting." />
-                    ) : !selectedMetric || !effectiveXKey ? (
-                        <EmptyState message="Choose chart dimensions to preview." />
-                    ) : !hasRenderableData ? (
-                        <EmptyState message="No chartable values for the current selection." />
-                    ) : (
-                        <div className="h-full min-h-[220px] w-full">
-                            <ChartContainer config={chartConfig} className="aspect-auto h-full w-full overflow-hidden">
-                                {chartType === 'line' ? (
-                                    <LineChart accessibilityLayer data={aggregated.data} margin={{ left: 8, right: 8, top: 8 }}>
-                                        <CartesianGrid vertical={false} />
-                                        <XAxis dataKey="xLabel" tickLine={false} axisLine={false} tickMargin={10} minTickGap={24} tickFormatter={value => String(value).slice(0, 18)} />
-                                        <YAxis tickLine={false} axisLine={false} width={56} />
-                                        <ChartTooltip content={<ChartTooltipContent />} />
-                                        {aggregated.series.map(series => (
-                                            <Line key={series.key} type="monotone" dataKey={series.key} stroke={`var(--color-${series.key})`} strokeWidth={2} dot={false} />
-                                        ))}
-                                    </LineChart>
-                                ) : (
-                                    <BarChart accessibilityLayer data={aggregated.data} margin={{ left: 8, right: 8, top: 8 }}>
-                                        <CartesianGrid vertical={false} />
-                                        <XAxis dataKey="xLabel" tickLine={false} axisLine={false} tickMargin={10} minTickGap={24} tickFormatter={value => String(value).slice(0, 18)} />
-                                        <YAxis tickLine={false} axisLine={false} width={56} />
-                                        <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                                        {aggregated.series.map(series => (
-                                            <Bar
-                                                key={series.key}
-                                                dataKey={series.key}
-                                                fill={`var(--color-${series.key})`}
-                                                radius={4}
-                                                stackId={effectiveGroupKey === NONE_VALUE ? undefined : 'group'}
-                                            />
-                                        ))}
-                                    </BarChart>
-                                )}
-                            </ChartContainer>
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border-none border-border/60 bg-muted/10">
+                    <div className="border-none border-border/60 px-3 py-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            <ChartSelect
+                                label="Chart"
+                                value={chartType}
+                                onValueChange={value => {
+                                    if (value === 'bar' || value === 'line') {
+                                        setChartType(value);
+                                    }
+                                }}
+                                options={[
+                                    { value: 'bar', label: 'Bar' },
+                                    { value: 'line', label: 'Line' },
+                                ]}
+                            />
+                            <ChartSelect
+                                label="X"
+                                value={xKey}
+                                onValueChange={setXKey}
+                                options={columnNames.map(columnName => ({ value: columnName, label: columnName }))}
+                                disabled={columnNames.length === 0}
+                            />
+                            <ChartSelect
+                                label="Y"
+                                value={yKey}
+                                onValueChange={setYKey}
+                                options={metricOptions.map(option => ({ value: option.key, label: option.label }))}
+                                disabled={metricOptions.length === 0}
+                            />
+                            <ChartSelect
+                                label="Group"
+                                value={groupKey}
+                                onValueChange={setGroupKey}
+                                options={[
+                                    { value: NONE_VALUE, label: 'None' },
+                                    ...columnNames.filter(columnName => columnName !== effectiveXKey).map(columnName => ({ value: columnName, label: columnName })),
+                                ]}
+                                disabled={columnNames.length === 0}
+                            />
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant={chartStateIsAuto ? 'secondary' : 'outline'}
+                                className="h-7 px-2.5 text-xs"
+                                onClick={() => {
+                                    setChartType(suggestedState.chartType);
+                                    setXKey(suggestedState.xKey);
+                                    setYKey(suggestedState.yKey);
+                                    setGroupKey(suggestedState.groupKey);
+                                }}
+                            >
+                                <Sparkles className="h-3 w-3" />
+                                Auto
+                            </Button>
                         </div>
-                    )}
+                    </div>
+
+                    <div className="flex min-h-0 flex-1 items-center justify-center p-4">
+                        {columnNames.length === 0 ? (
+                            <EmptyState message="No columns available for charting." />
+                        ) : !selectedMetric || !effectiveXKey ? (
+                            <EmptyState message="Choose chart dimensions to preview." />
+                        ) : !hasRenderableData ? (
+                            <EmptyState message="No chartable values for the current selection." />
+                        ) : (
+                            <div className="h-full min-h-[220px] w-full">
+                                <ChartContainer config={chartConfig} className="aspect-auto h-full w-full overflow-hidden">
+                                    {chartType === 'line' ? (
+                                        <LineChart accessibilityLayer data={aggregated.data} margin={{ left: 8, right: 8, top: 8 }}>
+                                            <CartesianGrid vertical={false} />
+                                            <XAxis dataKey="xLabel" tickLine={false} axisLine={false} tickMargin={10} minTickGap={24} tickFormatter={value => String(value).slice(0, 18)} />
+                                            <YAxis tickLine={false} axisLine={false} width={56} />
+                                            <ChartTooltip content={<ChartTooltipContent />} />
+                                            {aggregated.series.map(series => (
+                                                <Line key={series.key} type="monotone" dataKey={series.key} stroke={`var(--color-${series.key})`} strokeWidth={2} dot={false} />
+                                            ))}
+                                        </LineChart>
+                                    ) : (
+                                        <BarChart accessibilityLayer data={aggregated.data} margin={{ left: 8, right: 8, top: 8 }}>
+                                            <CartesianGrid vertical={false} />
+                                            <XAxis dataKey="xLabel" tickLine={false} axisLine={false} tickMargin={10} minTickGap={24} tickFormatter={value => String(value).slice(0, 18)} />
+                                            <YAxis tickLine={false} axisLine={false} width={56} />
+                                            <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                                            {aggregated.series.map(series => (
+                                                <Bar
+                                                    key={series.key}
+                                                    dataKey={series.key}
+                                                    fill={`var(--color-${series.key})`}
+                                                    radius={4}
+                                                    stackId={effectiveGroupKey === NONE_VALUE ? undefined : 'group'}
+                                                />
+                                            ))}
+                                        </BarChart>
+                                    )}
+                                </ChartContainer>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
@@ -319,10 +321,10 @@ function ChartSelect(props: { label: string; value: string; onValueChange: (valu
     const { label, value, onValueChange, options, disabled = false } = props;
 
     return (
-        <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">{label}:</span>
+        <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">{label}:</span>
             <Select value={value} onValueChange={onValueChange} disabled={disabled}>
-                <SelectTrigger size="sm" className="h-8 min-w-[140px] justify-between">
+                <SelectTrigger size="sm" className="h-7 min-w-[112px] justify-between text-xs">
                     <SelectValue placeholder={label} />
                 </SelectTrigger>
                 <SelectContent align="start">

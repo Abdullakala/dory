@@ -16,6 +16,7 @@ It combines intelligent SQL editing, context-aware AI assistance, conversational
 <p align="center">
   <a href="https://app.getdory.dev"><b>🚀 Try Live Demo</b></a> &nbsp; • &nbsp;
   <a href="https://github.com/dorylab/dory/releases"><b>🍎 Download for macOS</b></a> &nbsp; • &nbsp;
+  <a href="https://github.com/dorylab/dory/releases"><b>Download for Windows</b></a> &nbsp; • &nbsp;
   <a href="#quick-start"><b>📦 Quick Start</b></a> &nbsp; • &nbsp;
   <a href="https://github.com/dorylab/dory/stargazers"><b>⭐ Star</b></a>
 </p>
@@ -179,6 +180,7 @@ See the latest roadmap here:
 ## 🚀 Getting Started
 
 > Docker one-click deployment
+
 > Desktop client (macOS): https://github.com/dorylab/dory/releases  
 
 ---

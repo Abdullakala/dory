@@ -1,8 +1,13 @@
 'use client';
 
-import { BarChart3 } from 'lucide-react';
+import React from 'react';
+import { BarChart3, Check, ChevronsUpDown } from 'lucide-react';
 
+import { Button } from '@/registry/new-york-v4/ui/button';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/registry/new-york-v4/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/registry/new-york-v4/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/registry/new-york-v4/ui/select';
+import { cn } from '@/registry/new-york-v4/lib/utils';
 
 export type ChartType = 'bar' | 'line';
 export type MetricKind = 'count' | 'count_true' | 'sum' | 'avg' | 'max' | 'min' | 'count_distinct';
@@ -65,6 +70,68 @@ export function ChartSelect(props: { label: string; value: string; onValueChange
                     ))}
                 </SelectContent>
             </Select>
+        </div>
+    );
+}
+
+export function ChartCombobox(props: {
+    label: string;
+    value: string;
+    onValueChange: (value: string) => void;
+    options: Array<{ value: string; label: string }>;
+    disabled?: boolean;
+    placeholder?: string;
+    searchPlaceholder?: string;
+    emptyLabel?: string;
+}) {
+    const { label, value, onValueChange, options, disabled = false, placeholder, searchPlaceholder = 'Search...', emptyLabel = 'No results.' } = props;
+    const [open, setOpen] = React.useState(false);
+    const selected = options.find(option => option.value === value) ?? null;
+    const displayLabel = selected?.label ?? placeholder ?? label;
+
+    return (
+        <div className="flex items-center gap-1">
+            <span className="mr-1 text-[11px] font-medium text-muted-foreground/80">{label}</span>
+            <Popover open={open} onOpenChange={setOpen}>
+                <PopoverTrigger asChild>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={open}
+                        size="sm"
+                        disabled={disabled}
+                        className="h-7 min-w-[104px] justify-between border bg-background/50 px-2 text-[11px] font-normal text-muted-foreground shadow-none hover:bg-background/70"
+                    >
+                        <span className="truncate">{displayLabel}</span>
+                        <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-80" />
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-64 p-0">
+                    <Command>
+                        <CommandInput placeholder={searchPlaceholder} className="h-9 text-xs" />
+                        <CommandList className="max-h-64">
+                            <CommandEmpty>{emptyLabel}</CommandEmpty>
+                            <CommandGroup>
+                                {options.map(option => (
+                                    <CommandItem
+                                        key={option.value}
+                                        value={`${option.label} ${option.value}`}
+                                        onSelect={() => {
+                                            onValueChange(option.value);
+                                            setOpen(false);
+                                        }}
+                                        className="text-xs"
+                                    >
+                                        <span className="truncate">{option.label}</span>
+                                        <Check className={cn('ml-auto h-3.5 w-3.5', value === option.value ? 'opacity-100' : 'opacity-0')} />
+                                    </CommandItem>
+                                ))}
+                            </CommandGroup>
+                        </CommandList>
+                    </Command>
+                </PopoverContent>
+            </Popover>
         </div>
     );
 }

@@ -309,7 +309,7 @@ function buildMetricOptions(columnProfiles: ColumnProfile[]) {
         if (profile.isBooleanLike) {
             options.push({
                 key: `count_true:${profile.name}`,
-                label: `Count ${profile.name}`,
+                label: `Count(${profile.name})`,
                 kind: 'count_true',
                 column: profile.name,
             });
@@ -319,7 +319,7 @@ function buildMetricOptions(columnProfiles: ColumnProfile[]) {
         if (profile.isIdLike) {
             options.push({
                 key: `count_distinct:${profile.name}`,
-                label: `Count distinct ${profile.name}`,
+                label: `Count Distinct(${profile.name})`,
                 kind: 'count_distinct',
                 column: profile.name,
             });
@@ -329,31 +329,31 @@ function buildMetricOptions(columnProfiles: ColumnProfile[]) {
         options.push(
             {
                 key: `sum:${profile.name}`,
-                label: `Sum ${profile.name}`,
+                label: `Sum(${profile.name})`,
                 kind: 'sum',
                 column: profile.name,
             },
             {
                 key: `avg:${profile.name}`,
-                label: `Avg ${profile.name}`,
+                label: `Avg(${profile.name})`,
                 kind: 'avg',
                 column: profile.name,
             },
             {
                 key: `max:${profile.name}`,
-                label: `Max ${profile.name}`,
+                label: `Max(${profile.name})`,
                 kind: 'max',
                 column: profile.name,
             },
             {
                 key: `min:${profile.name}`,
-                label: `Min ${profile.name}`,
+                label: `Min(${profile.name})`,
                 kind: 'min',
                 column: profile.name,
             },
             {
                 key: `count_distinct:${profile.name}`,
-                label: `Count distinct ${profile.name}`,
+                label: `Count Distinct(${profile.name})`,
                 kind: 'count_distinct',
                 column: profile.name,
             },

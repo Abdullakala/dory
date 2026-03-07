@@ -158,7 +158,7 @@ async function handleChatRequest(req: NextRequest) {
                 const existed = await db.chat.readSession({
                     teamId,
                     sessionId: chatId,
-                    actorUserId: userId,
+                    userId,
                 });
                 if (existed) {
                     sessionTitle = existed.title ?? null;
@@ -303,7 +303,7 @@ async function handleChatRequest(req: NextRequest) {
             await db.chat.appendMessage({
                 teamId,
                 sessionId: chatId,
-                actorUserId: userId,
+                userId,
                 message: {
                     id: currentUserMessageId,
                     teamId,
@@ -431,7 +431,7 @@ async function handleChatRequest(req: NextRequest) {
                             await db.chat.appendMessage({
                                 teamId,
                                 sessionId: chatId,
-                                actorUserId: userId,
+                                userId,
                                 message: {
                                     id: messageId,
                                     teamId,
@@ -554,7 +554,7 @@ async function handleChatRequest(req: NextRequest) {
                             await db.chat.appendMessage({
                                 teamId,
                                 sessionId: chatId,
-                                actorUserId: userId,
+                                userId,
                                 message: {
                                     id: toolMessageId,
                                     teamId,

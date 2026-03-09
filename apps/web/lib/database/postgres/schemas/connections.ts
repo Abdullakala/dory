@@ -5,7 +5,17 @@ import { newEntityId } from '@/lib/id';
 export type ConnectionType = 'clickhouse' | 'doris' | 'mysql' | 'postgres';
 export type ConnectionStatus = 'draft' | 'ready' | 'error' | 'disabled';
 export type SyncSource = 'local' | 'cloud';
-export type SyncStatus = 'local_only' | 'pending' | 'synced' | 'failed' | 'conflict';
+export type SyncStatus =
+    | 'local_only'
+    | 'queued_create'
+    | 'queued_update'
+    | 'queued_delete'
+    | 'syncing_create'
+    | 'syncing_update'
+    | 'syncing_delete'
+    | 'synced'
+    | 'failed'
+    | 'conflict';
 
 export const connections = pgTable(
     'connections',
@@ -24,6 +34,7 @@ export const connections = pgTable(
         cloudId: text('cloud_id'),
         syncStatus: text('sync_status').notNull().default('local_only'),
         lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+        remoteUpdatedAt: timestamp('remote_updated_at', { withTimezone: true }),
         syncError: text('sync_error'),
 
         type: text('type').notNull(),
@@ -101,6 +112,8 @@ export const connectionIdentities = pgTable(
             .primaryKey()
             .$defaultFn(() => newEntityId()),
 
+        createdByUserId: text('created_by_user_id'),
+
         connectionId: text('connection_id').notNull(),
 
         // Redundant teamId for permission checks/queries
@@ -110,6 +123,7 @@ export const connectionIdentities = pgTable(
         cloudId: text('cloud_id'),
         syncStatus: text('sync_status').notNull().default('local_only'),
         lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+        remoteUpdatedAt: timestamp('remote_updated_at', { withTimezone: true }),
         syncError: text('sync_error'),
 
         // Display name for users, e.g. "Admin", "Read-only analyst"
@@ -152,11 +166,12 @@ export const connectionIdentities = pgTable(
         // Only one default identity per connection
         uniqueIndex('uniq_conn_identity_default_per_connection')
             .on(t.connectionId)
-            .where(sql`${t.isDefault} = true`),
+            .where(sql`${t.isDefault} = true AND ${t.deletedAt} IS NULL`),
 
         // Environment-level filter index
 
         index('idx_conn_identity_connection_id').on(t.connectionId),
+        index('idx_conn_identity_created_by_user_id').on(t.createdByUserId),
         index('idx_conn_identity_team_id').on(t.teamId),
         index('idx_conn_identity_enabled').on(t.enabled),
         index('idx_conn_identity_sync_status').on(t.syncStatus),
@@ -174,6 +189,7 @@ export const connectionIdentitySecrets = pgTable(
 
         // For future KMS/Vault integration, store reference here
         vaultRef: text('vault_ref'),
+        secretRef: text('secret_ref'),
 
         createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
         updatedAt: timestamp('updated_at', { withTimezone: true })

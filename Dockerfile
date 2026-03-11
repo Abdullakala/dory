@@ -26,7 +26,6 @@ RUN DIST="$(find apps/web -path '*/@electric-sql/pglite*/dist' -type d -print -q
  && ls -lah apps/web/dist-scripts | sed -n '1,120p'
  
 RUN rm -f apps/web/.next/standalone/.env apps/web/.next/standalone/.env.local
-RUN yarn install --production --frozen-lockfile
 
 FROM node:22-alpine AS runner
 WORKDIR /app

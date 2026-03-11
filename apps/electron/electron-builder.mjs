@@ -1,0 +1,64 @@
+const updateChannel = process.env.DORY_UPDATE_CHANNEL === 'beta' ? 'beta' : 'latest';
+
+/** @type {import('electron-builder').Configuration} */
+const config = {
+    appId: 'com.dory.app',
+    productName: 'Dory',
+    extraMetadata: {
+        main: 'dist-electron/main.js',
+    },
+    publish: [
+        {
+            provider: 'github',
+            owner: 'dorylab',
+            repo: 'dory',
+            releaseType: updateChannel === 'beta' ? 'prerelease' : 'release',
+            channel: updateChannel,
+        },
+    ],
+    protocols: [
+        {
+            name: 'Dory Protocol',
+            schemes: ['dory'],
+        },
+    ],
+    files: ['dist-electron/**/*', 'package.json'],
+    extraResources: [
+        {
+            from: '../../release/standalone',
+            to: 'standalone',
+        },
+    ],
+    asar: true,
+    asarUnpack: ['**/*.node'],
+    dmg: {
+        title: '${productName}-${version}-${arch}',
+    },
+    afterSign: './scripts/notarize.js',
+    mac: {
+        icon: '../web/public/logo.icns',
+        category: 'public.app-category.developer-tools',
+        hardenedRuntime: true,
+        gatekeeperAssess: false,
+        entitlements: './scripts/entitlements.mac.plist',
+        entitlementsInherit: './scripts/entitlements.mac.plist',
+        target: ['dmg', 'zip'],
+        signIgnore: ['.*\\.map$', '.*\\.ttf$', '.*\\.woff2?$'],
+    },
+    win: {
+        icon: '../../public/app.ico',
+        target: ['nsis', 'zip', 'portable'],
+    },
+    nsis: {
+        oneClick: false,
+        allowElevation: true,
+        allowToChangeInstallationDirectory: true,
+        installerIcon: '../../public/app.ico',
+        installerHeaderIcon: '../../public/app.ico',
+        createDesktopShortcut: true,
+        createStartMenuShortcut: true,
+        shortcutName: 'Dory',
+    },
+};
+
+export default config;

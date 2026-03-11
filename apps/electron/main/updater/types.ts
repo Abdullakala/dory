@@ -6,6 +6,8 @@ type UpdateInfo = import('electron-updater').UpdateInfo;
 
 export type { ProgressInfo, UpdateInfo };
 
+export type UpdateChannel = 'latest' | 'beta';
+
 export type UpdateAction =
     | 'dismiss'
     | 'install-update'
@@ -56,4 +58,5 @@ export interface UpdaterPreferences {
     autoDownloadInstall: boolean;
     skippedVersion: string | null;
     remindLaterUntil: number;
+    updateChannel?: UpdateChannel;
 }

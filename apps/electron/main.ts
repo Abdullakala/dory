@@ -8,6 +8,7 @@ import { getMainLogFilePath, setupMainLogger } from './main/logger.js';
 import { registerProtocolClient } from './main/protocol.js';
 import { createStandaloneServerManager } from './main/server.js';
 import { setupUpdater } from './main/updater.js';
+import type { UpdateChannel } from './main/updater/types.js';
 import {
   createMainWindow,
   focusMainWindow,
@@ -49,11 +50,42 @@ applyTheme(getStoredTheme());
 log('[electron] userData path:', app.getPath('userData'));
 log('[electron] stored theme on boot:', getStoredTheme());
 
+function createUpdateChannelMenuItems(options: {
+  getUpdateChannel: () => UpdateChannel;
+  onSelectUpdateChannel: (channel: UpdateChannel) => void | Promise<void>;
+  stableChannelLabel: string;
+  betaChannelLabel: string;
+}): MenuItemConstructorOptions[] {
+  return [
+    {
+      label: options.stableChannelLabel,
+      type: 'radio',
+      checked: options.getUpdateChannel() === 'latest',
+      click: () => {
+        void options.onSelectUpdateChannel('latest');
+      },
+    },
+    {
+      label: options.betaChannelLabel,
+      type: 'radio',
+      checked: options.getUpdateChannel() === 'beta',
+      click: () => {
+        void options.onSelectUpdateChannel('beta');
+      },
+    },
+  ];
+}
+
 function setupAppMenu(options: {
   onCheckUpdate: () => void;
+  onSelectUpdateChannel: (channel: UpdateChannel) => void | Promise<void>;
+  getUpdateChannel: () => UpdateChannel;
   onResetSkippedUpdate: () => void;
   onOpenUpdateDialogDebug?: () => void;
   checkForUpdatesLabel: string;
+  updateChannelLabel: string;
+  stableChannelLabel: string;
+  betaChannelLabel: string;
   resetSkippedUpdateLabel: string;
   openUpdateDialogDebugLabel: string;
   openLogLabel: string;
@@ -83,6 +115,10 @@ function setupAppMenu(options: {
               click: () => {
                 options.onCheckUpdate();
               },
+            },
+            {
+              label: options.updateChannelLabel,
+              submenu: createUpdateChannelMenuItems(options),
             },
             {
               label: options.resetSkippedUpdateLabel,
@@ -115,6 +151,9 @@ function setupAppMenu(options: {
               click: () => {
                 options.onCheckUpdate();
               },
+            }, {
+              label: options.updateChannelLabel,
+              submenu: createUpdateChannelMenuItems(options),
             }, {
               label: options.resetSkippedUpdateLabel,
               click: () => {
@@ -190,8 +229,12 @@ if (!gotLock) {
     const updater = setupUpdater({ log, logWarn, logError, locale, t });
     setupAppMenu({
       onCheckUpdate: () => {
-        updater.checkForUpdatesFromMenu();
+        void updater.checkForUpdatesFromMenu();
       },
+      onSelectUpdateChannel: channel => {
+        void updater.setUpdateChannelFromMenu(channel);
+      },
+      getUpdateChannel: () => updater.getUpdateChannel(),
       onResetSkippedUpdate: () => {
         updater.clearSkippedVersionFromMenu();
       },
@@ -201,6 +244,9 @@ if (!gotLock) {
           }
         : undefined,
       checkForUpdatesLabel: t('menu.checkForUpdates'),
+      updateChannelLabel: t('menu.updateChannel'),
+      stableChannelLabel: t('menu.updateChannelStable'),
+      betaChannelLabel: t('menu.updateChannelBeta'),
       resetSkippedUpdateLabel: t('menu.resetSkippedUpdate'),
       openUpdateDialogDebugLabel: t('menu.openUpdateDialogDebug'),
       openLogLabel: t('menu.openLog'),

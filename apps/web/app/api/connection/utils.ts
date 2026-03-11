@@ -6,7 +6,7 @@ import { ErrorCodes } from '@/lib/errors';
 import type { ConnectionListIdentity, ConnectionListItem, ConnectionSsh } from '@/types/connections';
 import { UnsupportedTypeError } from '@/lib/connection/base/errors';
 import { BaseConfig } from '@/lib/connection/base/types';
-import { applyConnectionRequestTimeout } from '@/lib/connection/defaults';
+import { applyQueryRequestTimeout } from '@/lib/connection/defaults';
 import { getDatasourcePool, destroyDatasourcePool, ensureDatasourcePool } from '@/lib/connection/pool-store';
 
 type IdentityWithPassword = ConnectionListIdentity & { password?: string | null };
@@ -109,7 +109,7 @@ function buildConnectionConfig(connection: ConnectionListItem['connection'], ide
         (options as any).httpPort = connection.httpPort;
     }
 
-    applyConnectionRequestTimeout(options);
+    applyQueryRequestTimeout(options);
 
     if (ssh?.enabled) {
         (options as any).ssh = {

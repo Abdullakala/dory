@@ -4,10 +4,10 @@ import { ErrorCodes } from '@/lib/errors';
 import type { ConnectionListIdentity, ConnectionListItem, ConnectionSsh } from '@/types/connections';
 import { UnsupportedTypeError } from '@/lib/connection/base/errors';
 import { BaseConfig } from '@/lib/connection/base/types';
+import { applyQueryRequestTimeout, CONNECTION_REQUEST_TIMEOUT_MS, withConnectionTimeout } from '@/lib/connection/defaults';
 import { getDatasourcePool, destroyDatasourcePool, ensureDatasourcePool } from '@/lib/connection/pool-store';
 import { withUserAndTeamHandler } from '@/app/api/utils/with-team-handler';
 import { getApiLocale, translateApi } from '@/app/api/utils/i18n';
-import { applyConnectionRequestTimeout } from '@/lib/connection/defaults';
 import { CONNECTION_ERROR_CODES, createConnectionError, getConnectionErrorCode } from '@/app/api/connection/utils';
 export const runtime = 'nodejs';
 type IdentityWithPassword = ConnectionListIdentity & { password?: string | null };
@@ -56,7 +56,7 @@ function buildDatasourceConfig(
         (options as any).httpPort = connection.httpPort;
     }
 
-    applyConnectionRequestTimeout(options);
+    applyQueryRequestTimeout(options);
 
     if (ssh?.enabled) {
         (options as any).ssh = {
@@ -164,8 +164,14 @@ export const POST = withUserAndTeamHandler(async ({ req, db, teamId }) => {
 
         const config = buildDatasourceConfig(record.connection, { ...identity, password: plainPassword }, sshConfig);
 
-        const poolEntry = await ensurePoolWithLatest(config);
-        const health = await poolEntry.instance.ping();
+        const { health } = await withConnectionTimeout(
+            (async () => {
+                const poolEntry = await ensurePoolWithLatest(config);
+                const health = await poolEntry.instance.ping();
+                return { poolEntry, health };
+            })(),
+            CONNECTION_REQUEST_TIMEOUT_MS,
+        );
         const tookMs = typeof health?.tookMs === 'number' ? health.tookMs : Date.now() - startedAt;
 
         await db.connections.updateLastCheck(record.connection.id, {

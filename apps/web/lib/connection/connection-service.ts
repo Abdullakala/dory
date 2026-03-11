@@ -1,7 +1,7 @@
 import { getDBService } from '@/lib/database';
 import { UnsupportedTypeError } from './base/errors';
 import type { BaseConfig } from './base/types';
-import { applyConnectionRequestTimeout } from './defaults';
+import { applyQueryRequestTimeout } from './defaults';
 import { ensureDatasourcePool, getDatasourcePool, type DatasourcePoolEntry } from './pool-store';
 import type { ConnectionListIdentity, ConnectionListItem, ConnectionSsh } from '@/types/connections';
 
@@ -51,7 +51,7 @@ function buildConnectionConfig(
         (options as any).httpPort = connection.httpPort;
     }
 
-    applyConnectionRequestTimeout(options);
+    applyQueryRequestTimeout(options);
 
     if (ssh?.enabled) {
         (options as any).ssh = {

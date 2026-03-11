@@ -4,6 +4,9 @@ type SupportedLocale = 'zh-CN' | 'en-US';
 
 type MessageKey =
     | 'menu.checkForUpdates'
+    | 'menu.updateChannel'
+    | 'menu.updateChannelStable'
+    | 'menu.updateChannelBeta'
     | 'menu.resetSkippedUpdate'
     | 'menu.openUpdateDialogDebug'
     | 'menu.openLog'
@@ -35,11 +38,17 @@ type MessageKey =
     | 'updater.installLocationBlockedDetail'
     | 'updater.notConfigured'
     | 'updater.notConfiguredDetail'
-    | 'updater.skipCleared';
+    | 'updater.skipCleared'
+    | 'updater.channelChanged'
+    | 'updater.channelChangedDetail'
+    | 'updater.channelBusy';
 
 const MESSAGES: Record<SupportedLocale, Record<MessageKey, string>> = {
     'zh-CN': {
         'menu.checkForUpdates': '检查更新',
+        'menu.updateChannel': '更新通道',
+        'menu.updateChannelStable': '正式版',
+        'menu.updateChannelBeta': 'Beta 测试版',
         'menu.resetSkippedUpdate': '恢复跳过的更新提醒',
         'menu.openUpdateDialogDebug': '打开更新弹窗（调试）',
         'menu.openLog': '打开日志',
@@ -72,9 +81,15 @@ const MESSAGES: Record<SupportedLocale, Record<MessageKey, string>> = {
         'updater.notConfigured': '更新功能未配置',
         'updater.notConfiguredDetail': '未找到 app-update.yml 或 dev-app-update.yml，请先在构建配置中设置 publish。',
         'updater.skipCleared': '已恢复跳过版本提醒',
+        'updater.channelChanged': '更新通道已切换',
+        'updater.channelChangedDetail': '当前更新通道：{channel}。之后会按该通道检查更新。',
+        'updater.channelBusy': '当前正在执行更新任务，请完成后再切换更新通道。',
     },
     'en-US': {
         'menu.checkForUpdates': 'Check for Updates',
+        'menu.updateChannel': 'Update Channel',
+        'menu.updateChannelStable': 'Stable',
+        'menu.updateChannelBeta': 'Beta',
         'menu.resetSkippedUpdate': 'Reset Skipped Updates',
         'menu.openUpdateDialogDebug': 'Open Update Dialog (Debug)',
         'menu.openLog': 'Open Log',
@@ -107,6 +122,9 @@ const MESSAGES: Record<SupportedLocale, Record<MessageKey, string>> = {
         'updater.notConfigured': 'Updater Not Configured',
         'updater.notConfiguredDetail': 'Missing app-update.yml or dev-app-update.yml. Configure publish in electron-builder first.',
         'updater.skipCleared': 'Skipped update preference has been reset.',
+        'updater.channelChanged': 'Update channel changed',
+        'updater.channelChangedDetail': 'Current update channel: {channel}. Future checks will use this channel.',
+        'updater.channelBusy': 'Finish the current update task before switching update channels.',
     },
 };
 

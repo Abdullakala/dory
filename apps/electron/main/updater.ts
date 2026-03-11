@@ -19,6 +19,7 @@ import type {
     ProgressDialogState,
     RendererUpdaterState,
     SetupUpdaterOptions,
+    UpdateChannel,
     UpdateAction,
     UpdateInfo,
     ProgressInfo,
@@ -33,6 +34,7 @@ import {
     showDialogWithoutFocus,
 } from './updater/utils.js';
 import { getMainWindow, setMainWindowQuitting } from './window.js';
+import { getDefaultUpdateChannelForVersion } from './updater/preferences.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -58,6 +60,40 @@ let rendererUpdaterState: RendererUpdaterState = {
     readyToInstall: false,
     version: null,
 };
+let activeUpdateChannel: UpdateChannel = 'latest';
+
+function getChannelLabel(channel: UpdateChannel, t: MainTranslator) {
+    return channel === 'beta' ? t('menu.updateChannelBeta') : t('menu.updateChannelStable');
+}
+
+function getStoredOrDefaultUpdateChannel() {
+    const storedChannel = updaterPreferenceStore.get('updateChannel');
+    if (storedChannel === 'beta' || storedChannel === 'latest') {
+        return storedChannel;
+    }
+
+    const derivedChannel = getDefaultUpdateChannelForVersion(app.getVersion());
+    updaterPreferenceStore.set('updateChannel', derivedChannel);
+    return derivedChannel;
+}
+
+function applyUpdateChannel(log: LogFn, channel: UpdateChannel) {
+    activeUpdateChannel = channel;
+    autoUpdater.channel = channel;
+    autoUpdater.allowPrerelease = channel === 'beta';
+    autoUpdater.allowDowngrade = false;
+    updaterPreferenceStore.set('updateChannel', channel);
+    log('[updater] update channel set:', channel);
+}
+
+interface UpdaterController {
+    checkForUpdatesFromMenu: () => Promise<void>;
+    getUpdateChannel: () => UpdateChannel;
+    setUpdateChannelFromMenu: (channel: UpdateChannel) => Promise<void>;
+    clearSkippedVersionFromMenu: () => void;
+    openUpdateDialogDebug: () => void;
+    startAutoUpdateChecks: () => void;
+}
 
 
 function closeAvailableDialog() {
@@ -428,7 +464,7 @@ function handleUpdateAction(log: LogFn, t: MainTranslator, action: UpdateAction)
     }
 }
 
-export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdaterOptions) {
+export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdaterOptions): UpdaterController {
     currentLocale = locale;
     const updateConfigPath = path.join(process.resourcesPath, 'app-update.yml');
     const hasUpdateConfig = fs.existsSync(updateConfigPath);
@@ -546,6 +582,10 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
                 debugPreviewMode = false;
                 showNotConfiguredDialog();
             },
+            getUpdateChannel: () => activeUpdateChannel,
+            setUpdateChannelFromMenu: async (channel: UpdateChannel) => {
+                applyUpdateChannel(log, channel);
+            },
             clearSkippedVersionFromMenu: () => {
                 clearSkippedVersion();
             },
@@ -558,8 +598,7 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
 
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = true;
-    autoUpdater.allowPrerelease = false;
-    autoUpdater.allowDowngrade = false;
+    applyUpdateChannel(log, getStoredOrDefaultUpdateChannel());
 
     autoUpdater.on('checking-for-update', () => {
         debugPreviewMode = false;
@@ -739,6 +778,51 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
     return {
         checkForUpdatesFromMenu: async () => {
             debugPreviewMode = false;
+            await runCheckForUpdates(true);
+        },
+        getUpdateChannel: () => activeUpdateChannel,
+        setUpdateChannelFromMenu: async (channel: UpdateChannel) => {
+            if (channel === activeUpdateChannel) {
+                return;
+            }
+
+            if (checkInProgress || downloadInProgress || rendererUpdaterState.readyToInstall) {
+                const options: MessageBoxOptions = {
+                    type: 'warning',
+                    title: t('updater.title'),
+                    message: t('updater.channelBusy'),
+                    buttons: [t('updater.ok')],
+                    defaultId: 0,
+                };
+                const parentWindow = getMainWindow();
+                if (parentWindow) {
+                    await dialog.showMessageBox(parentWindow, options);
+                } else {
+                    await dialog.showMessageBox(options);
+                }
+                return;
+            }
+
+            applyUpdateChannel(log, channel);
+            updaterPreferenceStore.set('skippedVersion', null);
+            updaterPreferenceStore.set('remindLaterUntil', 0);
+
+            const options: MessageBoxOptions = {
+                type: 'info',
+                title: t('updater.channelChanged'),
+                message: t('updater.channelChangedDetail', {
+                    channel: getChannelLabel(channel, t),
+                }),
+                buttons: [t('updater.ok')],
+                defaultId: 0,
+            };
+            const parentWindow = getMainWindow();
+            if (parentWindow) {
+                await dialog.showMessageBox(parentWindow, options);
+            } else {
+                await dialog.showMessageBox(options);
+            }
+
             await runCheckForUpdates(true);
         },
         clearSkippedVersionFromMenu: () => {

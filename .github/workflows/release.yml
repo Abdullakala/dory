@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       bump:
-        description: "Version bump type"
+        description: "Release action"
         required: true
         default: patch
         type: choice
@@ -12,11 +12,16 @@ on:
           - patch
           - minor
           - major
-      prerelease:
-        description: "Create as prerelease"
+          - prerelease
+          - promote
+      channel:
+        description: "Release channel"
         required: true
-        default: false
-        type: boolean
+        default: stable
+        type: choice
+        options:
+          - stable
+          - beta
 
 permissions:
   actions: write
@@ -54,10 +59,28 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Bump version in package.json files
+      - name: Compute release version
         id: version
         run: |
-          npm version "${{ inputs.bump }}" --no-git-tag-version
+          case "${{ inputs.channel }}:${{ inputs.bump }}" in
+            stable:patch|stable:minor|stable:major)
+              npm version "${{ inputs.bump }}" --no-git-tag-version
+              ;;
+            stable:promote)
+              NEW_VERSION="$(node -e "const version=require('./package.json').version; if (!version.includes('-')) { process.stderr.write('Current version is not a prerelease\\n'); process.exit(1); } process.stdout.write(version.split('-')[0]);")"
+              npm version "$NEW_VERSION" --no-git-tag-version
+              ;;
+            beta:patch|beta:minor|beta:major)
+              npm version "pre${{ inputs.bump }}" --preid beta --no-git-tag-version
+              ;;
+            beta:prerelease)
+              npm version prerelease --preid beta --no-git-tag-version
+              ;;
+            *)
+              echo "Unsupported combination: channel=${{ inputs.channel }}, bump=${{ inputs.bump }}"
+              exit 1
+              ;;
+          esac
           NEW_VERSION="$(node -p "require('./package.json').version")"
           for app_pkg in apps/*/package.json; do
             app_dir="$(dirname "$app_pkg")"
@@ -80,7 +103,7 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           PRERELEASE_FLAG=""
-          if [ "${{ inputs.prerelease }}" = "true" ]; then
+          if [ "${{ inputs.channel }}" = "beta" ]; then
             PRERELEASE_FLAG="--prerelease"
           fi
           gh release create "v$VERSION" \

@@ -16,12 +16,25 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 function buildUrl(host: string, httpPort?: number | string, useTls?: boolean): string {
-    if (/^https?:\/\//i.test(host)) {
-        return host;
+    const trimmedHost = host.trim();
+    const preferredScheme = useTls ? 'https' : 'http';
+
+    try {
+        const url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmedHost) ? trimmedHost : `${preferredScheme}://${trimmedHost}`);
+
+        url.protocol = `${preferredScheme}:`;
+
+        if (typeof httpPort !== 'undefined' && httpPort !== null && httpPort !== '') {
+            url.port = String(httpPort);
+        } else if (!url.port) {
+            url.port = useTls ? '8443' : '8123';
+        }
+
+        return url.origin;
+    } catch {
+        const port = typeof httpPort !== 'undefined' && httpPort !== null && httpPort !== '' ? `:${httpPort}` : '';
+        return `${preferredScheme}://${trimmedHost}${port}`;
     }
-    const port = typeof httpPort !== 'undefined' && httpPort !== null && httpPort !== '' ? `:${httpPort}` : '';
-    const scheme = useTls ? 'https' : 'http';
-    return `${scheme}://${host}${port}`;
 }
 
 export class ClickhouseDatasource extends BaseConnection {
@@ -288,6 +301,12 @@ export class ClickhouseDatasource extends BaseConnection {
 
         if (typeof fromOptions === 'number') return fromOptions;
         if (typeof fromOptions === 'string' && fromOptions.trim() !== '') return Number(fromOptions);
+        try {
+            const parsed = new URL(this.config.host);
+            if (parsed.port) return Number(parsed.port);
+        } catch {
+            // Ignore invalid URL input and fall back to config fields.
+        }
         if (typeof port === 'number') return port;
         if (typeof port === 'string' && port.trim() !== '') return Number(port);
         return undefined;
@@ -295,13 +314,18 @@ export class ClickhouseDatasource extends BaseConnection {
 
     private isTlsEnabled(): boolean {
         const raw = this.config.options as Record<string, unknown> | undefined;
-        if (!raw) return false;
-        if (typeof raw.ssl === 'boolean') return raw.ssl;
-        if (typeof raw.useSSL === 'boolean') return raw.useSSL;
-        if (typeof raw.protocol === 'string') {
-            return raw.protocol.toLowerCase().startsWith('https');
+        if (raw) {
+            if (typeof raw.ssl === 'boolean') return raw.ssl;
+            if (typeof raw.useSSL === 'boolean') return raw.useSSL;
+            if (typeof raw.protocol === 'string') {
+                return raw.protocol.toLowerCase().startsWith('https');
+            }
         }
-        return false;
+        try {
+            return new URL(this.config.host).protocol === 'https:';
+        } catch {
+            return false;
+        }
     }
 
     private extractSettings(): ClickHouseSettings | undefined {

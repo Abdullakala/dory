@@ -8,6 +8,7 @@ export const NEW_CONNECTION_DEFAULT_VALUES = {
         host: '',
         port: 9000,
         httpPort: 8123,
+        ssl: false,
         database: '',
         environment: '',
         tags: '',

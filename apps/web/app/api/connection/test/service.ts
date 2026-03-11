@@ -1,5 +1,6 @@
 import { UnsupportedTypeError } from '@/lib/connection/base/errors';
 import { BaseConfig, HealthInfo } from '@/lib/connection/base/types';
+import { applyQueryRequestTimeout, withConnectionTimeout } from '@/lib/connection/defaults';
 import { createProvider } from '@/lib/connection/factory';
 import { getDBService } from '@/lib/database';
 import { TestConnectionPayload } from '@/types/connections';
@@ -51,7 +52,7 @@ function hasSshSecret(ssh?: SSHConfigWithSecrets | null): boolean {
 
 
 function buildConnectionConfig(payload: TestConnectionPayload & { ssh?: SSHConfigWithSecrets | null }): BaseConfig {
-    const { connection, ssh, identity, timeout } = payload;
+    const { connection, ssh, identity } = payload;
     const sshConfig = ssh as SSHConfigWithSecrets | null;
 
     if (!connection?.host) {
@@ -73,13 +74,8 @@ function buildConnectionConfig(payload: TestConnectionPayload & { ssh?: SSHConfi
         (options as any).httpPort = connection.httpPort;
     }
 
-    
-    if (timeout && Number.isFinite(timeout)) {
-        (options as any).request_timeout = timeout;
-        (options as any).connectTimeout = timeout;
-    }
+    applyQueryRequestTimeout(options);
 
-    
     if (sshConfig?.enabled) {
         (options as any).ssh = {
             enabled: true,
@@ -145,10 +141,16 @@ export async function testConnectService(teamId: string, payload: TestConnection
     const testPassword = payload?.identity?.password ?? plainPassword;
     const resolvedSsh = await resolveSshSecrets(teamId, payload, db);
     const config = buildConnectionConfig({ ...payload, identity: { ...payload.identity, password: testPassword }, ssh: resolvedSsh });
-    const provider = await createProvider(config);
+    let provider = null as Awaited<ReturnType<typeof createProvider>> | null;
 
     try {
-        const result = await provider.ping();
+        const result = await withConnectionTimeout(
+            (async () => {
+                provider = await createProvider(config);
+                return provider.ping();
+            })(),
+            payload.timeout,
+        );
         const tookMs = typeof result?.tookMs === 'number' ? result.tookMs : Date.now() - startedAt;
         await recordLastCheck('ok', null, tookMs);
         return result;
@@ -158,9 +160,11 @@ export async function testConnectService(teamId: string, payload: TestConnection
         await recordLastCheck('error', message, tookMs);
         throw error;
     } finally {
-        await provider.close().catch(err => {
-            console.error('[connection] failed to close test datasource', err);
-        });
+        if (provider) {
+            await provider.close().catch(err => {
+                console.error('[connection] failed to close test datasource', err);
+            });
+        }
     }
 }
 

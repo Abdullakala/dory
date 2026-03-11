@@ -1,13 +1,23 @@
 import { z } from "zod";
 
+const requiredPort = z.preprocess(
+    value => {
+        if (value === '' || value === null || typeof value === 'undefined') return undefined;
+        if (typeof value === 'string') return Number(value);
+        return value;
+    },
+    z.number().int().min(1, 'Please provide a port number').max(65535, 'Port must be between 1 and 65535'),
+);
+
 export const ConnectionDialogFormSchema = z.object({
     connection: z.object({
         type: z.string().min(1, 'Please select a connection type'),
         name: z.string().min(1, 'Please provide a connection name'),
         description: z.string().optional().nullable(),
         host: z.string().min(1, 'Please provide a host'),
-        port: z.number().min(1, 'Please provide a port number'),
-        httpPort: z.number().optional(),
+        port: requiredPort,
+        httpPort: requiredPort,
+        ssl: z.boolean().default(false),
         environment: z.string().optional(),
         tags: z.string().optional(),
     }),

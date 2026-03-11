@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { ChevronDown, ChevronUp, Loader2, Server, Shield } from 'lucide-react';
@@ -26,6 +26,93 @@ import { NEW_CONNECTION_DEFAULT_VALUES } from '../constants';
 import { ConnectionDialogFormSchema } from '../form-schema';
 import { useAtomValue } from 'jotai';
 import { currentConnectionAtom } from '@/shared/stores/app.store';
+
+function parseConnectionOptions(raw: unknown): Record<string, unknown> {
+    if (!raw) return {};
+    if (typeof raw === 'object' && !Array.isArray(raw)) return { ...(raw as Record<string, unknown>) };
+    if (typeof raw === 'string') {
+        try {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                return parsed as Record<string, unknown>;
+            }
+        } catch {
+            return {};
+        }
+    }
+    return {};
+}
+
+function parseHostDraft(rawHost: unknown): { host?: string; httpPort?: number; ssl?: boolean } {
+    if (typeof rawHost !== 'string') return {};
+    const trimmed = rawHost.trim();
+    if (!trimmed) return {};
+
+    const hasProtocol = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed);
+
+    try {
+        const url = new URL(hasProtocol ? trimmed : `http://${trimmed}`);
+        const hostname = url.hostname.includes(':') && !url.hostname.startsWith('[') ? `[${url.hostname}]` : url.hostname;
+
+        return {
+            host: hostname || trimmed,
+            httpPort: url.port ? Number(url.port) : undefined,
+            ssl: hasProtocol ? url.protocol === 'https:' : undefined,
+        };
+    } catch {
+        return { host: trimmed };
+    }
+}
+
+function normalizeConnectionForForm(connection: any) {
+    const options = parseConnectionOptions(connection?.options);
+    const parsedHost = parseHostDraft(connection?.host);
+    const sslFromOptions =
+        typeof options.ssl === 'boolean'
+            ? options.ssl
+            : typeof options.useSSL === 'boolean'
+              ? options.useSSL
+              : typeof options.protocol === 'string'
+                ? options.protocol.toLowerCase().startsWith('https')
+                : undefined;
+    const ssl = parsedHost.ssl ?? sslFromOptions ?? false;
+    const httpPort =
+        connection?.httpPort ??
+        parsedHost.httpPort ??
+        (ssl ? 8443 : 8123);
+
+    return {
+        ...connection,
+        host: parsedHost.host ?? connection?.host ?? '',
+        port: typeof connection?.port === 'number' ? connection.port : 9000,
+        httpPort,
+        ssl,
+    };
+}
+
+function normalizeConnectionForSubmit(connection: any) {
+    const options = parseConnectionOptions(connection?.options);
+    const { ssl: _ssl, ...restConnection } = connection ?? {};
+    const parsedHost = parseHostDraft(connection?.host);
+    const ssl = parsedHost.ssl ?? Boolean(connection?.ssl);
+    const httpPort =
+        typeof connection?.httpPort === 'number' && Number.isFinite(connection.httpPort)
+            ? connection.httpPort
+            : parsedHost.httpPort ?? (ssl ? 8443 : 8123);
+
+    options.ssl = ssl;
+    options.useSSL = ssl;
+    options.protocol = ssl ? 'https' : 'http';
+    options.httpPort = httpPort;
+
+    return {
+        ...restConnection,
+        host: parsedHost.host ?? connection?.host?.trim?.() ?? '',
+        port: typeof connection?.port === 'number' ? connection.port : 9000,
+        httpPort,
+        options: JSON.stringify(options),
+    };
+}
 
 type Mode = 'Create' | 'Edit';
 
@@ -62,7 +149,10 @@ export function ConnectionDialog({
 
     const isEditMode = mode === 'Edit' && Boolean(connectionItem?.connection?.id);
 
-    
+    const resetDialogState = () => {
+        setTesting(false);
+        reset(NEW_CONNECTION_DEFAULT_VALUES);
+    };
 
     const normalizeSshValues = (sshValues: any, connectionId?: string | null) => {
         if (!sshValues) return null;
@@ -82,7 +172,7 @@ export function ConnectionDialog({
             console.log('Editing connection:', connectionItem);
             const formIdentity = connectionItem.identities?.find((iden: any) => iden.isDefault) || {};
             const nextValues = {
-                connection: connectionItem.connection,
+                connection: normalizeConnectionForForm(connectionItem.connection),
                 ssh: connectionItem.ssh ? { ...connectionItem.ssh } : { ...(NEW_CONNECTION_DEFAULT_VALUES as any).ssh },
                 identity: formIdentity,
             } as any;
@@ -101,9 +191,10 @@ export function ConnectionDialog({
             const connectionId = connectionItem?.connection?.id;
             const defaultIdentity = connectionItem?.identities?.find((iden: any) => iden.isDefault);
             const sshPayload = normalizeSshValues(values.ssh, isEditMode ? connectionId : null);
+            const normalizedConnection = normalizeConnectionForSubmit(values.connection);
 
             const savedValues = {
-                connection: isEditMode ? { ...values.connection, id: connectionId } : values.connection,
+                connection: isEditMode ? { ...normalizedConnection, id: connectionId } : normalizedConnection,
                 ssh: sshPayload,
                 identities: [
                     isEditMode
@@ -130,7 +221,7 @@ export function ConnectionDialog({
 
             onOpenChange(false);
             onSuccess && onSuccess();
-            reset(NEW_CONNECTION_DEFAULT_VALUES);
+            resetDialogState();
         } finally {
             setSubmitting(false);
         }
@@ -139,14 +230,17 @@ export function ConnectionDialog({
     
     const onValidTest = async (values: any) => {
         const sshPayload = normalizeSshValues(values.ssh);
+        const normalizedConnection = normalizeConnectionForSubmit(values.connection);
         let testPayload = { ...values, ssh: sshPayload };
         if (mode === 'Edit') {
             const mergedSsh = sshPayload ? { ...currentConnection?.ssh, ...sshPayload } : currentConnection?.ssh ?? null;
             testPayload = {
-                connection: { ...currentConnection?.connection, ...values.connection },
+                connection: { ...currentConnection?.connection, ...normalizedConnection },
                 identity: { ...currentConnection?.identities?.find((iden: any) => iden.isDefault), ...values.identity },
                 ssh: mergedSsh,
             };
+        } else {
+            testPayload = { ...values, connection: normalizedConnection, ssh: sshPayload };
         }
         setTesting(true);
         try {
@@ -171,12 +265,20 @@ export function ConnectionDialog({
 
     const handleClose = () => {
         if (submitting) return;
+        resetDialogState();
         onOpenChange(false);
-        reset(NEW_CONNECTION_DEFAULT_VALUES);
+    };
+
+    const handleOpenChange = (nextOpen: boolean) => {
+        if (submitting) return;
+        if (!nextOpen) {
+            resetDialogState();
+        }
+        onOpenChange(nextOpen);
     };
 
     return (
-        <Dialog open={open} onOpenChange={open => !submitting && onOpenChange(open)}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent className="sm:max-w-2xl max-h-[95vh] flex flex-col">
                 <DialogHeader className="shrink-0">
                     <DialogTitle>{isEditMode ? tc('Edit.title') : tc('Create.title')}</DialogTitle>

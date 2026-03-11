@@ -149,7 +149,10 @@ export function ConnectionDialog({
 
     const isEditMode = mode === 'Edit' && Boolean(connectionItem?.connection?.id);
 
-    
+    const resetDialogState = () => {
+        setTesting(false);
+        reset(NEW_CONNECTION_DEFAULT_VALUES);
+    };
 
     const normalizeSshValues = (sshValues: any, connectionId?: string | null) => {
         if (!sshValues) return null;
@@ -218,7 +221,7 @@ export function ConnectionDialog({
 
             onOpenChange(false);
             onSuccess && onSuccess();
-            reset(NEW_CONNECTION_DEFAULT_VALUES);
+            resetDialogState();
         } finally {
             setSubmitting(false);
         }
@@ -262,12 +265,20 @@ export function ConnectionDialog({
 
     const handleClose = () => {
         if (submitting) return;
+        resetDialogState();
         onOpenChange(false);
-        reset(NEW_CONNECTION_DEFAULT_VALUES);
+    };
+
+    const handleOpenChange = (nextOpen: boolean) => {
+        if (submitting) return;
+        if (!nextOpen) {
+            resetDialogState();
+        }
+        onOpenChange(nextOpen);
     };
 
     return (
-        <Dialog open={open} onOpenChange={open => !submitting && onOpenChange(open)}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent className="sm:max-w-2xl max-h-[95vh] flex flex-col">
                 <DialogHeader className="shrink-0">
                     <DialogTitle>{isEditMode ? tc('Edit.title') : tc('Create.title')}</DialogTitle>

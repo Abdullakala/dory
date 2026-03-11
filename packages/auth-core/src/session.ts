@@ -92,14 +92,14 @@ export function createSessionResolver<Session>(options: CreateSessionResolverOpt
       return session;
     }
 
-    log.warn('[auth/session] no session resolved', {
-      runtime,
-      hasCloudBase: Boolean(cloudBase),
-      proxied,
-      requestHost,
-      requestUrl,
-      cookieNames,
-    });
+    // log.warn('[auth/session] no session resolved', {
+    //   runtime,
+    //   hasCloudBase: Boolean(cloudBase),
+    //   proxied,
+    //   requestHost,
+    //   requestUrl,
+    //   cookieNames,
+    // });
 
     return null;
   };

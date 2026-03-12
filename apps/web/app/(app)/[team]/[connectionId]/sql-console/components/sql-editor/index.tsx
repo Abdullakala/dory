@@ -81,6 +81,10 @@ const SQLEditor = forwardRef<SQLEditorHandle, SQLEditorProps>(({ activeTab, upda
         onRunQuery,
         formatHandlerRef,
     });
+
+    if (activeTab?.tabType !== 'sql') {
+        return <div>{t('Editor.NotSqlTab')}</div>;
+    }
     
     useImperativeHandle(
         ref,

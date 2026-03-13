@@ -318,63 +318,7 @@ export async function createConnectionAndOpenConsole(page: Page) {
 
     const connectionCard = page.getByTestId('connection-card').filter({ hasText: 'E2E ClickHouse' }).first();
     await expect(connectionCard).toBeVisible();
-    const connectionId =
-        (await connectionCard.getAttribute('data-connection-id')) ?? 'conn-1';
-    const match = page.url().match(/\/([^/]+)\/connections$/);
-    const teamId = match?.[1];
-    if (!teamId) {
-        throw new Error(`Failed to resolve team id from URL: ${page.url()}`);
-    }
-
-    await page.evaluate(
-        ({ id }) => {
-            window.localStorage.setItem(
-                'currentConnection',
-                JSON.stringify({
-                    connection: {
-                        id,
-                        type: 'clickhouse',
-                        engine: 'clickhouse',
-                        name: 'E2E ClickHouse',
-                        description: null,
-                        host: 'localhost',
-                        port: 8123,
-                        httpPort: 8123,
-                        database: null,
-                        options: '{}',
-                        status: 'Connected',
-                        configVersion: 1,
-                        createdAt: new Date().toISOString(),
-                        updatedAt: new Date().toISOString(),
-                        deletedAt: null,
-                        lastUsedAt: null,
-                        lastCheckStatus: 'ok',
-                        lastCheckAt: new Date().toISOString(),
-                        lastCheckLatencyMs: 12,
-                        lastCheckError: null,
-                        environment: 'local',
-                        tags: '',
-                    },
-                    identities: [
-                        {
-                            id: 'identity-1',
-                            name: 'default',
-                            username: 'default',
-                            role: null,
-                            isDefault: true,
-                            database: null,
-                            enabled: true,
-                            status: 'active',
-                        },
-                    ],
-                    ssh: null,
-                }),
-            );
-        },
-        { id: connectionId },
-    );
-
-    await page.goto(`/${teamId}/${connectionId}/sql-console`);
+    await connectionCard.click();
     await expect(page).toHaveURL(/\/sql-console$/);
 }
 

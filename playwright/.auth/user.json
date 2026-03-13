@@ -1,25 +1,49 @@
 {
   "cookies": [
     {
+      "name": "ph_phc_o3VMn0VNqYPzgCWe46va7Vj3PDJVmxEajxKoBICgxJw_posthog",
+      "value": "%7B%22%24device_id%22%3A%22019ce50c-25b7-767c-b189-89fdef2a4161%22%2C%22distinct_id%22%3A%22019ce50c-25b7-767c-b189-89fdef2a4161%22%2C%22%24epp%22%3Atrue%2C%22%24user_state%22%3A%22anonymous%22%7D",
+      "domain": "127.0.0.1",
+      "path": "/",
+      "expires": 1804905307,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
       "name": "active_theme",
       "value": "default",
       "domain": "127.0.0.1",
       "path": "/",
-      "expires": 1804873397.339342,
+      "expires": 1804905304.504774,
       "httpOnly": false,
       "secure": false,
       "sameSite": "Lax"
     },
     {
       "name": "better-auth.session_token",
-      "value": "SXntwCKYoOWiHHdUs9FStU36mmqdJtu9.0QOCFLZ0f0sPIJHpjSnulOqjVhBCCSSdrKLpY1ylkCM%3D",
+      "value": "A6rkPogI30hq9gXMJlPgwf5KAKMjQz2n.nWpjl7sorq8k056OXbjKDZ2J8Ng77J%2FBqCWvtU8N1ho%3D",
       "domain": "127.0.0.1",
       "path": "/",
-      "expires": 1773942200.118764,
+      "expires": 1773974106.622398,
       "httpOnly": true,
       "secure": false,
       "sameSite": "Lax"
     }
   ],
-  "origins": []
+  "origins": [
+    {
+      "origin": "http://127.0.0.1:3100",
+      "localStorage": [
+        {
+          "name": "ph_phc_o3VMn0VNqYPzgCWe46va7Vj3PDJVmxEajxKoBICgxJw_posthog",
+          "value": "{\"$initialization_time\":\"2026-03-13T02:35:04.499Z\",\"$configured_session_timeout_ms\":1800000,\"distinct_id\":\"019ce50c-25b7-767c-b189-89fdef2a4161\",\"$device_id\":\"019ce50c-25b7-767c-b189-89fdef2a4161\",\"$user_state\":\"anonymous\",\"$epp\":true,\"$stored_person_properties\":{\"$internal_or_test_user\":true},\"environment\":\"development\",\"runtime\":\"web\",\"$feature_flag_errors\":[\"timeout\"]}"
+        },
+        {
+          "name": "ph_debug",
+          "value": "\"true\""
+        }
+      ]
+    }
+  ]
 }

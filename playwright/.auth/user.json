@@ -5,27 +5,27 @@
       "value": "default",
       "domain": "127.0.0.1",
       "path": "/",
-      "expires": 1804907776.714024,
+      "expires": 1804908453.486068,
       "httpOnly": false,
       "secure": false,
       "sameSite": "Lax"
     },
     {
       "name": "better-auth.session_token",
-      "value": "2aFrXvTOCTVMGpDxr12PD4fM5eEUqPVx.w5ncp8o9a%2FakKPC%2F78Tw9wpr3GQX9xyi83GT4GZCQWo%3D",
+      "value": "1yBuGHoD4nmEyS0IlVpeyVyy7yNchrwm.UNKiQKWXX4OyClTI%2Bb3mEaqVUU4zosbx5c7jsokmCh8%3D",
       "domain": "127.0.0.1",
       "path": "/",
-      "expires": 1773976579.343086,
+      "expires": 1773977256.014093,
       "httpOnly": true,
       "secure": false,
       "sameSite": "Lax"
     },
     {
       "name": "ph_phc_o3VMn0VNqYPzgCWe46va7Vj3PDJVmxEajxKoBICgxJw_posthog",
-      "value": "%7B%22%24device_id%22%3A%22019ce531-dec7-7bff-97b1-96a61cccb74b%22%2C%22distinct_id%22%3A%22019ce531-dec7-7bff-97b1-96a61cccb74b%22%2C%22%24sesid%22%3A%5B1773371780976%2C%22019ce531-ecb0-725f-b7bc-57ec5162c515%22%2C1773371780272%5D%2C%22%24epp%22%3Atrue%2C%22%24user_state%22%3A%22anonymous%22%7D",
+      "value": "%7B%22%24device_id%22%3A%22019ce53c-326d-783e-9be2-6581fc0cfb1b%22%2C%22distinct_id%22%3A%22019ce53c-326d-783e-9be2-6581fc0cfb1b%22%2C%22%24sesid%22%3A%5B1773372456991%2C%22019ce53c-3e99-7e56-8722-22563716f10b%22%2C1773372456601%5D%2C%22%24epp%22%3Atrue%2C%22%24user_state%22%3A%22anonymous%22%7D",
       "domain": "127.0.0.1",
       "path": "/",
-      "expires": 1804907780,
+      "expires": 1804908456,
       "httpOnly": false,
       "secure": false,
       "sameSite": "Lax"
@@ -37,7 +37,7 @@
       "localStorage": [
         {
           "name": "ph_phc_o3VMn0VNqYPzgCWe46va7Vj3PDJVmxEajxKoBICgxJw_posthog",
-          "value": "{\"$initialization_time\":\"2026-03-13T03:16:16.705Z\",\"$configured_session_timeout_ms\":1800000,\"distinct_id\":\"019ce531-dec7-7bff-97b1-96a61cccb74b\",\"$device_id\":\"019ce531-dec7-7bff-97b1-96a61cccb74b\",\"$user_state\":\"anonymous\",\"$epp\":true,\"$stored_person_properties\":{\"$internal_or_test_user\":true},\"environment\":\"development\",\"runtime\":\"web\",\"$error_tracking_suppression_rules\":[],\"$session_recording_remote_config\":{\"cache_timestamp\":1773371780273,\"enabled\":true,\"consoleLogRecordingEnabled\":true,\"endpoint\":\"/s/\",\"eventTriggers\":[],\"linkedFlag\":null,\"masking\":null,\"minimumDurationMilliseconds\":null,\"networkPayloadCapture\":{\"capturePerformance\":{\"network_timing\":true,\"web_vitals\":true,\"web_vitals_allowed_metrics\":null}},\"recorderVersion\":\"v2\",\"sampleRate\":null,\"scriptConfig\":{\"script\":\"posthog-recorder\"},\"triggerMatchType\":null,\"urlBlocklist\":[],\"urlTriggers\":[],\"canvasRecording\":{}},\"$autocapture_disabled_server_side\":false,\"$product_tours_enabled_server_side\":false,\"$heatmaps_enabled_server_side\":true,\"$web_vitals_enabled_server_side\":true,\"$web_vitals_allowed_metrics\":null,\"$exception_capture_enabled_server_side\":false,\"$dead_clicks_enabled_server_side\":false,\"$feature_flag_errors\":[\"timeout\"],\"$sesid\":[1773371780976,\"019ce531-ecb0-725f-b7bc-57ec5162c515\",1773371780272],\"$client_session_props\":{\"sessionId\":\"019ce531-ecb0-725f-b7bc-57ec5162c515\",\"props\":{\"r\":\"$direct\",\"u\":\"http://127.0.0.1:3100/\"}},\"$debug_first_full_snapshot_timestamp\":1773371780291}"
+          "value": "{\"$initialization_time\":\"2026-03-13T03:27:33.482Z\",\"$configured_session_timeout_ms\":1800000,\"distinct_id\":\"019ce53c-326d-783e-9be2-6581fc0cfb1b\",\"$device_id\":\"019ce53c-326d-783e-9be2-6581fc0cfb1b\",\"$user_state\":\"anonymous\",\"$epp\":true,\"$stored_person_properties\":{\"$internal_or_test_user\":true},\"environment\":\"development\",\"runtime\":\"web\",\"$feature_flag_errors\":[],\"$active_feature_flags\":[],\"$enabled_feature_flags\":{},\"$feature_flag_payloads\":{},\"$feature_flag_details\":{},\"$feature_flag_request_id\":\"08ac10c5-1c8d-4f73-a8d8-cd2cba7fc879\",\"$feature_flag_evaluated_at\":1773372456271,\"$error_tracking_suppression_rules\":[],\"$session_recording_remote_config\":{\"cache_timestamp\":1773372456601,\"enabled\":true,\"consoleLogRecordingEnabled\":true,\"endpoint\":\"/s/\",\"eventTriggers\":[],\"linkedFlag\":null,\"masking\":null,\"minimumDurationMilliseconds\":null,\"networkPayloadCapture\":{\"capturePerformance\":{\"network_timing\":true,\"web_vitals\":true,\"web_vitals_allowed_metrics\":null}},\"recorderVersion\":\"v2\",\"sampleRate\":null,\"scriptConfig\":{\"script\":\"posthog-recorder\"},\"triggerMatchType\":null,\"urlBlocklist\":[],\"urlTriggers\":[],\"canvasRecording\":{}},\"$autocapture_disabled_server_side\":false,\"$product_tours_enabled_server_side\":false,\"$heatmaps_enabled_server_side\":true,\"$web_vitals_enabled_server_side\":true,\"$web_vitals_allowed_metrics\":null,\"$exception_capture_enabled_server_side\":false,\"$dead_clicks_enabled_server_side\":false,\"$sesid\":[1773372456991,\"019ce53c-3e99-7e56-8722-22563716f10b\",1773372456601],\"$client_session_props\":{\"sessionId\":\"019ce53c-3e99-7e56-8722-22563716f10b\",\"props\":{\"r\":\"$direct\",\"u\":\"http://127.0.0.1:3100/\"}},\"$debug_first_full_snapshot_timestamp\":1773372456956}"
         },
         {
           "name": "ph_debug",

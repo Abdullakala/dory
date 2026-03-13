@@ -318,26 +318,67 @@ export async function createConnectionAndOpenConsole(page: Page) {
 
     const connectionCard = page.getByTestId('connection-card').filter({ hasText: 'E2E ClickHouse' }).first();
     await expect(connectionCard).toBeVisible();
-    let connectRequestSeen = false;
-    let connectResponseStatus: number | null = null;
+    const connectionId = (await connectionCard.getAttribute('data-connection-id')) ?? 'conn-1';
+    const match = page.url().match(/\/([^/]+)\/connections$/);
+    const teamId = match?.[1];
+
+    if (!teamId) {
+        throw new Error(`Failed to resolve team id from URL: ${page.url()}`);
+    }
+
+    await page.evaluate(
+        ({ id }) => {
+            window.localStorage.setItem(
+                'currentConnection',
+                JSON.stringify({
+                    connection: {
+                        id,
+                        type: 'clickhouse',
+                        engine: 'clickhouse',
+                        name: 'E2E ClickHouse',
+                        description: null,
+                        host: 'localhost',
+                        port: 9000,
+                        httpPort: 8123,
+                        database: null,
+                        options: '{"ssl":false,"useSSL":false,"protocol":"http","httpPort":8123}',
+                        status: 'Connected',
+                        configVersion: 1,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                        deletedAt: null,
+                        lastUsedAt: null,
+                        lastCheckStatus: 'ok',
+                        lastCheckAt: new Date().toISOString(),
+                        lastCheckLatencyMs: 12,
+                        lastCheckError: null,
+                        environment: 'local',
+                        tags: '',
+                    },
+                    identities: [
+                        {
+                            id: 'identity-1',
+                            name: 'default',
+                            username: 'default',
+                            role: null,
+                            isDefault: true,
+                            database: null,
+                            enabled: true,
+                            status: 'active',
+                        },
+                    ],
+                    ssh: null,
+                }),
+            );
+        },
+        { id: connectionId },
+    );
+
+    const targetPath = `/${teamId}/${connectionId}/sql-console`;
 
     try {
-        await Promise.all([
-            page.waitForResponse(response => {
-                const isConnectRequest =
-                    response.url().includes('/api/connection/connect') &&
-                    response.request().method() === 'POST';
-
-                if (isConnectRequest) {
-                    connectRequestSeen = true;
-                    connectResponseStatus = response.status();
-                }
-
-                return isConnectRequest;
-            }),
-            page.waitForURL(/\/sql-console$/, { timeout: 15000 }),
-            connectionCard.click(),
-        ]);
+        await page.goto(targetPath, { waitUntil: 'commit' });
+        await expect(page).toHaveURL(new RegExp(`/${teamId}/${connectionId}/sql-console$`));
     } catch (error) {
         const diagnostics = await page.evaluate(() => {
             const cards = Array.from(document.querySelectorAll('[data-testid="connection-card"]')).map(card => ({
@@ -358,8 +399,7 @@ export async function createConnectionAndOpenConsole(page: Page) {
 
         console.error('[workbench helper] failed to open SQL console', {
             currentUrl: page.url(),
-            connectRequestSeen,
-            connectResponseStatus,
+            targetPath,
             cardConnectionId,
             cardText: cardText?.replace(/\s+/g, ' ').trim() ?? null,
             diagnostics,

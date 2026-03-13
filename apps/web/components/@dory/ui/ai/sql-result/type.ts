@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 export type SqlResultPart = {
     type: 'sql-result';
     ok: boolean;
@@ -24,8 +26,10 @@ export type SqlResultCardProps = {
     result: SqlResultPart;
     onCopy: (sql: string) => void;
     onManualExecute: (payload: { sql: string; database: string | null; mode?: SqlResultManualExecutionMode }) => void;
-
     onFollowUp?: (prompt: string) => void;
+    footerActions?: ReactNode;
+    manualPrimaryAction?: ReactNode;
+    manualMenuActions?: ReactNode;
     mode?: SqlResultCardMode;
 };
 

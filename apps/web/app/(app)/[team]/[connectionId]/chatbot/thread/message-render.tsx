@@ -12,6 +12,7 @@ import { SqlResultCard } from '@/components/@dory/ui/ai/sql-result';
 import { AssistantFallbackCard } from '@/components/@dory/ui/ai/assistant-fallback';
 import { Card, CardContent, CardHeader, CardTitle } from '@/registry/new-york-v4/ui/card';
 import { Button } from '@/registry/new-york-v4/ui/button';
+import { DropdownMenuItem } from '@/registry/new-york-v4/ui/dropdown-menu';
 import { buildAutoChartFromSql } from '@/components/@dory/ui/ai/utils/auto-charts';
 import { useTranslations } from 'next-intl';
 
@@ -325,28 +326,53 @@ const MessageRenderer = ({
 
             
             contentItems.push(
-                <div key={`${message.id}-sql-${i}`} className="space-y-2">
-                    <SqlResultCard result={sqlResult} onCopy={onCopySql} onManualExecute={onManualExecute} mode={mode} />
-
-                    {showCopilotSqlActions && sqlResult.sql?.trim() ? (
-                        <div className="flex flex-wrap items-center gap-2">
+                <SqlResultCard
+                    key={`${message.id}-sql-${i}`}
+                    result={sqlResult}
+                    onCopy={onCopySql}
+                    onManualExecute={onManualExecute}
+                    mode={mode}
+                    manualPrimaryAction={
+                        showCopilotSqlActions && sqlResult.manualExecution?.required && sqlResult.sql?.trim() ? (
                             <Button
+                                type="button"
                                 size="sm"
-                                variant="secondary"
+                                className="h-9 rounded-full px-4 text-sm font-medium"
                                 onClick={() => onExecuteAction?.({ type: 'sql.replace', sql: sqlResult.sql })}
                             >
                                 {t('Tools.ReplaceSql')}
                             </Button>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => onExecuteAction?.({ type: 'sql.newTab', sql: sqlResult.sql })}
-                            >
+                        ) : undefined
+                    }
+                    manualMenuActions={
+                        showCopilotSqlActions && sqlResult.manualExecution?.required && sqlResult.sql?.trim() ? (
+                            <DropdownMenuItem onClick={() => onExecuteAction?.({ type: 'sql.newTab', sql: sqlResult.sql })}>
                                 {t('Tools.NewTab')}
-                            </Button>
-                        </div>
-                    ) : null}
-                </div>,
+                            </DropdownMenuItem>
+                        ) : undefined
+                    }
+                    footerActions={
+                        showCopilotSqlActions && !sqlResult.manualExecution?.required && sqlResult.sql?.trim() ? (
+                            <>
+                                <Button
+                                    size="sm"
+                                    className="h-9 rounded-full px-4 text-sm font-medium"
+                                    onClick={() => onExecuteAction?.({ type: 'sql.replace', sql: sqlResult.sql })}
+                                >
+                                    {t('Tools.ReplaceSql')}
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    className="h-9 rounded-full border-0 px-4 text-sm font-medium"
+                                    onClick={() => onExecuteAction?.({ type: 'sql.newTab', sql: sqlResult.sql })}
+                                >
+                                    {t('Tools.NewTab')}
+                                </Button>
+                            </>
+                        ) : null
+                    }
+                />,
             );
             return;
         }

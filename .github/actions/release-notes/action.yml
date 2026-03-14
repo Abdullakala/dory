@@ -1,0 +1,80 @@
+name: Generate Release Notes
+description: Generate AI release notes markdown for a given tag.
+
+inputs:
+  tag:
+    description: Release tag to generate notes for.
+    required: true
+  from_ref:
+    description: Optional start ref. Defaults to the latest reachable tag from the target ref.
+    required: false
+    default: ""
+  to_ref:
+    description: Optional end ref. Defaults to HEAD.
+    required: false
+    default: HEAD
+  output_dir:
+    description: Directory where the markdown file will be written.
+    required: false
+    default: release-notes
+  max_commits:
+    description: Maximum number of commits to send to the model.
+    required: false
+    default: "200"
+
+outputs:
+  tag:
+    description: Resolved release tag.
+    value: ${{ steps.refs.outputs.tag }}
+  previous_tag:
+    description: Previous reachable tag before the release tag.
+    value: ${{ steps.refs.outputs.previous_tag }}
+  notes_file:
+    description: Generated markdown file path.
+    value: ${{ steps.refs.outputs.notes_file }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve tag and output path
+      id: refs
+      shell: bash
+      run: |
+        TAG="${{ inputs.tag }}"
+        if [ -z "$TAG" ]; then
+          echo "release tag is required"
+          exit 1
+        fi
+
+        FROM_REF_INPUT="${{ inputs.from_ref }}"
+        TO_REF="${{ inputs.to_ref }}"
+        OUTPUT_DIR="${{ inputs.output_dir }}"
+        SAFE_TAG="${TAG//\//-}"
+        NOTES_FILE="${OUTPUT_DIR}/${SAFE_TAG}.md"
+        PREVIOUS_TAG="$FROM_REF_INPUT"
+
+        if [ -z "$PREVIOUS_TAG" ]; then
+          PREVIOUS_TAG="$(git describe --tags --abbrev=0 "$TO_REF" 2>/dev/null || true)"
+        fi
+
+        mkdir -p "$OUTPUT_DIR"
+
+        echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+        echo "to_ref=$TO_REF" >> "$GITHUB_OUTPUT"
+        echo "previous_tag=$PREVIOUS_TAG" >> "$GITHUB_OUTPUT"
+        echo "notes_file=$NOTES_FILE" >> "$GITHUB_OUTPUT"
+
+    - name: Generate notes markdown
+      shell: bash
+      run: |
+        TAG="${{ steps.refs.outputs.tag }}"
+        TO_REF="${{ steps.refs.outputs.to_ref }}"
+        PREVIOUS_TAG="${{ steps.refs.outputs.previous_tag }}"
+        NOTES_FILE="${{ steps.refs.outputs.notes_file }}"
+        MAX_COMMITS="${{ inputs.max_commits }}"
+
+        if [ -n "$PREVIOUS_TAG" ]; then
+          yarn release-notes --from "$PREVIOUS_TAG" --to "$TO_REF" --max-commits "$MAX_COMMITS" --output "$NOTES_FILE"
+        else
+          yarn release-notes --to "$TO_REF" --max-commits "$MAX_COMMITS" --output "$NOTES_FILE"
+        fi

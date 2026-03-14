@@ -1,5 +1,5 @@
-import { existsSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { config as loadEnv } from 'dotenv';
 import { generateText } from 'ai';
@@ -27,6 +27,7 @@ function main() {
     applyReleaseAiEnvOverrides();
 
     const options = parseArgs(process.argv.slice(2));
+    const outputPath = options.output ? resolveOutputPath(options.output) : null;
     const fromRef = options.from ?? getLatestTag();
     const range = fromRef ? `${fromRef}..${options.to}` : options.to;
     const commits = getCommits(range, options.maxCommits);
@@ -36,8 +37,9 @@ function main() {
             ? `No commits found in range ${fromRef}..${options.to}.`
             : `No commits found up to ${options.to}.`;
 
-        if (options.output) {
-            writeFileSync(resolve(process.cwd(), options.output), `${emptyMessage}\n`, 'utf8');
+        if (outputPath) {
+            ensureParentDir(outputPath);
+            writeFileSync(outputPath, `${emptyMessage}\n`, 'utf8');
         }
 
         process.stdout.write(`${emptyMessage}\n`);
@@ -53,8 +55,9 @@ function main() {
         .then((notes) => {
             const normalized = notes.trim();
 
-            if (options.output) {
-                writeFileSync(resolve(process.cwd(), options.output), `${normalized}\n`, 'utf8');
+            if (outputPath) {
+                ensureParentDir(outputPath);
+                writeFileSync(outputPath, `${normalized}\n`, 'utf8');
             }
 
             process.stdout.write(`${normalized}\n`);
@@ -105,6 +108,19 @@ function safeGitRoot() {
     } catch {
         return null;
     }
+}
+
+function resolveOutputPath(output: string) {
+    if (output.startsWith('/')) {
+        return output;
+    }
+
+    const gitRoot = safeGitRoot();
+    return resolve(gitRoot ?? process.cwd(), output);
+}
+
+function ensureParentDir(path: string) {
+    mkdirSync(dirname(path), { recursive: true });
 }
 
 function parseArgs(argv: string[]): CliOptions {

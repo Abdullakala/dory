@@ -55,6 +55,17 @@ export interface TableMeta {
     database?: string;
 }
 
+export type ConnectionSchemaMap = Record<string, string[]>;
+
+export type TableColumnInfo = {
+    columnName: string;
+    columnType?: string | null;
+    defaultKind?: string | null;
+    defaultExpression?: string | null;
+    isPrimaryKey?: boolean | number | string | null;
+    comment?: string | null;
+};
+
 export type DatabaseObjectRow = {
     name: string;
     engine?: string | null;
@@ -144,6 +155,8 @@ export type GetTableInfoAPI = {
 export type ConnectionMetadataAPI = {
     getDatabases: () => Promise<DatabaseMeta[]>;
     getTables: (database?: string) => Promise<TableMeta[]>;
+    getSchema?: (database?: string) => Promise<ConnectionSchemaMap>;
+    getTableColumns?: (database: string, table: string) => Promise<TableColumnInfo[]>;
     getTablesOnly?: (database: string) => Promise<DatabaseObjectRow[]>;
     getViews?: (database: string) => Promise<DatabaseObjectRow[]>;
     getMaterializedViews?: (database: string) => Promise<DatabaseObjectRow[]>;

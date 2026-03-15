@@ -1,15 +1,18 @@
 import type {
     ConnectionMetadataAPI,
+    ConnectionSchemaMap,
     DatabaseFunctionMeta,
     DatabaseObjectRow,
     DatabaseSummary,
     DatabaseSummaryOptions,
     DatabaseSummaryTable,
     DatabaseRecentTable,
+    TableColumnInfo,
 } from '@/lib/connection/base/types';
 import type { ClickhouseDatasource } from '../ClickhouseDatasource';
 
 export type ClickhouseMetadataAPI = ConnectionMetadataAPI & {
+    getTableColumns: (database: string, table: string) => Promise<TableColumnInfo[]>;
     getTablesOnly: (database: string) => Promise<DatabaseObjectRow[]>;
     getViews: (database: string) => Promise<DatabaseObjectRow[]>;
     getMaterializedViews: (database: string) => Promise<DatabaseObjectRow[]>;
@@ -68,6 +71,64 @@ async function getTables(datasource: ClickhouseDatasource, database?: string) {
         'SELECT name AS table, database AS db FROM system.tables ORDER BY database, name',
     );
     return rows.rows.map(row => ({ value: row.table, label: `${row.db}.${row.table}`, database: row.db }));
+}
+
+async function getSchema(datasource: ClickhouseDatasource, database?: string): Promise<ConnectionSchemaMap> {
+    const targetDatabase = database?.trim();
+    const schemaSql = targetDatabase
+        ? `
+            SELECT
+                table AS tableName,
+                name AS columnName
+            FROM system.columns
+            WHERE database = {db:String}
+            ORDER BY table, position
+        `
+        : `
+            SELECT
+                table AS tableName,
+                name AS columnName
+            FROM system.columns
+            ORDER BY table, position
+        `;
+
+    const result = await datasource.query<{ tableName?: string; columnName?: string }>(
+        schemaSql,
+        targetDatabase ? { db: targetDatabase } : undefined,
+    );
+    const rows = Array.isArray(result.rows) ? result.rows : [];
+
+    return rows.reduce<ConnectionSchemaMap>((schema, row) => {
+        const tableName = row?.tableName?.trim();
+        const columnName = row?.columnName?.trim();
+        if (!tableName || !columnName) {
+            return schema;
+        }
+        if (!schema[tableName]) {
+            schema[tableName] = [];
+        }
+        schema[tableName].push(columnName);
+        return schema;
+    }, {});
+}
+
+async function getTableColumns(datasource: ClickhouseDatasource, database: string, table: string): Promise<TableColumnInfo[]> {
+    const columnsQuery = `
+        SELECT
+            name AS columnName,
+            type AS columnType,
+            default_kind AS defaultKind,
+            default_expression AS defaultExpression,
+            is_in_primary_key AS isPrimaryKey,
+            comment
+        FROM system.columns
+        WHERE database = {db:String}
+          AND table = {tbl:String}
+        ORDER BY position
+    `;
+
+    const result = await datasource.query<TableColumnInfo>(columnsQuery, { db: database, tbl: table });
+    return Array.isArray(result.rows) ? result.rows : [];
 }
 
 async function getDatabaseSummary(
@@ -266,6 +327,8 @@ export function createClickhouseMetadataCapability(datasource: ClickhouseDatasou
     return {
         getDatabases: () => getDatabases(datasource),
         getTables: database => getTables(datasource, database),
+        getSchema: database => getSchema(datasource, database),
+        getTableColumns: (database, table) => getTableColumns(datasource, database, table),
         getTablesOnly: database => getTablesOnly(datasource, database),
         getViews: database => getViews(datasource, database),
         getMaterializedViews: database => getMaterializedViews(datasource, database),

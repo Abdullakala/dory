@@ -2,7 +2,7 @@ import type { ConnectionListIdentity, ConnectionListItem, ConnectionSsh, TestCon
 import { UnsupportedTypeError } from './base/errors';
 import type { BaseConfig } from './base/types';
 import { applyQueryRequestTimeout } from './defaults';
-import { isDatasourceType } from './registry/types';
+import { isConnectionDriverType } from './registry/types';
 
 type IdentityWithPassword = ConnectionListIdentity & { password?: string | null };
 type SshWithSecrets = ConnectionSsh & { password?: string | null; privateKey?: string | null; passphrase?: string | null };
@@ -46,7 +46,7 @@ export function pickConnectionIdentity(list: ConnectionListIdentity[], targetId?
 
 export function resolveConnectionType(rawType: unknown): BaseConfig['type'] {
     const normalizedType = typeof rawType === 'string' ? rawType.toLowerCase() : rawType;
-    if (!isDatasourceType(normalizedType)) {
+    if (!isConnectionDriverType(normalizedType)) {
         throw new UnsupportedTypeError(String(rawType));
     }
     return normalizedType;

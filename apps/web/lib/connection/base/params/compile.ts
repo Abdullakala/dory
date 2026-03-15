@@ -1,15 +1,15 @@
-import type { DatasourceDialect } from '@/lib/connection/registry/types';
-import { isNamedParams, isPositionalParams, type SQLParams } from './types';
+import type { ConnectionParameterDialect } from '@/lib/connection/registry/types';
+import { isNamedParams, isPositionalParams, type DriverQueryParams } from './types';
 
 export type CompiledQuery = {
     sql: string;
-    params: SQLParams | undefined;
+    params: DriverQueryParams | undefined;
 };
 
 export function compileParams(
-    dialect: DatasourceDialect,
+    dialect: ConnectionParameterDialect,
     sql: string,
-    params?: SQLParams,
+    params?: DriverQueryParams,
 ): CompiledQuery {
     if (!params) {
         return { sql, params: undefined };
@@ -22,9 +22,9 @@ export function compileParams(
         return { sql, params };
     }
 
-    if (!isPositionalParams(params)) {
-        throw new Error(`${dialect.id} requires positional parameters`);
+    if (isPositionalParams(params)) {
+        return { sql, params };
     }
 
-    return { sql, params };
+    throw new Error(`${dialect.id} requires positional parameters`);
 }

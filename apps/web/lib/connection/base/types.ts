@@ -21,7 +21,7 @@ export type ColumnMeta = {
     type?: string;
 };
 
-export type QueryContext = {
+export type ConnectionQueryContext = {
     database?: string;
     schema?: string;
     queryId?: string;
@@ -54,6 +54,62 @@ export interface TableMeta {
     value: string;
     database?: string;
 }
+
+export type DatabaseObjectRow = {
+    name: string;
+    engine?: string | null;
+    totalBytes?: number | null;
+    totalRows?: number | null;
+    comment?: string | null;
+    lastModified?: string | null;
+};
+
+export type DatabaseFunctionMeta = {
+    label: string;
+    value: string;
+};
+
+export type DatabaseSummaryTable = {
+    name: string;
+    bytes: number | null;
+    rowsEstimate: number | null;
+    comment: string | null;
+};
+
+export type DatabaseRecentTable = {
+    name: string;
+    lastUpdatedAt: string | null;
+};
+
+export type DatabaseSummaryEngine = 'clickhouse' | 'doris' | 'mysql' | 'unknown';
+
+export type DatabaseSummary = {
+    databaseName: string;
+    catalogName: string | null;
+    schemaName: string | null;
+    engine: DatabaseSummaryEngine;
+    cluster: string | null;
+    tablesCount: number | null;
+    viewsCount: number | null;
+    materializedViewsCount: number | null;
+    totalBytes: number | null;
+    totalRowsEstimate: number | null;
+    lastUpdatedAt: string | null;
+    lastQueriedAt: string | null;
+    topTablesByBytes: DatabaseSummaryTable[];
+    topTablesByRows: DatabaseSummaryTable[];
+    recentTables: DatabaseRecentTable[];
+    oneLineSummary: string | null;
+};
+
+export type DatabaseSummaryOptions = {
+    database: string;
+    catalogName?: string | null;
+    schemaName?: string | null;
+    engine?: DatabaseSummaryEngine;
+    cluster?: string | null;
+    timeoutMs?: number;
+};
 
 export type Pagination = {
     pageIndex: number;
@@ -88,6 +144,12 @@ export type GetTableInfoAPI = {
 export type ConnectionMetadataAPI = {
     getDatabases: () => Promise<DatabaseMeta[]>;
     getTables: (database?: string) => Promise<TableMeta[]>;
+    getTablesOnly?: (database: string) => Promise<DatabaseObjectRow[]>;
+    getViews?: (database: string) => Promise<DatabaseObjectRow[]>;
+    getMaterializedViews?: (database: string) => Promise<DatabaseObjectRow[]>;
+    getFunctions?: (database?: string) => Promise<DatabaseFunctionMeta[]>;
+    getDatabaseSummary?: (options: DatabaseSummaryOptions) => Promise<DatabaseSummary>;
+    getDatabaseTablesDetail?: (database: string) => Promise<DatabaseObjectRow[]>;
 };
 
 export type ConnectionCapabilities = {
@@ -96,3 +158,10 @@ export type ConnectionCapabilities = {
     tableInfo?: GetTableInfoAPI;
     privileges?: Record<string, unknown>;
 };
+
+export function hasMetadataCapability<K extends keyof ConnectionMetadataAPI>(
+    metadata: ConnectionMetadataAPI | undefined,
+    capability: K,
+): metadata is ConnectionMetadataAPI & Required<Pick<ConnectionMetadataAPI, K>> {
+    return Boolean(metadata && typeof metadata[capability] === 'function');
+}

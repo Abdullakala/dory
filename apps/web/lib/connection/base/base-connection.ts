@@ -1,15 +1,15 @@
 import http from 'node:http';
 import { NotInitializedError } from './errors';
-import type { DatasourceDialect } from '../registry/types';
-import { BaseConfig, ConnectionCapabilities, HealthInfo, QueryContext, QueryResult } from './types';
-import type { SQLParams } from './params/types';
+import type { ConnectionParameterDialect } from '../registry/types';
+import { BaseConfig, ConnectionCapabilities, ConnectionQueryContext, HealthInfo, QueryResult } from './types';
+import type { DriverQueryParams } from './params/types';
 import { translate } from '@/lib/i18n/i18n';
 import { routing } from '@/lib/i18n/routing';
 import { SshTunnel, createSshTunnel, type SshOptions } from '../ssh/ssh-tunnel';
 
 export abstract class BaseConnection {
     protected _initialized = false;
-    abstract readonly dialect: DatasourceDialect;
+    abstract readonly dialect: ConnectionParameterDialect;
     readonly capabilities: ConnectionCapabilities = {};
 
     constructor(public readonly config: BaseConfig) {}
@@ -32,21 +32,24 @@ export abstract class BaseConnection {
     abstract ping(): Promise<HealthInfo>;
 
     /** Execute query (query/DDL/transaction behavior depends on driver) */
-    abstract query<Row = any>(sql: string, params?: SQLParams, context?: QueryContext): Promise<QueryResult<Row>>;
+    abstract query<Row = any>(sql: string, params?: DriverQueryParams, context?: ConnectionQueryContext): Promise<QueryResult<Row>>;
 
     /**
      * Query with context; defaults to plain query.
      * Subclasses can override to support database/schema selection.
      */
-    async queryWithContext<Row = any>(sql: string, context?: QueryContext & { params?: SQLParams }): Promise<QueryResult<Row>> {
+    async queryWithContext<Row = any>(
+        sql: string,
+        context?: ConnectionQueryContext & { params?: DriverQueryParams },
+    ): Promise<QueryResult<Row>> {
         return this.query<Row>(sql, context?.params, context);
     }
 
-    async command(sql: string, params?: SQLParams, context?: QueryContext): Promise<void> {
+    async command(sql: string, params?: DriverQueryParams, context?: ConnectionQueryContext): Promise<void> {
         await this.query(sql, params, context);
     }
 
-    async cancelQuery(_queryId: string, _context?: QueryContext): Promise<void> {
+    async cancelQuery(_queryId: string, _context?: ConnectionQueryContext): Promise<void> {
         throw new Error(translate(routing.defaultLocale, 'Utils.Connection.CancelUnsupported'));
     }
 

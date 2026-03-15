@@ -1,60 +1,24 @@
-import type { ConnectionMetadataAPI } from '@/lib/connection/base/types';
+import type {
+    ConnectionMetadataAPI,
+    ConnectionSchemaMap,
+    DatabaseFunctionMeta,
+    DatabaseObjectRow,
+    DatabaseSummary,
+    DatabaseSummaryOptions,
+    DatabaseSummaryTable,
+    DatabaseRecentTable,
+    TableColumnInfo,
+} from '@/lib/connection/base/types';
 import type { ClickhouseDatasource } from '../ClickhouseDatasource';
 
-type DatabaseTableRow = {
-    name: string;
-    engine?: string | null;
-    totalBytes?: number | null;
-    totalRows?: number | null;
-    comment?: string | null;
-    lastModified?: string | null;
-};
-
-export type DatabaseSummaryTable = {
-    name: string;
-    bytes: number | null;
-    rowsEstimate: number | null;
-    comment: string | null;
-};
-
-export type DatabaseRecentTable = {
-    name: string;
-    lastUpdatedAt: string | null;
-};
-
-export type DatabaseSummary = {
-    databaseName: string;
-    catalogName: string | null;
-    schemaName: string | null;
-    engine: 'clickhouse' | 'doris' | 'mysql' | 'unknown';
-    cluster: string | null;
-    tablesCount: number | null;
-    viewsCount: number | null;
-    materializedViewsCount: number | null;
-    totalBytes: number | null;
-    totalRowsEstimate: number | null;
-    lastUpdatedAt: string | null;
-    lastQueriedAt: string | null;
-    topTablesByBytes: DatabaseSummaryTable[];
-    topTablesByRows: DatabaseSummaryTable[];
-    recentTables: DatabaseRecentTable[];
-    oneLineSummary: string | null;
-};
-
 export type ClickhouseMetadataAPI = ConnectionMetadataAPI & {
-    getTablesOnly: (database: string) => Promise<DatabaseTableRow[]>;
-    getViews: (database: string) => Promise<DatabaseTableRow[]>;
-    getMaterializedViews: (database: string) => Promise<DatabaseTableRow[]>;
-    getFunctions: (database?: string) => Promise<Array<{ label: string; value: string }>>;
-    getDatabaseSummary: (options: {
-        database: string;
-        catalogName?: string | null;
-        schemaName?: string | null;
-        engine?: DatabaseSummary['engine'];
-        cluster?: string | null;
-        timeoutMs?: number;
-    }) => Promise<DatabaseSummary>;
-    getDatabaseTablesDetail: (database: string) => Promise<DatabaseTableRow[]>;
+    getTableColumns: (database: string, table: string) => Promise<TableColumnInfo[]>;
+    getTablesOnly: (database: string) => Promise<DatabaseObjectRow[]>;
+    getViews: (database: string) => Promise<DatabaseObjectRow[]>;
+    getMaterializedViews: (database: string) => Promise<DatabaseObjectRow[]>;
+    getFunctions: (database?: string) => Promise<DatabaseFunctionMeta[]>;
+    getDatabaseSummary: (options: DatabaseSummaryOptions) => Promise<DatabaseSummary>;
+    getDatabaseTablesDetail: (database: string) => Promise<DatabaseObjectRow[]>;
 };
 
 const VIEW_ENGINES = new Set(['VIEW', 'LIVEVIEW', 'LAZYVIEW', 'WINDOWVIEW']);
@@ -109,16 +73,67 @@ async function getTables(datasource: ClickhouseDatasource, database?: string) {
     return rows.rows.map(row => ({ value: row.table, label: `${row.db}.${row.table}`, database: row.db }));
 }
 
+async function getSchema(datasource: ClickhouseDatasource, database?: string): Promise<ConnectionSchemaMap> {
+    const targetDatabase = database?.trim();
+    const schemaSql = targetDatabase
+        ? `
+            SELECT
+                table AS tableName,
+                name AS columnName
+            FROM system.columns
+            WHERE database = {db:String}
+            ORDER BY table, position
+        `
+        : `
+            SELECT
+                table AS tableName,
+                name AS columnName
+            FROM system.columns
+            ORDER BY table, position
+        `;
+
+    const result = await datasource.query<{ tableName?: string; columnName?: string }>(
+        schemaSql,
+        targetDatabase ? { db: targetDatabase } : undefined,
+    );
+    const rows = Array.isArray(result.rows) ? result.rows : [];
+
+    return rows.reduce<ConnectionSchemaMap>((schema, row) => {
+        const tableName = row?.tableName?.trim();
+        const columnName = row?.columnName?.trim();
+        if (!tableName || !columnName) {
+            return schema;
+        }
+        if (!schema[tableName]) {
+            schema[tableName] = [];
+        }
+        schema[tableName].push(columnName);
+        return schema;
+    }, {});
+}
+
+async function getTableColumns(datasource: ClickhouseDatasource, database: string, table: string): Promise<TableColumnInfo[]> {
+    const columnsQuery = `
+        SELECT
+            name AS columnName,
+            type AS columnType,
+            default_kind AS defaultKind,
+            default_expression AS defaultExpression,
+            is_in_primary_key AS isPrimaryKey,
+            comment
+        FROM system.columns
+        WHERE database = {db:String}
+          AND table = {tbl:String}
+        ORDER BY position
+    `;
+
+    const result = await datasource.query<TableColumnInfo>(columnsQuery, { db: database, tbl: table });
+    return Array.isArray(result.rows) ? result.rows : [];
+}
+
 async function getDatabaseSummary(
     datasource: ClickhouseDatasource,
-    options: {
-        database: string;
-        catalogName?: string | null;
-        schemaName?: string | null;
-        engine?: DatabaseSummary['engine'];
-        cluster?: string | null;
-        timeoutMs?: number;
-    },
+    options: DatabaseSummaryOptions,
 ): Promise<DatabaseSummary> {
     const timeoutMs = options.timeoutMs ?? DEFAULT_SUMMARY_TIMEOUT_MS;
     const baseSummary: DatabaseSummary = {
@@ -261,7 +276,7 @@ async function getDatabaseSummary(
     };
 }
 
-async function getDatabaseTablesDetail(datasource: ClickhouseDatasource, database: string): Promise<DatabaseTableRow[]> {
+async function getDatabaseTablesDetail(datasource: ClickhouseDatasource, database: string): Promise<DatabaseObjectRow[]> {
     const sql = `
         SELECT
             name,
@@ -275,11 +290,11 @@ async function getDatabaseTablesDetail(datasource: ClickhouseDatasource, databas
         ORDER BY name
     `;
 
-    const result = await datasource.query<DatabaseTableRow>(sql, { db: database });
+    const result = await datasource.query<DatabaseObjectRow>(sql, { db: database });
     return Array.isArray(result.rows) ? result.rows : [];
 }
 
-async function getTablesOnly(datasource: ClickhouseDatasource, database: string): Promise<DatabaseTableRow[]> {
+async function getTablesOnly(datasource: ClickhouseDatasource, database: string): Promise<DatabaseObjectRow[]> {
     const rows = await getDatabaseTablesDetail(datasource, database);
     return rows.filter(row => {
         const engine = normalizeEngine(row.engine);
@@ -287,12 +302,12 @@ async function getTablesOnly(datasource: ClickhouseDatasource, database: string)
     });
 }
 
-async function getViews(datasource: ClickhouseDatasource, database: string): Promise<DatabaseTableRow[]> {
+async function getViews(datasource: ClickhouseDatasource, database: string): Promise<DatabaseObjectRow[]> {
     const rows = await getDatabaseTablesDetail(datasource, database);
     return rows.filter(row => VIEW_ENGINES.has(normalizeEngine(row.engine)));
 }
 
-async function getMaterializedViews(datasource: ClickhouseDatasource, database: string): Promise<DatabaseTableRow[]> {
+async function getMaterializedViews(datasource: ClickhouseDatasource, database: string): Promise<DatabaseObjectRow[]> {
     const rows = await getDatabaseTablesDetail(datasource, database);
     return rows.filter(row => MATERIALIZED_VIEW_ENGINES.has(normalizeEngine(row.engine)));
 }
@@ -312,6 +327,8 @@ export function createClickhouseMetadataCapability(datasource: ClickhouseDatasou
     return {
         getDatabases: () => getDatabases(datasource),
         getTables: database => getTables(datasource, database),
+        getSchema: database => getSchema(datasource, database),
+        getTableColumns: (database, table) => getTableColumns(datasource, database, table),
         getTablesOnly: database => getTablesOnly(datasource, database),
         getViews: database => getViews(datasource, database),
         getMaterializedViews: database => getMaterializedViews(datasource, database),

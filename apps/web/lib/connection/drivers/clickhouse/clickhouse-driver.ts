@@ -5,8 +5,8 @@ import { translate } from '@/lib/i18n/i18n';
 import { routing } from '@/lib/i18n/routing';
 import { enforceSelectLimit } from '@/lib/connection/base/limit';
 import { compileParams } from '@/lib/connection/base/params/compile';
-import type { BaseConfig, HealthInfo, QueryContext, QueryResult } from '@/lib/connection/base/types';
-import type { SQLParams } from '@/lib/connection/base/params/types';
+import type { BaseConfig, ConnectionQueryContext, HealthInfo, QueryResult } from '@/lib/connection/base/types';
+import type { DriverQueryParams } from '@/lib/connection/base/params/types';
 import { ClickhouseDialect } from './dialect';
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -150,7 +150,7 @@ export async function pingClickhouse(client: ClickHouseClient): Promise<HealthIn
     };
 }
 
-function normalizeParams(params?: SQLParams): Record<string, unknown> | undefined {
+function normalizeParams(params?: DriverQueryParams): Record<string, unknown> | undefined {
     if (!params) return undefined;
     const compiled = compileParams(ClickhouseDialect, '', params);
     return compiled.params as Record<string, unknown> | undefined;
@@ -159,8 +159,8 @@ function normalizeParams(params?: SQLParams): Record<string, unknown> | undefine
 export async function executeClickhouseQuery<Row>(
     client: ClickHouseClient,
     sql: string,
-    params?: SQLParams,
-    context?: QueryContext,
+    params?: DriverQueryParams,
+    context?: ConnectionQueryContext,
 ): Promise<QueryResult<Row>> {
     const started = Date.now();
     const resultSet = await client.query({
@@ -213,7 +213,7 @@ export async function executeClickhouseQuery<Row>(
 export async function executeClickhouseCommand(
     client: ClickHouseClient,
     sql: string,
-    params?: SQLParams,
+    params?: DriverQueryParams,
 ): Promise<void> {
     await client.command({
         query: sql,

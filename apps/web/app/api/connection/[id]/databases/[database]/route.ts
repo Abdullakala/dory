@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ResponseUtil } from '@/lib/result';
 import { ErrorCodes } from '@/lib/errors';
 import { ensureConnectionPoolForUser, mapConnectionErrorToResponse } from '@/app/api/connection/utils';
-import type { ClickhouseMetadataAPI } from '@/lib/connection/drivers/clickhouse/capabilities/metadata';
+import { hasMetadataCapability } from '@/lib/connection/base/types';
 import { withUserAndTeamHandler } from '@/app/api/utils/with-team-handler';
 import { getApiLocale, translateApi } from '@/app/api/utils/i18n';
 
@@ -45,8 +45,8 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
 
         try {
             const { entry } = await ensureConnectionPoolForUser(userId, teamId, datasourceId, null);
-            const metadata = entry.instance.capabilities.metadata as ClickhouseMetadataAPI | undefined;
-            if (!metadata) {
+            const metadata = entry.instance.capabilities.metadata;
+            if (!hasMetadataCapability(metadata, 'getDatabaseTablesDetail')) {
                 throw new Error(errorMessages.fallback);
             }
             const tables = await metadata.getDatabaseTablesDetail(database);

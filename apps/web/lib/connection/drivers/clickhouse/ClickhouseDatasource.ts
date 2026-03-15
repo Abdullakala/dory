@@ -1,7 +1,7 @@
 import type { ClickHouseClient } from '@clickhouse/client';
 import { BaseConnection } from '../../base/base-connection';
-import type { HealthInfo, QueryContext, QueryResult } from '../../base/types';
-import type { SQLParams } from '../../base/params/types';
+import type { ConnectionQueryContext, HealthInfo, QueryResult } from '../../base/types';
+import type { DriverQueryParams } from '../../base/params/types';
 import { ClickhouseDialect } from './dialect';
 import {
     cancelClickhouseQuery,
@@ -50,12 +50,15 @@ export class ClickhouseDatasource extends BaseConnection {
         return pingClickhouse(this.client!);
     }
 
-    async query<Row = any>(sql: string, params?: SQLParams, context?: QueryContext): Promise<QueryResult<Row>> {
+    async query<Row = any>(sql: string, params?: DriverQueryParams, context?: ConnectionQueryContext): Promise<QueryResult<Row>> {
         this.assertReady();
         return executeClickhouseQuery<Row>(this.client!, sql, params, context);
     }
 
-    async queryWithContext<Row = any>(sql: string, context?: QueryContext & { params?: SQLParams }): Promise<QueryResult<Row>> {
+    async queryWithContext<Row = any>(
+        sql: string,
+        context?: ConnectionQueryContext & { params?: DriverQueryParams },
+    ): Promise<QueryResult<Row>> {
         const targetDb = context?.database ?? this.config.database;
 
         if (!targetDb || targetDb === this.config.database) {
@@ -74,7 +77,7 @@ export class ClickhouseDatasource extends BaseConnection {
         }
     }
 
-    async command(sql: string, params?: SQLParams): Promise<void> {
+    async command(sql: string, params?: DriverQueryParams): Promise<void> {
         this.assertReady();
         await executeClickhouseCommand(this.client!, sql, params);
     }

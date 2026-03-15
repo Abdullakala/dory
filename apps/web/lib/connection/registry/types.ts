@@ -1,20 +1,20 @@
 import type { BaseConfig, ConnectionType } from '../base/types';
 import type { BaseConnection } from '../base/base-connection';
 
-export type DataSourceType = ConnectionType;
+export type ConnectionDriverType = ConnectionType;
 
-export type DatasourceDialect = {
-    id: DataSourceType;
-    parameterStyle: 'named' | 'positional';
-    supports: {
-        queryCancellation: boolean;
-        queryInsights: boolean;
-        tableInfo: boolean;
-    };
-};
+export type ConnectionParameterDialect =
+    | {
+          id: ConnectionDriverType;
+          parameterStyle: 'named';
+      }
+    | {
+          id: ConnectionDriverType;
+          parameterStyle: 'positional';
+      };
 
-export type DatasourceCtor = new (config: BaseConfig) => BaseConnection;
+export type ConnectionDriverCtor = new (config: BaseConfig) => BaseConnection;
 
-export function isDatasourceType(value: unknown): value is DataSourceType {
+export function isConnectionDriverType(value: unknown): value is ConnectionDriverType {
     return value === 'clickhouse' || value === 'postgres';
 }

@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ResponseUtil } from '@/lib/result';
 import { ErrorCodes } from '@/lib/errors';
 import z from 'zod';
+import { hasMetadataCapability, TableColumnInfo } from '@/lib/connection/base/types';
 import { ensureConnectionPoolForUser, mapConnectionErrorToResponse } from '@/app/api/connection/utils';
 import { withUserAndTeamHandler } from '@/app/api/utils/with-team-handler';
 import { getApiLocale, translateApi } from '@/app/api/utils/i18n';
@@ -64,25 +65,13 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
 
         try {
             const { entry } = await ensureConnectionPoolForUser(userId, teamId, datasourceId, null);
+            const metadata = entry.instance.capabilities.metadata;
+            if (!hasMetadataCapability(metadata, 'getTableColumns')) {
+                throw new Error(errorMessages.fallback);
+            }
+            const columns = await metadata.getTableColumns(database, table);
 
-            const columnsQuery = `
-                SELECT
-                    name AS columnName,
-                    type AS columnType,
-                    default_kind AS defaultKind,
-                    default_expression AS defaultExpression,
-                    is_in_primary_key AS isPrimaryKey,
-                    comment
-                FROM system.columns
-                WHERE database = {db:String}
-                  AND table = {tbl:String}
-                ORDER BY position
-            `;
-
-            const result = await entry.instance.query(columnsQuery, { db: database, tbl: table });
-            const rows = Array.isArray(result.rows) ? (result.rows as any[]) : [];
-
-            return NextResponse.json(ResponseUtil.success(rows));
+            return NextResponse.json(ResponseUtil.success<TableColumnInfo[]>(columns));
         } catch (error) {
             console.log('Error fetching columns:', error);
             return mapConnectionErrorToResponse(error, {

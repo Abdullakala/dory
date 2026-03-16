@@ -11,12 +11,13 @@ import { Input } from '@/registry/new-york-v4/ui/input';
 import { ScrollArea } from '@/registry/new-york-v4/ui/scroll-area';
 import { useDatabases } from '@/hooks/use-databases';
 import type { ResponseObject } from '@/types';
+import { getSidebarConfig } from '@/app/(app)/[team]/components/sql-console-sidebar/sidebar-config';
 import { authFetch } from '@/lib/client/auth-fetch';
 import { isSuccess } from '@/lib/result';
 import { activeDatabaseAtom, currentConnectionAtom } from '@/shared/stores/app.store';
 import { CatalogSchemaTree } from './catalog-schema-sidebar-tree';
 import { DEFAULT_GROUP_STATE, EMPTY_DATABASE_OBJECTS } from './types';
-import type { DatabaseObjects, GroupState, TargetOption } from './types';
+import type { DatabaseObjects, GroupState, SchemaNode, TargetOption } from './types';
 
 type CatalogSchemaSidebarProps = {
     catalogName?: string;
@@ -31,8 +32,9 @@ const STALE_TIME = 1000 * 60 * 5;
 const GC_TIME = STALE_TIME * 2;
 const GROUP_ENDPOINTS = {
     tables: 'tables',
-    materializedViews: 'materialized-views',
     views: 'views',
+    materializedViews: 'materialized-views',
+    functions: 'functions',
 } as const;
 const GROUP_KEYS = Object.keys(GROUP_ENDPOINTS) as (keyof GroupState)[];
 
@@ -40,17 +42,43 @@ function resolveParam(value?: string | string[]) {
     return Array.isArray(value) ? value[0] : value;
 }
 
+function buildScopeKey(database: string, schema?: string) {
+    return schema ? `${database}::${schema}` : database;
+}
+
 function normalizeEntry(entry: TargetOption): TargetOption | null {
     const value = (entry.value ?? entry.label ?? entry.name ?? '').toString();
     if (!value) return null;
-    const label = (entry.label ?? entry.value ?? entry.name ?? value).toString();
-    return { ...entry, value, label };
+
+    return {
+        ...entry,
+        value,
+        label: (entry.label ?? entry.value ?? entry.name ?? value).toString(),
+    };
 }
 
 function normalizeEntries(entries: TargetOption[]): TargetOption[] {
     return entries
         .map(entry => normalizeEntry(entry))
         .filter((entry): entry is TargetOption => Boolean(entry));
+}
+
+function resolveSchemaName(entry: TargetOption, defaultSchemaName?: string | null) {
+    if (typeof entry.schema === 'string' && entry.schema.trim()) {
+        return entry.schema.trim();
+    }
+
+    const rawValue = (entry.value ?? entry.label ?? entry.name ?? '').toString().trim();
+    if (!rawValue) {
+        return defaultSchemaName ?? null;
+    }
+
+    const [schemaName, ...rest] = rawValue.split('.');
+    if (rest.length === 0) {
+        return defaultSchemaName ?? null;
+    }
+
+    return schemaName || defaultSchemaName || null;
 }
 
 export function CatalogSchemaSidebar({
@@ -69,24 +97,31 @@ export function CatalogSchemaSidebar({
     const params = useParams<{ connectionId?: string | string[] }>();
     const connectionId = resolveParam(params?.connectionId) ?? currentConnection?.connection?.id;
     const connectionType = currentConnection?.connection?.type;
-    const showCatalog = connectionType !== 'clickhouse';
+    const sidebarConfig = useMemo(() => getSidebarConfig(connectionType), [connectionType]);
+    const supportsSchemas = sidebarConfig.supportsSchemas;
+    const defaultSchemaName = sidebarConfig.defaultSchemaName ?? 'public';
+    const showCatalog = false; // For now, we are hiding the catalog level as it's not commonly used and adds extra complexity to the UI. We can revisit this decision in the future if needed.
 
     const { databases } = useDatabases();
 
     const [expandedCatalog, setExpandedCatalog] = useState(false);
     const [expandedDatabases, setExpandedDatabases] = useState<Set<string>>(new Set());
     const [expandedGroups, setExpandedGroups] = useState<Record<string, GroupState>>({});
+    const [expandedSchemas, setExpandedSchemas] = useState<Record<string, boolean>>({});
     const skipAutoExpandRef = useRef(false);
+
     const databaseEntries = useMemo(() => {
         return (databases ?? [])
             .map(db => {
-                const dbName = db?.value ?? db?.label ?? '';
-                return {
-                    dbName,
-                    label: db?.label ?? dbName,
-                };
+                const dbName = (db?.value ?? db?.label ?? '').toString();
+                return dbName
+                    ? {
+                          label: (db?.label ?? dbName).toString(),
+                          value: dbName,
+                      }
+                    : null;
             })
-            .filter(entry => entry.dbName);
+            .filter((entry): entry is { label: string; value: string } => Boolean(entry));
     }, [databases]);
 
     const normalized = deferredFilter.trim().toLowerCase();
@@ -102,16 +137,47 @@ export function CatalogSchemaSidebar({
         [normalized],
     );
 
+    const schemaQueries = useQueries({
+        queries: databaseEntries.map(entry => ({
+            queryKey: ['catalog-db-schemas', connectionId, entry.value] as const,
+            queryFn: async ({ signal }: { signal?: AbortSignal }): Promise<TargetOption[]> => {
+                if (!connectionId || !supportsSchemas) return [];
+
+                try {
+                    const response = await authFetch(
+                        `/api/connection/${connectionId}/databases/${encodeURIComponent(entry.value)}/schemas`,
+                        {
+                            method: 'GET',
+                            signal,
+                            headers: {
+                                'X-Connection-ID': connectionId,
+                            },
+                        },
+                    );
+                    const payload = (await response.json()) as ResponseObject<TargetOption[]>;
+                    if (!isSuccess(payload)) return [];
+                    return normalizeEntries(payload.data ?? []);
+                } catch (error) {
+                    console.error('Failed to load schemas:', error);
+                    return [];
+                }
+            },
+            enabled: Boolean(connectionId) && supportsSchemas && expandedDatabases.has(entry.value),
+            staleTime: STALE_TIME,
+            gcTime: GC_TIME,
+        })),
+    });
+
     const groupQueries = useQueries({
         queries: databaseEntries.flatMap(entry =>
             GROUP_KEYS.map(group => ({
-                queryKey: ['catalog-db-group', connectionId, entry.dbName, group] as const,
+                queryKey: ['catalog-db-group', connectionId, entry.value, group] as const,
                 queryFn: async ({ signal }: { signal?: AbortSignal }): Promise<TargetOption[]> => {
                     if (!connectionId) return [];
-                    const encodedDb = encodeURIComponent(entry.dbName);
+
                     try {
                         const response = await authFetch(
-                            `/api/connection/${connectionId}/databases/${encodedDb}/${GROUP_ENDPOINTS[group]}`,
+                            `/api/connection/${connectionId}/databases/${encodeURIComponent(entry.value)}/${GROUP_ENDPOINTS[group]}`,
                             {
                                 method: 'GET',
                                 signal,
@@ -128,10 +194,16 @@ export function CatalogSchemaSidebar({
                         return [];
                     }
                 },
-                enabled:
-                    Boolean(connectionId) &&
-                    expandedDatabases.has(entry.dbName) &&
-                    (expandedGroups[entry.dbName]?.[group] ?? false),
+                enabled: (() => {
+                    if (!connectionId || !expandedDatabases.has(entry.value)) return false;
+                    if (!supportsSchemas) {
+                        return true;
+                    }
+
+                    return Object.entries(expandedSchemas).some(([scopeKey, expanded]) => {
+                        return expanded && scopeKey.startsWith(`${entry.value}::`);
+                    });
+                })(),
                 staleTime: STALE_TIME,
                 gcTime: GC_TIME,
             })),
@@ -141,8 +213,10 @@ export function CatalogSchemaSidebar({
     const databaseObjects = useMemo(() => {
         const next: Record<string, DatabaseObjects> = {};
         let index = 0;
+
         databaseEntries.forEach(entry => {
             const objects: DatabaseObjects = { ...EMPTY_DATABASE_OBJECTS };
+
             GROUP_KEYS.forEach(group => {
                 const data = groupQueries[index]?.data;
                 if (Array.isArray(data)) {
@@ -150,24 +224,100 @@ export function CatalogSchemaSidebar({
                 }
                 index += 1;
             });
-            next[entry.dbName] = objects;
+
+            next[entry.value] = objects;
         });
+
         return next;
     }, [databaseEntries, groupQueries]);
 
     const loadingGroups = useMemo(() => {
         const next: Record<string, GroupState> = {};
         let index = 0;
+
         databaseEntries.forEach(entry => {
-            const groupLoading: GroupState = { ...DEFAULT_GROUP_STATE };
+            const databaseLoading: GroupState = { ...DEFAULT_GROUP_STATE };
+
             GROUP_KEYS.forEach(group => {
-                groupLoading[group] = Boolean(groupQueries[index]?.isFetching);
+                databaseLoading[group] = Boolean(groupQueries[index]?.isFetching);
                 index += 1;
             });
-            next[entry.dbName] = groupLoading;
+
+            next[entry.value] = databaseLoading;
+
+            Object.entries(expandedSchemas).forEach(([scopeKey, expanded]) => {
+                if (!expanded || !scopeKey.startsWith(`${entry.value}::`)) return;
+                next[scopeKey] = databaseLoading;
+            });
+        });
+
+        return next;
+    }, [databaseEntries, expandedSchemas, groupQueries]);
+
+    const databaseSchemas = useMemo(() => {
+        const next: Record<string, SchemaNode[]> = {};
+
+        databaseEntries.forEach((entry, index) => {
+            const schemaEntries = supportsSchemas ? schemaQueries[index]?.data ?? [] : [];
+            const seen = new Set<string>();
+            const nodes: SchemaNode[] = [];
+
+            schemaEntries.forEach(schema => {
+                const value = (schema.value ?? schema.label ?? schema.name ?? '').toString().trim();
+                if (!value || seen.has(value)) return;
+                seen.add(value);
+                nodes.push({
+                    name: value,
+                    label: (schema.label ?? value).toString(),
+                });
+            });
+
+            next[entry.value] = nodes;
+        });
+
+        return next;
+    }, [databaseEntries, schemaQueries, supportsSchemas]);
+
+    const loadingSchemas = useMemo(() => {
+        const next: Record<string, boolean> = {};
+        databaseEntries.forEach((entry, index) => {
+            next[entry.value] = Boolean(schemaQueries[index]?.isFetching);
         });
         return next;
-    }, [databaseEntries, groupQueries]);
+    }, [databaseEntries, schemaQueries]);
+
+    const schemaObjectsByDatabase = useMemo(() => {
+        if (!supportsSchemas) return {};
+
+        const next: Record<string, Record<string, DatabaseObjects>> = {};
+
+        databaseEntries.forEach(entry => {
+            const perSchema: Record<string, DatabaseObjects> = {};
+            const objects = databaseObjects[entry.value] ?? EMPTY_DATABASE_OBJECTS;
+
+            GROUP_KEYS.forEach(group => {
+                objects[group].forEach(item => {
+                    const schemaName = resolveSchemaName(item, defaultSchemaName);
+                    if (!schemaName) return;
+
+                    if (!perSchema[schemaName]) {
+                        perSchema[schemaName] = {
+                            tables: [],
+                            views: [],
+                            materializedViews: [],
+                            functions: [],
+                        };
+                    }
+
+                    perSchema[schemaName][group].push(item);
+                });
+            });
+
+            next[entry.value] = perSchema;
+        });
+
+        return next;
+    }, [databaseEntries, databaseObjects, defaultSchemaName, supportsSchemas]);
 
     useEffect(() => {
         if (!selectedDatabase) return;
@@ -175,6 +325,7 @@ export function CatalogSchemaSidebar({
             skipAutoExpandRef.current = false;
             return;
         }
+
         setExpandedDatabases(prev => {
             if (prev.has(selectedDatabase)) return prev;
             const next = new Set(prev);
@@ -183,27 +334,48 @@ export function CatalogSchemaSidebar({
         });
     }, [selectedDatabase]);
 
-    const toggleDatabase = useCallback(
-        (database: string) => {
-            setExpandedDatabases(prev => {
-                const next = new Set(prev);
-                if (next.has(database)) {
-                    next.delete(database);
-                } else {
-                    next.add(database);
-                }
-                return next;
-            });
-        },
-        [],
-    );
+    useEffect(() => {
+        if (!supportsSchemas || !selectedDatabase || !selectedTable) return;
 
-    const toggleGroup = useCallback((database: string, group: keyof GroupState) => {
-        setExpandedGroups(prev => {
-            const current = prev[database] ?? DEFAULT_GROUP_STATE;
+        const entrySchema = resolveSchemaName({ value: selectedTable }, defaultSchemaName);
+        if (!entrySchema) return;
+
+        const scopeKey = buildScopeKey(selectedDatabase, entrySchema);
+        setExpandedSchemas(prev => {
+            if (prev[scopeKey]) return prev;
             return {
                 ...prev,
-                [database]: {
+                [scopeKey]: true,
+            };
+        });
+    }, [defaultSchemaName, selectedDatabase, selectedTable, supportsSchemas]);
+
+    const toggleDatabase = useCallback((database: string) => {
+        setExpandedDatabases(prev => {
+            const next = new Set(prev);
+            if (next.has(database)) {
+                next.delete(database);
+            } else {
+                next.add(database);
+            }
+            return next;
+        });
+    }, []);
+
+    const toggleSchema = useCallback((database: string, schema: string) => {
+        const scopeKey = buildScopeKey(database, schema);
+        setExpandedSchemas(prev => ({
+            ...prev,
+            [scopeKey]: !prev[scopeKey],
+        }));
+    }, []);
+
+    const toggleGroup = useCallback((scopeKey: string, group: keyof GroupState) => {
+        setExpandedGroups(prev => {
+            const current = prev[scopeKey] ?? DEFAULT_GROUP_STATE;
+            return {
+                ...prev,
+                [scopeKey]: {
                     ...current,
                     [group]: !current[group],
                 },
@@ -212,34 +384,46 @@ export function CatalogSchemaSidebar({
     }, []);
 
     const filteredDatabases = useMemo(() => {
-        if (!normalized) return databases ?? [];
-        return (databases ?? []).filter(db => {
-            const dbName = (db?.value ?? db?.label ?? '').toString();
-            if (dbName.toLowerCase().includes(normalized)) return true;
-            const objects = databaseObjects[dbName];
+        if (!normalized) return databaseEntries;
+
+        return databaseEntries.filter(db => {
+            if (db.label.toLowerCase().includes(normalized) || db.value.toLowerCase().includes(normalized)) {
+                return true;
+            }
+
+            const schemas = databaseSchemas[db.value] ?? [];
+            if (schemas.some(schema => schema.label.toLowerCase().includes(normalized) || schema.name.toLowerCase().includes(normalized))) {
+                return true;
+            }
+
+            const objects = databaseObjects[db.value];
             if (!objects) return false;
-            return (
-                filterEntries(objects.tables).length > 0 ||
-                filterEntries(objects.materializedViews).length > 0 ||
-                filterEntries(objects.views).length > 0
-            );
+
+            return GROUP_KEYS.some(group => filterEntries(objects[group]).length > 0);
         });
-    }, [databaseObjects, databases, filterEntries, normalized]);
+    }, [databaseEntries, databaseObjects, databaseSchemas, filterEntries, normalized]);
 
     const hasAnyResults = useMemo(() => {
         if (!normalized) return true;
         return filteredDatabases.length > 0;
     }, [filteredDatabases.length, normalized]);
 
+    const getSchemaObjects = useCallback(
+        (database: string, schema: string): DatabaseObjects => {
+            return schemaObjectsByDatabase[database]?.[schema] ?? EMPTY_DATABASE_OBJECTS;
+        },
+        [schemaObjectsByDatabase],
+    );
+
     return (
-        <div className="flex flex-col h-full min-h-0 gap-2 p-3 w-full min-w-0">
+        <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-2 p-3">
             <div className="relative">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                     value={localFilter}
                     onChange={e => setFilter(e.target.value)}
                     placeholder={t('Filter tables or views')}
-                    className="pl-8 h-8"
+                    className="h-8 pl-8"
                     aria-label={t('Filter tables or views')}
                 />
             </div>
@@ -253,8 +437,12 @@ export function CatalogSchemaSidebar({
                         filteredDatabases={filteredDatabases}
                         expandedDatabases={expandedDatabases}
                         expandedGroups={expandedGroups}
+                        expandedSchemas={expandedSchemas}
                         databaseObjects={databaseObjects}
+                        databaseSchemas={databaseSchemas}
                         loadingGroups={loadingGroups}
+                        loadingSchemas={loadingSchemas}
+                        supportsSchemas={supportsSchemas}
                         normalized={normalized}
                         hasAnyResults={hasAnyResults}
                         selectedDatabase={selectedDatabase}
@@ -262,6 +450,7 @@ export function CatalogSchemaSidebar({
                         onToggleCatalog={() => setExpandedCatalog(prev => !prev)}
                         onToggleDatabase={toggleDatabase}
                         onToggleGroup={toggleGroup}
+                        onToggleSchema={toggleSchema}
                         onSelectDatabase={dbName => {
                             skipAutoExpandRef.current = true;
                             setActiveDatabase(dbName);
@@ -276,6 +465,7 @@ export function CatalogSchemaSidebar({
                             onOpenTableTab?.(payload);
                         }}
                         filterEntries={filterEntries}
+                        getSchemaObjects={getSchemaObjects}
                     />
                 </div>
             </ScrollArea>

@@ -24,8 +24,10 @@ export async function hydrateActionContext(ctx: ActionContext): Promise<ActionCo
         teamId: ctx.teamId,
         datasourceId: ctx.connectionId,
         database: inferred.database ?? ctx.database ?? null,
+        schema: inferred.schema ?? null,
         tables: inferred.tables.map(table => ({
             database: table.database ?? inferred.database ?? ctx.database ?? null,
+            schema: table.schema ?? inferred.schema ?? null,
             name: table.name,
         })),
     });

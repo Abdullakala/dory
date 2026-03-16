@@ -832,6 +832,7 @@
                 "CopyLabel": "复制{label}",
                 "InferredTitle": "推断上下文",
                 "DatabaseLabel": "数据库",
+                "SchemaLabel": "Schema",
                 "TablesLabel": "表",
                 "ConfidenceLabel": "置信度",
                 "EmptyValue": "—",

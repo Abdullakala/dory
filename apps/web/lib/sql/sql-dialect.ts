@@ -94,6 +94,7 @@ export const getSqlDialectConfigForConnectionType = (connectionType?: Connection
 
 export const getSqlDialectParser = async (dialect?: ConnectionDialect): Promise<SqlDialectParser> => {
     const config = getSqlDialectConfig(dialect);
+    console.log(`[getSqlDialectParser] Getting parser for dialect=${dialect}, using parserKey=${config.parserKey}`);
     const cached = parserCache.get(config.parserKey);
     if (cached) return cached;
 

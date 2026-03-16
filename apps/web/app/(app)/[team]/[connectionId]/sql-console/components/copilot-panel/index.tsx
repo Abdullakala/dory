@@ -119,6 +119,7 @@ export default function CopilotPanel({
                 },
             });
 
+
             if (!cancelled) {
                 setCopilotEnvelope(nextEnvelope);
             }

@@ -38,6 +38,8 @@ export async function createCopilotSQLContextEnvelope(params: {
         baselineDatabase: params.baselineDatabase ?? null,
     });
 
+    console.log('Inferred SQL context:', inferred); 
+
     const context: CopilotContextSQL = {
         baseline: {
             database: params.baselineDatabase ?? null,

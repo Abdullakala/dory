@@ -830,6 +830,7 @@
                 "CopyLabel": "Copy {label}",
                 "InferredTitle": "Inferred Context",
                 "DatabaseLabel": "Database",
+                "SchemaLabel": "Schema",
                 "TablesLabel": "Tables",
                 "ConfidenceLabel": "Confidence",
                 "EmptyValue": "—",

@@ -53,6 +53,7 @@ export interface TableMeta {
     label: string;
     value: string;
     database?: string;
+    schema?: string;
 }
 
 export type ConnectionSchemaMap = Record<string, string[]>;

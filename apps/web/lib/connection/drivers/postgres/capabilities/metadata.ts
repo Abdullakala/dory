@@ -135,6 +135,7 @@ async function getTables(datasource: PostgresDatasource, database?: string) {
                 value,
                 label: value,
                 database,
+                schema: row.schemaName,
             };
         })
         .filter((row): row is NonNullable<typeof row> => Boolean(row));

@@ -409,6 +409,7 @@ export function useSqlMonacoEditor({
 
             
             const parser = await getSqlDialectParser(dialectConfig.dialect);
+            console.log(`[useSqlMonacoEditor] Loaded parser for dialect=${dialectConfig.dialect}`);
 
             monaco.editor.defineTheme('github-dark', vsPlusTheme.darkThemeData);
             monaco.editor.defineTheme('github-light', vsPlusTheme.lightThemeData);

@@ -11,6 +11,8 @@ type SchemaOption = {
     label: string;
 };
 
+const inflightSchemaRequests = new Map<string, Promise<void>>();
+
 function resolveConnectionParam(value?: string | string[]) {
     return Array.isArray(value) ? value[0] : value;
 }
@@ -42,20 +44,36 @@ export function useSchemas(database?: string, enabled = true) {
             return;
         }
 
-        const response = await authFetch(`/api/connection/${connectionId}/databases/${encodeURIComponent(database)}/schemas`, {
-            method: 'GET',
-            headers: {
-                'X-Connection-ID': connectionId,
-            },
-        });
-        const payload = (await response.json()) as ResponseObject<SchemaOption[]>;
-
-        if (isSuccess(payload)) {
-            setSchemas(payload.data ?? []);
+        const requestKey = `${connectionId}::${database}`;
+        const existingRequest = inflightSchemaRequests.get(requestKey);
+        if (existingRequest) {
+            await existingRequest;
             return;
         }
 
-        setSchemas([]);
+        const request = (async () => {
+            const response = await authFetch(`/api/connection/${connectionId}/databases/${encodeURIComponent(database)}/schemas`, {
+                method: 'GET',
+                headers: {
+                    'X-Connection-ID': connectionId,
+                },
+            });
+            const payload = (await response.json()) as ResponseObject<SchemaOption[]>;
+
+            if (isSuccess(payload)) {
+                setSchemas(payload.data ?? []);
+                return;
+            }
+
+            setSchemas([]);
+        })();
+
+        inflightSchemaRequests.set(requestKey, request);
+        try {
+            await request;
+        } finally {
+            inflightSchemaRequests.delete(requestKey);
+        }
     };
 
     return {

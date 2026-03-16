@@ -53,7 +53,7 @@ export function ObjectGroup({
             <button
                 type="button"
                 onClick={onToggle}
-                className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+                className="flex items-center gap-2 rounded px-2 py-1 text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             >
                 {isLoading ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -84,7 +84,7 @@ export function ObjectGroup({
                                 />
                             ))
                     ) : (
-                        <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                        <div className="px-2 py-1.5 text-xs text-sidebar-foreground/70">
                             {normalized ? t('No matching items') : group.emptyLabel}
                         </div>
                     )}
@@ -120,7 +120,9 @@ function ObjectItem({
             type="button"
             className={cn(
                 'flex w-full items-center gap-2 truncate rounded px-2 py-1 text-left text-sm',
-                isSelected ? 'bg-primary/10 text-foreground ring-1 ring-primary/30' : 'text-muted-foreground hover:bg-muted/50',
+                isSelected
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                    : 'text-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
             )}
             onClick={() =>
                 onSelectObject({

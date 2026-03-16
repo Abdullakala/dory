@@ -157,11 +157,11 @@ function CatalogHeader({
     const t = useTranslations('CatalogSchemaSidebar');
 
     return (
-        <div className="flex items-center gap-2 px-2 py-1 text-xs uppercase tracking-wide text-muted-foreground">
+        <div className="flex items-center gap-2 px-2 py-1 text-xs uppercase tracking-wide text-sidebar-foreground/70">
             <button
                 type="button"
                 onClick={onToggle}
-                className="rounded p-0.5 hover:bg-muted"
+                className="rounded p-0.5 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 aria-label={`${expanded ? t('Collapse') : t('Expand')} ${catalogName}`}
             >
                 {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
@@ -241,7 +241,7 @@ function DatabaseNode({
                 <button
                     type="button"
                     onClick={() => onToggleDatabase(dbName)}
-                    className="rounded p-0.5 hover:bg-muted"
+                    className="rounded p-0.5 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     aria-label={`${isExpanded ? t('Collapse') : t('Expand')} ${dbName}`}
                 >
                     {isExpanded && isDatabaseLoading ? (
@@ -252,13 +252,15 @@ function DatabaseNode({
                         <ChevronRight className="h-3.5 w-3.5" />
                     )}
                 </button>
-                <Database className="h-3.5 w-3.5 text-muted-foreground" />
+                <Database className="h-3.5 w-3.5 text-sidebar-foreground/70" />
                 <button
                     type="button"
                     onClick={() => onSelectDatabase(dbName)}
                     className={cn(
-                        'flex-1 truncate text-left text-sm',
-                        selectedDatabase === dbName ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+                        'flex-1 truncate rounded px-1 py-0.5 text-left text-sm',
+                        selectedDatabase === dbName
+                            ? 'text-foreground'
+                            : 'text-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
                     )}
                     title={dbName}
                 >
@@ -301,7 +303,7 @@ function DatabaseNode({
                                 : null}
 
                             {!visibleSchemas.length && !loadingSchemas[dbName] ? (
-                                <div className="px-2 py-1.5 text-xs text-muted-foreground">{t('No schemas')}</div>
+                                <div className="px-2 py-1.5 text-xs text-sidebar-foreground/70">{t('No schemas')}</div>
                             ) : null}
                         </>
                     ) : (

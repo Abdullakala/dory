@@ -54,7 +54,7 @@ export function SchemaNodeRow({
             <button
                 type="button"
                 onClick={() => onToggleSchema(dbName, schema.name)}
-                className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm text-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 aria-label={`${isExpanded ? t('Collapse') : t('Expand')} ${schema.label}`}
             >
                 {isExpanded && isLoading ? (

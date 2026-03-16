@@ -41,7 +41,8 @@ type MessageKey =
     | 'updater.skipCleared'
     | 'updater.channelChanged'
     | 'updater.channelChangedDetail'
-    | 'updater.channelBusy';
+    | 'updater.channelBusy'
+    | 'updater.updateInProgress';
 
 const MESSAGES: Record<SupportedLocale, Record<MessageKey, string>> = {
     'zh-CN': {
@@ -84,6 +85,7 @@ const MESSAGES: Record<SupportedLocale, Record<MessageKey, string>> = {
         'updater.channelChanged': '更新通道已切换',
         'updater.channelChangedDetail': '当前更新通道：{channel}。之后会按该通道检查更新。',
         'updater.channelBusy': '当前正在执行更新任务，请完成后再切换更新通道。',
+        'updater.updateInProgress': '正在检查或下载更新，请稍后再试。',
     },
     'en-US': {
         'menu.checkForUpdates': 'Check for Updates',
@@ -125,6 +127,7 @@ const MESSAGES: Record<SupportedLocale, Record<MessageKey, string>> = {
         'updater.channelChanged': 'Update channel changed',
         'updater.channelChangedDetail': 'Current update channel: {channel}. Future checks will use this channel.',
         'updater.channelBusy': 'Finish the current update task before switching update channels.',
+        'updater.updateInProgress': 'An update check or download is already in progress. Please try again later.',
     },
 };
 

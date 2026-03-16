@@ -310,8 +310,11 @@
     },
     "SQLConsoleSidebar": {
         "Select database": "选择数据库",
+        "Select schema": "选择 Schema",
         "Search databases": "搜索数据库...",
+        "Search schemas": "搜索 Schema...",
         "Databases": "数据库",
+        "Schemas": "Schemas",
         "No results": "未找到匹配项",
         "Filter tables": "筛选表",
         "No matching tables found": "未找到匹配的表",

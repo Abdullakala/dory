@@ -339,16 +339,41 @@ function showNoUpdateDialog(t: MainTranslator) {
     dialog.showMessageBox(options);
 }
 
-function showUpdateError(logError: LogFn, error: unknown) {
+function showUpdateError(logError: LogFn, t: MainTranslator, error: unknown, manual: boolean) {
     const rawMessage = error instanceof Error ? error.message : String(error);
     const compactRaw = rawMessage.replace(/\s+/g, ' ').trim();
-    logError('[updater] update flow failed (silent):', compactRaw || rawMessage || error);
+    logError('[updater] update flow failed:', compactRaw || rawMessage || error);
 
     const mainWindow = getMainWindow();
     if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.setProgressBar(-1);
     }
     closeAllDialogs();
+
+    if (manual) {
+        let detail: string;
+        const lower = compactRaw.toLowerCase();
+        if (lower.includes('net::') || lower.includes('enotfound') || lower.includes('etimedout') || lower.includes('econnrefused') || lower.includes('network')) {
+            detail = t('updater.checkFailedNetwork');
+        } else if (lower.includes('404') || lower.includes('502') || lower.includes('503') || lower.includes('server')) {
+            detail = t('updater.checkFailedServer');
+        } else {
+            detail = t('updater.checkFailedGeneric');
+        }
+        const options: MessageBoxOptions = {
+            type: 'warning',
+            title: t('updater.failed'),
+            message: detail,
+            buttons: [t('updater.ok')],
+            defaultId: 0,
+        };
+        const parentWindow = getMainWindow();
+        if (parentWindow && !parentWindow.isDestroyed()) {
+            void dialog.showMessageBox(parentWindow, options);
+        } else {
+            void dialog.showMessageBox(options);
+        }
+    }
 }
 
 function showInstallLocationBlockedDialog(t: MainTranslator) {
@@ -394,7 +419,7 @@ function handleUpdateAction(log: LogFn, t: MainTranslator, action: UpdateAction)
             downloadInProgress = true;
             autoUpdater.downloadUpdate().catch((error: unknown) => {
                 downloadInProgress = false;
-                showUpdateError(log, error);
+                showUpdateError(log, t, error, true);
             });
             break;
         }
@@ -444,7 +469,7 @@ function handleUpdateAction(log: LogFn, t: MainTranslator, action: UpdateAction)
                 restartInstallInFlight = false;
                 setMainWindowQuitting(false);
                 log('[updater] quitAndInstall failed:', error);
-                showUpdateError(log, error);
+                showUpdateError(log, t, error, true);
             }
             break;
         }
@@ -651,6 +676,12 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
             return;
         }
 
+        const remindUntil = updaterPreferenceStore.get('remindLaterUntil');
+        if (remindUntil && Date.now() < remindUntil) {
+            log('[updater] remind-later still active, suppress auto download until:', new Date(remindUntil).toISOString());
+            return;
+        }
+
         // Auto checks should always fetch the update package in background so renderer can show
         // "ready to install" state without extra user action.
         log('[updater] auto check found update, start silent background download');
@@ -661,7 +692,7 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
             downloadInProgress = false;
             shouldAutoInstallAfterDownload = false;
             showDownloadProgressDialog = false;
-            showUpdateError(logError, error);
+            showUpdateError(logError, t, error, false);
         });
     });
 
@@ -714,6 +745,7 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
     autoUpdater.on('error', (error: Error) => {
         debugPreviewMode = false;
         stopDebugProgressTimer();
+        const wasManual = isManualCheck;
         checkInProgress = false;
         downloadInProgress = false;
         downloadCanceledByUser = false;
@@ -722,7 +754,7 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
         isManualCheck = false;
         availableVersion = null;
         closeAllDialogs();
-        showUpdateError(logError, error);
+        showUpdateError(logError, t, error, wasManual);
     });
 
     app.on('before-quit', () => {
@@ -736,6 +768,19 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
         if (checkInProgress || downloadInProgress) {
             if (manual) {
                 logWarn('[updater] check ignored: update flow already in progress');
+                const options: MessageBoxOptions = {
+                    type: 'info',
+                    title: t('updater.title'),
+                    message: t('updater.updateInProgress'),
+                    buttons: [t('updater.ok')],
+                    defaultId: 0,
+                };
+                const parentWindow = getMainWindow();
+                if (parentWindow && !parentWindow.isDestroyed()) {
+                    void dialog.showMessageBox(parentWindow, options);
+                } else {
+                    void dialog.showMessageBox(options);
+                }
             }
             return;
         }
@@ -757,7 +802,7 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
             isManualCheck = false;
             availableVersion = null;
             closeAllDialogs();
-            showUpdateError(logError, error);
+            showUpdateError(logError, t, error, manual);
         } finally {
             showCheckingDialog = false;
         }

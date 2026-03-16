@@ -300,7 +300,7 @@ export default function SQLConsoleClient({
                     minSize={INITIAL_LAYOUT.horizontal.leftPanel.min}
                     maxSize={INITIAL_LAYOUT.horizontal.leftPanel.max}
                 >
-                    <div className="flex flex-col h-full border-r min-h-0 bg-card">
+                    <div className="flex flex-col h-full min-h-0 bg-card">
                         <Tabs defaultValue="tables" className="flex-1 min-h-0">
                             <TabsList className="w-full rounded-none px-2">
                                 <TabsTrigger value="tables" className="flex-1">

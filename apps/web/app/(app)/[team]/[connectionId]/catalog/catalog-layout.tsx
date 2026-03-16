@@ -146,7 +146,7 @@ export default function CatalogLayout({
         <main className="relative h-full w-full">
             <PanelGroup direction="horizontal" autoSaveId="sql-console-horizontal" onLayout={handleLayoutChange}>
                 <Panel defaultSize={horizontalLayout[0]} minSize={15} maxSize={40}>
-                    <div className="flex flex-col h-full border-r min-h-0 bg-card">
+                    <div className="flex flex-col h-full min-h-0 bg-card">
                         <CatalogSchemaSidebar
                             catalogName={catalogName}
                             onSelectTable={handleSelectTable}

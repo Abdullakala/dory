@@ -244,38 +244,40 @@ export function CatalogSchemaSidebar({
                 />
             </div>
 
-            <ScrollArea className="flex-1 space-y-2 min-h-0 mt-1">
-                <CatalogSchemaTree
-                    catalogName={catalogName}
-                    showCatalog={showCatalog}
-                    expandedCatalog={expandedCatalog}
-                    filteredDatabases={filteredDatabases}
-                    expandedDatabases={expandedDatabases}
-                    expandedGroups={expandedGroups}
-                    databaseObjects={databaseObjects}
-                    loadingGroups={loadingGroups}
-                    normalized={normalized}
-                    hasAnyResults={hasAnyResults}
-                    selectedDatabase={selectedDatabase}
-                    selectedTable={selectedTable}
-                    onToggleCatalog={() => setExpandedCatalog(prev => !prev)}
-                    onToggleDatabase={toggleDatabase}
-                    onToggleGroup={toggleGroup}
-                    onSelectDatabase={dbName => {
-                        skipAutoExpandRef.current = true;
-                        setActiveDatabase(dbName);
-                        onSelectDatabase?.(dbName);
-                    }}
-                    onSelectObject={payload => {
-                        setActiveDatabase(payload.database);
-                        onSelectTable?.(payload);
-                    }}
-                    onOpenObject={payload => {
-                        setActiveDatabase(payload.database);
-                        onOpenTableTab?.(payload);
-                    }}
-                    filterEntries={filterEntries}
-                />
+            <ScrollArea className="mt-1 min-h-0 flex-1 w-[calc(100%+0.75rem)] -mr-3 space-y-2">
+                <div className="pr-3">
+                    <CatalogSchemaTree
+                        catalogName={catalogName}
+                        showCatalog={showCatalog}
+                        expandedCatalog={expandedCatalog}
+                        filteredDatabases={filteredDatabases}
+                        expandedDatabases={expandedDatabases}
+                        expandedGroups={expandedGroups}
+                        databaseObjects={databaseObjects}
+                        loadingGroups={loadingGroups}
+                        normalized={normalized}
+                        hasAnyResults={hasAnyResults}
+                        selectedDatabase={selectedDatabase}
+                        selectedTable={selectedTable}
+                        onToggleCatalog={() => setExpandedCatalog(prev => !prev)}
+                        onToggleDatabase={toggleDatabase}
+                        onToggleGroup={toggleGroup}
+                        onSelectDatabase={dbName => {
+                            skipAutoExpandRef.current = true;
+                            setActiveDatabase(dbName);
+                            onSelectDatabase?.(dbName);
+                        }}
+                        onSelectObject={payload => {
+                            setActiveDatabase(payload.database);
+                            onSelectTable?.(payload);
+                        }}
+                        onOpenObject={payload => {
+                            setActiveDatabase(payload.database);
+                            onOpenTableTab?.(payload);
+                        }}
+                        filterEntries={filterEntries}
+                    />
+                </div>
             </ScrollArea>
         </div>
     );

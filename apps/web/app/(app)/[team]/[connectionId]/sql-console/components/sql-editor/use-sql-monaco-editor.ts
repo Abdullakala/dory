@@ -7,6 +7,7 @@ import type * as Monaco from 'monaco-editor';
 import { vsPlusTheme } from '@/components/@dory/ui/monaco-editor/theme';
 import { useColumns } from '@/hooks/use-columns';
 import { useDatabases } from '@/hooks/use-databases';
+import { useSchemas } from '@/hooks/use-schemas';
 import { useTables } from '@/hooks/use-tables';
 import { activeDatabaseAtom } from '@/shared/stores/app.store';
 import { buildSqlEditorOptions, SqlEditorSettings } from '@/shared/stores/sql-editor-settings.store';
@@ -47,6 +48,27 @@ const resolveTableName = (table: any) => {
 
 const resolveDatabaseName = (database: any) => {
     return (database?.value ?? database?.label ?? database?.name ?? database?.databaseName ?? '').toString();
+};
+
+const resolveSchemaName = (schema: any) => {
+    return (schema?.value ?? schema?.label ?? schema?.name ?? '').toString();
+};
+
+const resolveSchemaQualifiedTable = (tableName: string, defaultSchemaName = 'public') => {
+    const trimmed = tableName.trim();
+    if (!trimmed) {
+        return { schemaName: defaultSchemaName, tableName: '' };
+    }
+
+    const parts = trimmed.split('.');
+    if (parts.length === 1) {
+        return { schemaName: defaultSchemaName, tableName: parts[0] ?? '' };
+    }
+
+    return {
+        schemaName: parts[0] || defaultSchemaName,
+        tableName: parts.slice(1).join('.'),
+    };
 };
 
 const dedupeCompletionItems = (items: Monaco.languages.CompletionItem[]) => {
@@ -110,12 +132,16 @@ const registerDtSqlCompletion = (
     monaco: typeof import('monaco-editor'),
     languageId: string,
     parser: SqlDialectParser,
+    currentConnectionType: ConnectionType | undefined,
     t: ReturnType<typeof useTranslations>,
     getTables: () => any[],
     getColumns: (tableName: string) => Promise<any[] | undefined>,
     getDatabases: () => any[],
+    getSchemas: () => any[],
     getActiveDatabase?: () => string,
 ) => {
+    const isPostgres = currentConnectionType === 'postgres';
+
     return monaco.languages.registerCompletionItemProvider(languageId, {
         triggerCharacters: [' ', '.', ',', '(', '=', '\n'],
         async provideCompletionItems(model, position) {
@@ -134,6 +160,7 @@ const registerDtSqlCompletion = (
             const currentWord = wordInfo.word ?? '';
             const tables = getTables() || [];
             const databases = getDatabases() || [];
+            const schemas = getSchemas() || [];
             const activeDb = getActiveDatabase?.() ?? '';
 
             const offset = model.getOffsetAt(position);
@@ -190,26 +217,34 @@ const registerDtSqlCompletion = (
 
                     console.log('Table context detected, prefix:', typedTablePrefix);
 
-                    const isDbPrefix = typedTablePrefix.includes('.');
-
-                    
-                    const dbPrefixRaw = isDbPrefix ? typedTablePrefix.split('.')[0] : '';
-                    const dbPrefixLower = dbPrefixRaw.toLowerCase();
+                    const hasQualifierPrefix = typedTablePrefix.includes('.');
+                    const qualifierPrefixRaw = hasQualifierPrefix ? typedTablePrefix.split('.')[0] : '';
+                    const qualifierPrefixLower = qualifierPrefixRaw.toLowerCase();
                     const activeDbLower = activeDb?.toLowerCase?.() ?? '';
 
-                    
-                    
-                    const isCrossDbPrefix = isDbPrefix && !!dbPrefixLower && !!activeDbLower && dbPrefixLower !== activeDbLower;
+                    const isCrossDbPrefix = !isPostgres && hasQualifierPrefix && !!qualifierPrefixLower && !!activeDbLower && qualifierPrefixLower !== activeDbLower;
 
-                    
                     if (tables.length && !isCrossDbPrefix) {
                         for (const table of tables) {
                             const tableName = resolveTableName(table);
                             if (!tableName) continue;
 
-                            
-                            if (!isDbPrefix) {
-                                if (normalizedPrefix && !tableName.toLowerCase().startsWith(normalizedPrefix)) continue;
+                            if (isPostgres) {
+                                const qualifiedTable = resolveSchemaQualifiedTable(tableName);
+                                const normalizedTableName = qualifiedTable.tableName.toLowerCase();
+
+                                if (hasQualifierPrefix) {
+                                    const typedTableParts = typedTablePrefix.split('.');
+                                    const schemaPrefix = (typedTableParts[0] ?? '').toLowerCase();
+                                    const tablePrefix = typedTableParts.slice(1).join('.').toLowerCase();
+
+                                    if (qualifiedTable.schemaName.toLowerCase() !== schemaPrefix) continue;
+                                    if (tablePrefix && !normalizedTableName.startsWith(tablePrefix)) continue;
+                                } else if (normalizedPrefix && !tableName.toLowerCase().startsWith(normalizedPrefix)) {
+                                    continue;
+                                }
+                            } else if (!hasQualifierPrefix && normalizedPrefix && !tableName.toLowerCase().startsWith(normalizedPrefix)) {
+                                continue;
                             }
 
                             items.push({
@@ -224,9 +259,25 @@ const registerDtSqlCompletion = (
                     }
 
                     
-                    if (databases.length) {
-                        
-                        const normalizedDbPrefix = (dbPrefixRaw || typedTablePrefix || currentWord).toLowerCase();
+                    if (isPostgres) {
+                        const normalizedSchemaPrefix = (qualifierPrefixRaw || typedTablePrefix || currentWord).toLowerCase();
+
+                        for (const schema of schemas) {
+                            const schemaName = resolveSchemaName(schema);
+                            if (!schemaName) continue;
+                            if (normalizedSchemaPrefix && !schemaName.toLowerCase().startsWith(normalizedSchemaPrefix)) continue;
+
+                            items.push({
+                                label: schemaName,
+                                kind: monaco.languages.CompletionItemKind.Module,
+                                insertText: schemaName,
+                                detail: t('Editor.Completion.Database'),
+                                sortText: '1z_' + schemaName,
+                                range,
+                            });
+                        }
+                    } else if (databases.length) {
+                        const normalizedDbPrefix = (qualifierPrefixRaw || typedTablePrefix || currentWord).toLowerCase();
 
                         for (const db of databases) {
                             const dbName = resolveDatabaseName(db);
@@ -245,29 +296,45 @@ const registerDtSqlCompletion = (
                     }
                 }
 
-                
-                if (hasDatabaseContext && databases.length) {
+                if (hasDatabaseContext) {
                     const databaseSyntax = syntaxList.find(s => s.syntaxContextType === 'database' || s.syntaxContextType === 'databaseCreate');
                     const typedDatabasePrefix =
                         (databaseSyntax?.wordRanges ?? [])
                             .map(w => w?.text ?? '')
                             .join('')
                             .trim() || currentWord;
-                    const normalizedDbPrefix = (typedDatabasePrefix ?? '').toLowerCase();
+                    const normalizedContextPrefix = (typedDatabasePrefix ?? '').toLowerCase();
 
-                    for (const db of databases) {
-                        const dbName = resolveDatabaseName(db);
-                        if (!dbName) continue;
-                        if (normalizedDbPrefix && !dbName.toLowerCase().startsWith(normalizedDbPrefix)) continue;
+                    if (isPostgres) {
+                        for (const schema of schemas) {
+                            const schemaName = resolveSchemaName(schema);
+                            if (!schemaName) continue;
+                            if (normalizedContextPrefix && !schemaName.toLowerCase().startsWith(normalizedContextPrefix)) continue;
 
-                        items.push({
-                            label: dbName,
-                            kind: monaco.languages.CompletionItemKind.Module,
-                            insertText: dbName,
-                            detail: t('Editor.Completion.Database'),
-                            sortText: '1_' + dbName,
-                            range,
-                        });
+                            items.push({
+                                label: schemaName,
+                                kind: monaco.languages.CompletionItemKind.Module,
+                                insertText: schemaName,
+                                detail: t('Editor.Completion.Database'),
+                                sortText: '1_' + schemaName,
+                                range,
+                            });
+                        }
+                    } else if (databases.length) {
+                        for (const db of databases) {
+                            const dbName = resolveDatabaseName(db);
+                            if (!dbName) continue;
+                            if (normalizedContextPrefix && !dbName.toLowerCase().startsWith(normalizedContextPrefix)) continue;
+
+                            items.push({
+                                label: dbName,
+                                kind: monaco.languages.CompletionItemKind.Module,
+                                insertText: dbName,
+                                detail: t('Editor.Completion.Database'),
+                                sortText: '1_' + dbName,
+                                range,
+                            });
+                        }
                     }
                 }
 
@@ -351,6 +418,7 @@ export function useSqlMonacoEditor({
     const tablesRef = useRef<any[]>([]);
     const activeDatabaseRef = useRef<string>('');
     const databasesRef = useRef<any[]>([]);
+    const schemasRef = useRef<any[]>([]);
     const onRunQueryRef = useRef(onRunQuery);
     const onFormatRef = useRef(onFormat);
     const editorThemeRef = useRef(editorTheme);
@@ -360,6 +428,7 @@ export function useSqlMonacoEditor({
     const setSelectionByTab = useSetAtom(editorSelectionByTabAtom);
     const { databases } = useDatabases();
     const { tables } = useTables(activeDatabase);
+    const { schemas } = useSchemas(activeDatabase, currentConnectionType === 'postgres');
     const { refresh: refreshColumns } = useColumns();
     const refreshColumnsRef = useRef(refreshColumns);
     const t = useTranslations('SqlConsole');
@@ -371,6 +440,10 @@ export function useSqlMonacoEditor({
     useEffect(() => {
         databasesRef.current = databases || [];
     }, [databases]);
+
+    useEffect(() => {
+        schemasRef.current = schemas || [];
+    }, [schemas]);
 
     useEffect(() => {
         activeDatabaseRef.current = activeDatabase;
@@ -437,10 +510,12 @@ export function useSqlMonacoEditor({
                 monaco,
                 languageId,
                 parser,
+                currentConnectionType,
                 t,
                 () => tablesRef.current,
                 fetchColumnsForCompletion,
                 () => databasesRef.current,
+                () => schemasRef.current,
                 () => activeDatabaseRef.current,
             );
 

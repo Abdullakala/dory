@@ -11,6 +11,7 @@ import { normalizePostgresTableKind } from '../postgres-driver';
 import type { PostgresDatasource } from '../PostgresDatasource';
 
 export type PostgresMetadataAPI = ConnectionMetadataAPI & {
+    getSchemas: (database: string) => Promise<{ label: string; value: string }[]>;
     getTableColumns: (database: string, table: string) => Promise<TableColumnInfo[]>;
     getTablesOnly: (database: string) => Promise<DatabaseObjectRow[]>;
     getViews: (database: string) => Promise<DatabaseObjectRow[]>;
@@ -139,6 +140,29 @@ async function getTables(datasource: PostgresDatasource, database?: string) {
         .filter((row): row is NonNullable<typeof row> => Boolean(row));
 }
 
+async function getSchemas(datasource: PostgresDatasource, database: string) {
+    const result = await datasource.queryWithContext<{
+        schemaName: string;
+    }>(
+        `
+            SELECT schema_name AS "schemaName"
+            FROM information_schema.schemata
+            WHERE schema_name NOT IN ('pg_catalog', 'information_schema')
+              AND schema_name NOT LIKE 'pg_toast%'
+            ORDER BY schema_name
+        `,
+        { database },
+    );
+
+    return result.rows
+        .map(row => row.schemaName?.trim())
+        .filter((schemaName): schemaName is string => Boolean(schemaName))
+        .map(schemaName => ({
+            value: schemaName,
+            label: schemaName,
+        }));
+}
+
 async function getSchema(datasource: PostgresDatasource, database?: string): Promise<ConnectionSchemaMap> {
     const result = await datasource.queryWithContext<{
         schemaName: string;
@@ -238,9 +262,7 @@ async function getDatabaseTablesDetail(datasource: PostgresDatasource, database:
         { database },
     );
 
-    return result.rows
-        .map(normalizeObjectRow)
-        .filter((row): row is DatabaseObjectRow => Boolean(row));
+    return result.rows.map(normalizeObjectRow).filter((row): row is DatabaseObjectRow => Boolean(row));
 }
 
 async function getTablesOnly(datasource: PostgresDatasource, database: string): Promise<DatabaseObjectRow[]> {
@@ -345,6 +367,7 @@ export function createPostgresMetadataCapability(datasource: PostgresDatasource)
     return {
         getDatabases: () => getDatabases(datasource),
         getTables: database => getTables(datasource, database),
+        getSchemas: database => getSchemas(datasource, database),
         getSchema: database => getSchema(datasource, database),
         getTableColumns: (database, table) => getTableColumns(datasource, database, table),
         getTablesOnly: database => getTablesOnly(datasource, database),

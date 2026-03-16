@@ -1,38 +1,38 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Database, Check, ChevronsUpDown } from 'lucide-react';
-import { cn } from '@/registry/new-york-v4/lib/utils';
+import { Check, ChevronsUpDown, Database } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-
+import { cn } from '@/registry/new-york-v4/lib/utils';
 import { Button } from '@/registry/new-york-v4/ui/button';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/registry/new-york-v4/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/registry/new-york-v4/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/registry/new-york-v4/ui/tooltip';
+import type { SidebarOption } from './types';
 
-type Props = {
+type DatabaseSelectProps = {
     value: string;
-    databases: Array<{ value: string; label: string }>;
-    onChange: (id: string) => void;
+    databases: SidebarOption[];
+    onChange: (database: string) => void;
     className?: string;
 };
 
-export function DatabasesSelect({ value, databases, onChange, className }: Props) {
+export function DatabaseSelect({ value, databases, onChange, className }: DatabaseSelectProps) {
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState('');
     const t = useTranslations('SQLConsoleSidebar');
 
-    const selected = useMemo(() => databases.find(d => d.value === value) || null, [databases, value]);
+    const selected = useMemo(() => databases.find(database => database.value === value) ?? null, [databases, value]);
 
     const filtered = useMemo(() => {
         if (!query.trim()) return databases;
-        const q = query.toLowerCase();
-        
-        return databases.filter(d => d.label.toLowerCase().includes(q) || d?.value?.toLowerCase().includes(q));
+        const normalizedQuery = query.toLowerCase();
+
+        return databases.filter(database => database.label.toLowerCase().includes(normalizedQuery) || database.value.toLowerCase().includes(normalizedQuery));
     }, [databases, query]);
 
-    const handleSelect = (val: string) => {
-        onChange(val);
+    const handleSelect = (database: string) => {
+        onChange(database);
         setOpen(false);
     };
 
@@ -40,42 +40,36 @@ export function DatabasesSelect({ value, databases, onChange, className }: Props
         <TooltipProvider>
             <Popover open={open} onOpenChange={setOpen}>
                 <PopoverTrigger asChild>
-                    <Button variant="outline" role="combobox" aria-expanded={open} className={cn('w-full h-8 justify-between', className)}>
-                        <span className="flex items-center gap-2 min-w-0">
+                    <Button variant="outline" role="combobox" aria-expanded={open} className={cn('h-8 w-full justify-between', className)}>
+                        <span className="flex min-w-0 items-center gap-2">
                             <Database className="h-4 w-4 shrink-0" />
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <span className="truncate text-sm max-w-[220px]">{selected ? selected.label : t('Select database')}</span>
+                                    <span className="max-w-[220px] truncate text-sm">{selected ? selected.label : t('Select database')}</span>
                                 </TooltipTrigger>
                                 <TooltipContent side="right">{selected ? selected.label : t('Select database')}</TooltipContent>
                             </Tooltip>
                         </span>
-                        <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
+                        <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                 </PopoverTrigger>
 
-                <PopoverContent align="start" className="p-0 w-80">
+                <PopoverContent align="start" className="w-80 p-0">
                     <Command shouldFilter={false}>
-                        <CommandInput
-                            placeholder={t('Search databases')}
-                            value={query}
-                            onValueChange={setQuery}
-                            
-                            className="h-9"
-                        />
+                        <CommandInput placeholder={t('Search databases')} value={query} onValueChange={setQuery} className="h-9" />
                         <CommandList className="max-h-64">
                             <CommandEmpty>{t('No results')}</CommandEmpty>
                             <CommandGroup heading={t('Databases')}>
-                                {filtered.map(db => (
-                                    <CommandItem key={db.value} value={db.value} onSelect={handleSelect} className="flex items-center gap-2">
+                                {filtered.map(database => (
+                                    <CommandItem key={database.value} value={database.value} onSelect={handleSelect} className="flex items-center gap-2">
                                         <Database className="h-4 w-4 shrink-0" />
                                         <Tooltip>
                                             <TooltipTrigger asChild>
-                                                <span className="text-sm truncate max-w-[200px]">{db.label}</span>
+                                                <span className="max-w-[200px] truncate text-sm">{database.label}</span>
                                             </TooltipTrigger>
-                                            <TooltipContent side="right">{db.label}</TooltipContent>
+                                            <TooltipContent side="right">{database.label}</TooltipContent>
                                         </Tooltip>
-                                        <Check className={cn('ml-auto h-4 w-4', value === db.value ? 'opacity-100' : 'opacity-0')} />
+                                        <Check className={cn('ml-auto h-4 w-4', value === database.value ? 'opacity-100' : 'opacity-0')} />
                                     </CommandItem>
                                 ))}
                             </CommandGroup>

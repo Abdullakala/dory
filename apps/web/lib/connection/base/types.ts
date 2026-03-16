@@ -130,19 +130,10 @@ export type Pagination = {
 export type QueryInsightsImpl = {
     summary: (filters: QueryInsightsFilters) => Promise<QueryInsightsSummary>;
     timeline: (filters: QueryInsightsFilters) => Promise<QueryTimelinePoint[]>;
-    queryLogs: (
-        filters: QueryInsightsFilters,
-        pagination?: Pagination,
-    ) => Promise<{ rows: QueryInsightsRow[]; total: number }>;
+    queryLogs: (filters: QueryInsightsFilters, pagination?: Pagination) => Promise<{ rows: QueryInsightsRow[]; total: number }>;
     recentQueries: (filters: QueryInsightsFilters, options?: { limit?: number }) => Promise<QueryInsightsRow[]>;
-    slowQueries: (
-        filters: QueryInsightsFilters,
-        pagination?: Pagination,
-    ) => Promise<{ rows: QueryInsightsRow[]; total: number }>;
-    errorQueries: (
-        filters: QueryInsightsFilters,
-        pagination?: Pagination,
-    ) => Promise<{ rows: QueryInsightsRow[]; total: number }>;
+    slowQueries: (filters: QueryInsightsFilters, pagination?: Pagination) => Promise<{ rows: QueryInsightsRow[]; total: number }>;
+    errorQueries: (filters: QueryInsightsFilters, pagination?: Pagination) => Promise<{ rows: QueryInsightsRow[]; total: number }>;
 };
 
 export type QueryInsightsAPI = QueryInsightsImpl;
@@ -155,6 +146,7 @@ export type GetTableInfoAPI = {
 export type ConnectionMetadataAPI = {
     getDatabases: () => Promise<DatabaseMeta[]>;
     getTables: (database?: string) => Promise<TableMeta[]>;
+    getSchemas?: (database: string) => Promise<DatabaseMeta[]>;
     getSchema?: (database?: string) => Promise<ConnectionSchemaMap>;
     getTableColumns?: (database: string, table: string) => Promise<TableColumnInfo[]>;
     getTablesOnly?: (database: string) => Promise<DatabaseObjectRow[]>;

@@ -2,16 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAtom } from 'jotai';
-import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
-import { useTranslations } from 'next-intl';
 
 import { activeDatabaseAtom } from '@/shared/stores/app.store';
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from '@/registry/new-york-v4/ui/breadcrumb';
 import { CatalogSchemaSidebar } from '../../../components/catalog-schema-sidebar/catalog-schema-sidebar';
 import { useDataExplorerLayout } from '../../catalog/hooks/use-layout';
-import { buildExplorerBasePath, buildExplorerDatabasePath } from '@/lib/data-explorer/routing';
+import { buildExplorerDatabasePath } from '@/lib/explorer/build-path';
 
 function normalizeHorizontalLayout(layout: readonly number[] | undefined): [number, number] {
     if (!Array.isArray(layout) || layout.length === 0) return [25, 85];
@@ -42,7 +39,6 @@ export function ExplorerLayout({ defaultLayout = [25, 85], database, table, chil
     const horizontalLayout = useMemo(() => normalizeHorizontalLayout(normalizedLayout), [normalizedLayout]);
     const [activeDatabase] = useAtom(activeDatabaseAtom);
     const router = useRouter();
-    const t = useTranslations('Catalog');
     const params = useParams<{
         team?: string | string[];
         connectionId?: string | string[];
@@ -87,34 +83,6 @@ export function ExplorerLayout({ defaultLayout = [25, 85], database, table, chil
         [connectionId, router, team],
     );
 
-    const breadcrumbItems = useMemo(() => {
-        if (!team || !connectionId) return [];
-
-        const base = buildExplorerBasePath({ team, connectionId });
-        const items: { label: string; href: string }[] = [];
-
-        items.push({
-            label: 'Explorer',
-            href: base,
-        });
-
-        if (resolvedDatabase) {
-            items.push({
-                label: resolvedDatabase,
-                href: `${base}/database/${encodeURIComponent(resolvedDatabase)}`,
-            });
-        }
-
-        if (resolvedTable && resolvedDatabase) {
-            items.push({
-                label: resolvedTable,
-                href: `${base}/database/${encodeURIComponent(resolvedDatabase)}`,
-            });
-        }
-
-        return items;
-    }, [connectionId, resolvedDatabase, resolvedTable, team]);
-
     return (
         <main className="relative h-full w-full">
             <PanelGroup direction="horizontal" autoSaveId="sql-console-horizontal" onLayout={onLayout}>
@@ -133,25 +101,7 @@ export function ExplorerLayout({ defaultLayout = [25, 85], database, table, chil
                 <PanelResizeHandle className="w-1.5 bg-border transition-colors data-[resize-handle-active=true]:bg-foreground/30" />
 
                 <Panel defaultSize={horizontalLayout[1]} minSize={40}>
-                    <div className="flex h-full min-h-0 flex-col">
-                        {breadcrumbItems.length ? (
-                            <div className="border-b px-6 py-3">
-                                <Breadcrumb>
-                                    <BreadcrumbList>
-                                        {breadcrumbItems.map((item, index) => (
-                                            <BreadcrumbItem key={`${item.label}-${item.href}`}>
-                                                <BreadcrumbLink asChild>
-                                                    <Link href={item.href}>{item.label}</Link>
-                                                </BreadcrumbLink>
-                                                {index < breadcrumbItems.length - 1 ? <BreadcrumbSeparator /> : null}
-                                            </BreadcrumbItem>
-                                        ))}
-                                    </BreadcrumbList>
-                                </Breadcrumb>
-                            </div>
-                        ) : null}
-                        <div className="min-h-0 flex-1 overflow-auto">{children}</div>
-                    </div>
+                    <div className="flex h-full min-h-0 flex-col">{children}</div>
                 </Panel>
             </PanelGroup>
         </main>

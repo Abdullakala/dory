@@ -19,7 +19,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/registry/new-york-v4/
 import type { User } from 'better-auth';
 import { useAtomValue } from 'jotai';
 import { currentConnectionAtom } from '@/shared/stores/app.store';
-import { buildExplorerBasePath, buildExplorerDatabasePath } from '@/lib/data-explorer/routing';
+import { buildExplorerBasePath, buildExplorerDatabasePath } from '@/lib/explorer/build-path';
 
 type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
     initialUser?: User | null;

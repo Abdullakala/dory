@@ -15,15 +15,16 @@ const SUB_TABS: SubTab[] = ['summary', 'tables', 'views', 'materialized-views'];
 type DatabaseTabsProps = {
     catalog?: string;
     database?: string;
+    initialTab?: SubTab;
 };
 
-export default function DatabaseTabs({ catalog, database }: DatabaseTabsProps) {
-    const [currentTab, setCurrentTab] = useState<SubTab>('summary');
+export default function DatabaseTabs({ catalog, database, initialTab = 'summary' }: DatabaseTabsProps) {
+    const [currentTab, setCurrentTab] = useState<SubTab>(initialTab);
     const t = useTranslations('Catalog');
 
     useEffect(() => {
-        setCurrentTab('summary');
-    }, [catalog, database]);
+        setCurrentTab(initialTab);
+    }, [catalog, database, initialTab]);
 
     return (
         <div className="p-6 h-full flex flex-col">

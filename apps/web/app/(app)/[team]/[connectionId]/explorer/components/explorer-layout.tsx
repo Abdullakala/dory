@@ -8,15 +8,10 @@ import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { useTranslations } from 'next-intl';
 
 import { activeDatabaseAtom } from '@/shared/stores/app.store';
-import {
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbLink,
-    BreadcrumbList,
-    BreadcrumbSeparator,
-} from '@/registry/new-york-v4/ui/breadcrumb';
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from '@/registry/new-york-v4/ui/breadcrumb';
 import { CatalogSchemaSidebar } from '../../../components/catalog-schema-sidebar/catalog-schema-sidebar';
 import { useDataExplorerLayout } from '../../catalog/hooks/use-layout';
+import { buildExplorerBasePath, buildExplorerDatabasePath } from '@/lib/data-explorer/routing';
 
 function normalizeHorizontalLayout(layout: readonly number[] | undefined): [number, number] {
     if (!Array.isArray(layout) || layout.length === 0) return [25, 85];
@@ -42,12 +37,7 @@ function resolveParam(value?: string | string[]) {
     return Array.isArray(value) ? value[0] : value;
 }
 
-export function ExplorerLayout({
-    defaultLayout = [25, 85],
-    database,
-    table,
-    children,
-}: ExplorerLayoutProps) {
+export function ExplorerLayout({ defaultLayout = [25, 85], database, table, children }: ExplorerLayoutProps) {
     const { normalizedLayout, onLayout } = useDataExplorerLayout(defaultLayout);
     const horizontalLayout = useMemo(() => normalizeHorizontalLayout(normalizedLayout), [normalizedLayout]);
     const [activeDatabase] = useAtom(activeDatabaseAtom);
@@ -82,9 +72,7 @@ export function ExplorerLayout({
             setSelectedDatabase(dbName);
             setSelectedTable(payload.tableName);
 
-            router.push(
-                `/${encodeURIComponent(team)}/${encodeURIComponent(connectionId)}/explorer/database/${encodeURIComponent(dbName)}`,
-            );
+            router.push(buildExplorerDatabasePath({ team, connectionId }, dbName));
         },
         [activeDatabase, connectionId, resolvedDatabase, router, team],
     );
@@ -94,7 +82,7 @@ export function ExplorerLayout({
             if (!team || !connectionId || !dbName) return;
 
             setSelectedDatabase(dbName);
-            router.push(`/${encodeURIComponent(team)}/${encodeURIComponent(connectionId)}/explorer/database/${encodeURIComponent(dbName)}`);
+            router.push(buildExplorerDatabasePath({ team, connectionId }, dbName));
         },
         [connectionId, router, team],
     );
@@ -102,7 +90,7 @@ export function ExplorerLayout({
     const breadcrumbItems = useMemo(() => {
         if (!team || !connectionId) return [];
 
-        const base = `/${encodeURIComponent(team)}/${encodeURIComponent(connectionId)}/explorer`;
+        const base = buildExplorerBasePath({ team, connectionId });
         const items: { label: string; href: string }[] = [];
 
         items.push({

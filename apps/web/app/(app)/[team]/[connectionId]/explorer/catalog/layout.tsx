@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ExplorerLayout } from './components/explorer-layout';
+import { ExplorerLayout } from '../components/explorer-layout';
 
 type ExplorerLayoutParams = {
     team: string;

@@ -19,6 +19,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/registry/new-york-v4/
 import type { User } from 'better-auth';
 import { useAtomValue } from 'jotai';
 import { currentConnectionAtom } from '@/shared/stores/app.store';
+import { buildExplorerBasePath, buildExplorerDatabasePath } from '@/lib/data-explorer/routing';
 
 type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
     initialUser?: User | null;
@@ -32,8 +33,7 @@ export function AppSidebar({ initialUser = null, ...props }: AppSidebarProps) {
     const team = params.team;
     const connectionId = params.connectionId;
     const currentConnection = useAtomValue(currentConnectionAtom);
-    const defaultDatabase =
-        currentConnection && currentConnection.connection.id === connectionId ? currentConnection.connection.database : null;
+    const defaultDatabase = currentConnection && currentConnection.connection.id === connectionId ? currentConnection.connection.database : null;
     const schemaUrl =
         connectionId && defaultDatabase
             ? `/${team}/${connectionId}/catalog/default/${encodeURIComponent(defaultDatabase)}`
@@ -42,9 +42,9 @@ export function AppSidebar({ initialUser = null, ...props }: AppSidebarProps) {
               : `/${team}/connections`;
     const explorerUrl =
         connectionId && defaultDatabase
-            ? `/${team}/${connectionId}/explorer/database/${encodeURIComponent(defaultDatabase)}`
+            ? buildExplorerDatabasePath({ team, connectionId }, defaultDatabase)
             : connectionId
-              ? `/${team}/${connectionId}/explorer`
+              ? buildExplorerBasePath({ team, connectionId })
               : `/${team}/connections`;
     const [updaterState, setUpdaterState] = React.useState<{ readyToInstall: boolean; version: string | null }>({
         readyToInstall: false,

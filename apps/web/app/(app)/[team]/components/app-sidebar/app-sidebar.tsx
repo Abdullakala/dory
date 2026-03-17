@@ -42,7 +42,7 @@ export function AppSidebar({ initialUser = null, ...props }: AppSidebarProps) {
               : `/${team}/connections`;
     const explorerUrl =
         connectionId && defaultDatabase
-            ? `/${team}/${connectionId}/explorer/${encodeURIComponent(defaultDatabase)}`
+            ? `/${team}/${connectionId}/explorer/database/${encodeURIComponent(defaultDatabase)}`
             : connectionId
               ? `/${team}/${connectionId}/explorer`
               : `/${team}/connections`;

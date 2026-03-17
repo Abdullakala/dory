@@ -31,11 +31,8 @@ function normalizeHorizontalLayout(layout: readonly number[] | undefined): [numb
     return [normalizedLeft, 100 - normalizedLeft];
 }
 
-const DEFAULT_CATALOG = 'default';
-
 type ExplorerLayoutProps = {
     defaultLayout?: number[] | undefined;
-    catalog?: string;
     database?: string;
     table?: string;
     children?: ReactNode;
@@ -47,7 +44,6 @@ function resolveParam(value?: string | string[]) {
 
 export function ExplorerLayout({
     defaultLayout = [25, 85],
-    catalog,
     database,
     table,
     children,
@@ -60,16 +56,13 @@ export function ExplorerLayout({
     const params = useParams<{
         team?: string | string[];
         connectionId?: string | string[];
-        catalog?: string | string[];
         database?: string | string[];
         table?: string | string[];
     }>();
     const team = resolveParam(params?.team);
     const connectionId = resolveParam(params?.connectionId);
-    const resolvedCatalog = catalog ?? resolveParam(params?.catalog);
     const resolvedDatabase = database ?? resolveParam(params?.database);
     const resolvedTable = table ?? resolveParam(params?.table);
-    const catalogName = resolvedCatalog ?? DEFAULT_CATALOG;
     const [selectedDatabase, setSelectedDatabase] = useState(resolvedDatabase);
     const [selectedTable, setSelectedTable] = useState(resolvedTable);
 
@@ -90,12 +83,10 @@ export function ExplorerLayout({
             setSelectedTable(payload.tableName);
 
             router.push(
-                `/${encodeURIComponent(team)}/${encodeURIComponent(connectionId)}/catalog/${encodeURIComponent(
-                    catalogName,
-                )}/${encodeURIComponent(dbName)}/${encodeURIComponent(payload.tableName)}`,
+                `/${encodeURIComponent(team)}/${encodeURIComponent(connectionId)}/explorer/database/${encodeURIComponent(dbName)}`,
             );
         },
-        [activeDatabase, catalogName, connectionId, resolvedDatabase, router, team],
+        [activeDatabase, connectionId, resolvedDatabase, router, team],
     );
 
     const handleSelectDatabase = useCallback(
@@ -103,44 +94,38 @@ export function ExplorerLayout({
             if (!team || !connectionId || !dbName) return;
 
             setSelectedDatabase(dbName);
-            router.push(
-                `/${encodeURIComponent(team)}/${encodeURIComponent(connectionId)}/catalog/${encodeURIComponent(
-                    catalogName,
-                )}/${encodeURIComponent(dbName)}`,
-            );
+            router.push(`/${encodeURIComponent(team)}/${encodeURIComponent(connectionId)}/explorer/database/${encodeURIComponent(dbName)}`);
         },
-        [catalogName, connectionId, router, team],
+        [connectionId, router, team],
     );
 
     const breadcrumbItems = useMemo(() => {
         if (!team || !connectionId) return [];
 
-        const base = `/${encodeURIComponent(team)}/${encodeURIComponent(connectionId)}/catalog`;
+        const base = `/${encodeURIComponent(team)}/${encodeURIComponent(connectionId)}/explorer`;
         const items: { label: string; href: string }[] = [];
 
-        if (catalogName) {
-            items.push({
-                label: t('Catalog'),
-                href: `${base}/${encodeURIComponent(catalogName)}`,
-            });
-        }
+        items.push({
+            label: 'Explorer',
+            href: base,
+        });
 
         if (resolvedDatabase) {
             items.push({
                 label: resolvedDatabase,
-                href: `${base}/${encodeURIComponent(catalogName)}/${encodeURIComponent(resolvedDatabase)}`,
+                href: `${base}/database/${encodeURIComponent(resolvedDatabase)}`,
             });
         }
 
         if (resolvedTable && resolvedDatabase) {
             items.push({
                 label: resolvedTable,
-                href: `${base}/${encodeURIComponent(catalogName)}/${encodeURIComponent(resolvedDatabase)}/${encodeURIComponent(resolvedTable)}`,
+                href: `${base}/database/${encodeURIComponent(resolvedDatabase)}`,
             });
         }
 
         return items;
-    }, [catalogName, connectionId, resolvedDatabase, resolvedTable, t, team]);
+    }, [connectionId, resolvedDatabase, resolvedTable, team]);
 
     return (
         <main className="relative h-full w-full">
@@ -148,7 +133,7 @@ export function ExplorerLayout({
                 <Panel defaultSize={horizontalLayout[0]} minSize={15} maxSize={40}>
                     <div className="flex h-full min-h-0 flex-col bg-card">
                         <CatalogSchemaSidebar
-                            catalogName={catalogName}
+                            catalogName="default"
                             onSelectTable={handleSelectTable}
                             onSelectDatabase={handleSelectDatabase}
                             selectedDatabase={selectedDatabase}

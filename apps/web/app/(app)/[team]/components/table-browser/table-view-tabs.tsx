@@ -7,8 +7,7 @@ import TableStructure from './components/structure';
 import TableStats from './components/stats';
 import { TableOverview } from './components/overview';
 import TableDataPreview from './components/data-preview';
-
-export type TableSubTab = 'overview' | 'data' | 'structure' | 'stats';
+import type { TableSubTab } from './types';
 
 type TableViewTabsProps = {
     connectionId?: string;
@@ -21,14 +20,7 @@ type TableViewTabsProps = {
 
 const SUB_TABS: TableSubTab[] = ['overview', 'data', 'structure', 'stats'];
 
-export function TableViewTabs({
-    connectionId,
-    databaseName,
-    tableName,
-    activeSubTab,
-    initialSubTab = 'overview',
-    onSubTabChange,
-}: TableViewTabsProps) {
+export function TableViewTabs({ connectionId, databaseName, tableName, activeSubTab, initialSubTab = 'overview', onSubTabChange }: TableViewTabsProps) {
     const t = useTranslations('TableBrowser');
     const [currentTab, setCurrentTab] = useState<TableSubTab>(activeSubTab ?? initialSubTab);
 

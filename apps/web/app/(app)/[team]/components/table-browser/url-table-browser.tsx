@@ -1,18 +1,22 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { ExplorerDriver } from '@/lib/explorer/types';
 import { Card, CardContent } from '@/registry/new-york-v4/ui/card';
 import { useTranslations } from 'next-intl';
-import { TableViewTabs, type TableSubTab } from './table-view-tabs';
+import { DriverTableBrowser } from './driver-table-browser';
+import type { TableSubTab } from './types';
 
 type UrlTableBrowserProps = {
     catalog?: string;
+    driver?: ExplorerDriver;
+    connectionId?: string;
     databaseName?: string;
     tableName?: string;
     initialTab?: TableSubTab;
 };
 
-export default function UrlTableBrowser({ catalog, databaseName, tableName, initialTab = 'overview' }: UrlTableBrowserProps) {
+export default function UrlTableBrowser({ catalog, driver, connectionId, databaseName, tableName, initialTab = 'overview' }: UrlTableBrowserProps) {
     const [currentTab, setCurrentTab] = useState<TableSubTab>(initialTab);
     const t = useTranslations('TableBrowser');
 
@@ -29,13 +33,13 @@ export default function UrlTableBrowser({ catalog, databaseName, tableName, init
     }
 
     return (
-        <div className="p-6 h-full flex flex-col">
-            <TableViewTabs
-                databaseName={databaseName}
-                tableName={tableName}
-                activeSubTab={currentTab}
-                onSubTabChange={value => setCurrentTab(value)}
-            />
-        </div>
+        <DriverTableBrowser
+            driver={driver}
+            connectionId={connectionId}
+            databaseName={databaseName}
+            tableName={tableName}
+            activeSubTab={currentTab}
+            onSubTabChange={value => setCurrentTab(value)}
+        />
     );
 }

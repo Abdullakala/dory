@@ -447,6 +447,60 @@
             "Name": "name"
         }
     },
+    "PostgresExplorer": {
+        "Tabs": {
+            "summary": "Summary",
+            "schemas": "Schemas",
+            "search": "Search",
+            "extensions": "Extensions",
+            "tables": "Tables",
+            "views": "Views",
+            "functions": "Functions",
+            "sequences": "Sequences",
+            "overview": "Overview",
+            "data": "Data",
+            "structure": "Structure",
+            "stats": "Stats",
+            "indexes": "Indexes"
+        },
+        "Schemas": {
+            "SearchPlaceholder": "Search schemas",
+            "Empty": "No schemas",
+            "FilteredEmpty": "No matching schemas"
+        },
+        "Search": {
+            "Placeholder": "Search schemas, tables, views, functions, or sequences",
+            "Empty": "No matching objects"
+        },
+        "Extensions": {
+            "SearchPlaceholder": "Search extensions",
+            "Empty": "No extensions",
+            "FilteredEmpty": "No matching extensions"
+        },
+        "Tables": {
+            "SearchPlaceholder": "Search tables",
+            "Empty": "No tables",
+            "FilteredEmpty": "No matching tables"
+        },
+        "Views": {
+            "SearchPlaceholder": "Search views",
+            "Empty": "No views",
+            "FilteredEmpty": "No matching views"
+        },
+        "Functions": {
+            "SearchPlaceholder": "Search functions",
+            "Empty": "No functions",
+            "FilteredEmpty": "No matching functions"
+        },
+        "Sequences": {
+            "SearchPlaceholder": "Search sequences",
+            "Empty": "No sequences",
+            "FilteredEmpty": "No matching sequences"
+        },
+        "Indexes": {
+            "Empty": "No indexes"
+        }
+    },
     "TableStats": {
         "No available connection": "No available connection found.",
         "Select table to view stats": "Select a table to view stats.",
@@ -1449,21 +1503,21 @@
         "Connection": {
             "Errors": {
                 "Unauthorized": "Unauthorized or insufficient permissions",
-            "FetchCatalogFailed": "Failed to fetch catalog context",
-            "NotFound": "Connection not found or insufficient permissions",
-            "MissingHost": "Connection is missing host information",
-            "MissingConnectionId": "Missing connection ID",
-            "MissingUsername": "Missing username",
-            "MissingIdentity": "No available identity found",
-            "MissingIdentityInfo": "Missing identity information",
-            "MissingPassword": "Missing identity password",
-            "MissingSshPassword": "Missing SSH password",
-            "MissingSshPrivateKey": "Missing SSH private key",
-            "UnsupportedType": "This database type is not supported yet",
-            "ConnectFailed": "Connection failed",
-            "SchemaReadFailed": "Failed to read schema",
-            "TestFailed": "Test connection failed"
-        },
+                "FetchCatalogFailed": "Failed to fetch catalog context",
+                "NotFound": "Connection not found or insufficient permissions",
+                "MissingHost": "Connection is missing host information",
+                "MissingConnectionId": "Missing connection ID",
+                "MissingUsername": "Missing username",
+                "MissingIdentity": "No available identity found",
+                "MissingIdentityInfo": "Missing identity information",
+                "MissingPassword": "Missing identity password",
+                "MissingSshPassword": "Missing SSH password",
+                "MissingSshPrivateKey": "Missing SSH private key",
+                "UnsupportedType": "This database type is not supported yet",
+                "ConnectFailed": "Connection failed",
+                "SchemaReadFailed": "Failed to read schema",
+                "TestFailed": "Test connection failed"
+            },
             "Validation": {
                 "DatabaseRequired": "Database name is required",
                 "TableRequired": "Table name is required"
@@ -1671,8 +1725,7 @@
                 "DatabaseRequired": "Database is required",
                 "UnsupportedType": "Unsupported type",
                 "FetchFailed": "Failed to fetch privilege targets"
-            }
-            ,
+            },
             "Clusters": {
                 "FetchFailed": "Failed to fetch cluster metadata"
             }
@@ -2017,4 +2070,3 @@
         "SQL Console": "SQL Console"
     }
 }
-    

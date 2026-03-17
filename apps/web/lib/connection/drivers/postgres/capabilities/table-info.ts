@@ -1,6 +1,6 @@
 import type { GetTableInfoAPI } from '@/lib/connection/base/types';
 import { DEFAULT_TABLE_PREVIEW_LIMIT } from '@/shared/data/app.data';
-import type { TablePropertiesRow, TableStats } from '@/types/table-info';
+import type { TableIndexInfo, TablePropertiesRow, TableStats } from '@/types/table-info';
 import type { PostgresDatasource } from '../PostgresDatasource';
 
 type TableIdentityRow = {
@@ -31,6 +31,15 @@ type PartitionRow = {
     name?: string;
     rowCount?: number | string | null;
     compressedBytes?: number | string | null;
+};
+
+type TableIndexRow = {
+    indexName?: string;
+    method?: string | null;
+    isPrimary?: boolean | null;
+    isUnique?: boolean | null;
+    sizeBytes?: number | string | null;
+    definition?: string | null;
 };
 
 function toNumberOrNull(value: unknown): number | null {
@@ -136,13 +145,10 @@ async function getTableDDL(datasource: PostgresDatasource, database: string, tab
     const qualifiedName = `"${schemaName.replace(/"/g, '""')}"."${tableName.replace(/"/g, '""')}"`;
 
     if (identity.relkind === 'v' || identity.relkind === 'm') {
-        const viewDefinition = await datasource.queryWithContext<ViewDefRow>(
-            'SELECT pg_get_viewdef($1::regclass, true) AS definition',
-            {
-                database,
-                params: [qualifiedName],
-            },
-        );
+        const viewDefinition = await datasource.queryWithContext<ViewDefRow>('SELECT pg_get_viewdef($1::regclass, true) AS definition', {
+            database,
+            params: [qualifiedName],
+        });
 
         const definition = viewDefinition.rows[0]?.definition?.trim();
         if (!definition) {
@@ -245,24 +251,16 @@ async function getTableStats(datasource: PostgresDatasource, database: string, t
     };
 }
 
-async function getTablePreview(
-    datasource: PostgresDatasource,
-    database: string,
-    table: string,
-    options?: { limit?: number },
-) {
+async function getTablePreview(datasource: PostgresDatasource, database: string, table: string, options?: { limit?: number }) {
     const parsed = parseTableName(table);
     const schemaName = parsed.schema?.trim() || 'public';
     const tableName = parsed.name.trim();
     const limit = normalizePreviewLimit(options?.limit);
     const qualifiedName = `${quoteIdentifier(schemaName)}.${quoteIdentifier(tableName)}`;
-    const result = await datasource.queryWithContext<Record<string, unknown>>(
-        `SELECT * FROM ${qualifiedName} LIMIT $1`,
-        {
-            database,
-            params: [limit],
-        },
-    );
+    const result = await datasource.queryWithContext<Record<string, unknown>>(`SELECT * FROM ${qualifiedName} LIMIT $1`, {
+        database,
+        params: [limit],
+    });
 
     return {
         ...result,
@@ -271,11 +269,53 @@ async function getTablePreview(
     };
 }
 
+async function getTableIndexes(datasource: PostgresDatasource, database: string, table: string): Promise<TableIndexInfo[]> {
+    const identity = await getTableIdentity(datasource, database, table);
+    if (!identity?.oid) {
+        return [];
+    }
+
+    const result = await datasource.queryWithContext<TableIndexRow>(
+        `
+            SELECT
+                idx.relname AS "indexName",
+                am.amname AS method,
+                i.indisprimary AS "isPrimary",
+                i.indisunique AS "isUnique",
+                pg_relation_size(idx.oid) AS "sizeBytes",
+                pg_get_indexdef(idx.oid) AS definition
+            FROM pg_index i
+            JOIN pg_class idx
+              ON idx.oid = i.indexrelid
+            LEFT JOIN pg_am am
+              ON am.oid = idx.relam
+            WHERE i.indrelid = $1
+            ORDER BY i.indisprimary DESC, idx.relname
+        `,
+        {
+            database,
+            params: [identity.oid],
+        },
+    );
+
+    return result.rows
+        .filter(row => row.indexName)
+        .map(row => ({
+            name: row.indexName as string,
+            method: row.method ?? null,
+            isPrimary: row.isPrimary ?? null,
+            isUnique: row.isUnique ?? null,
+            sizeBytes: toNumberOrNull(row.sizeBytes),
+            definition: row.definition ?? null,
+        }));
+}
+
 export function createPostgresTableInfoCapability(datasource: PostgresDatasource): GetTableInfoAPI {
     return {
         properties: (database, table) => getTableProperties(datasource, database, table),
         ddl: (database, table) => getTableDDL(datasource, database, table),
         stats: (database, table) => getTableStats(datasource, database, table),
         preview: (database, table, options) => getTablePreview(datasource, database, table, options),
+        indexes: (database, table) => getTableIndexes(datasource, database, table),
     };
 }

@@ -17,22 +17,21 @@ type UrlTableBrowserProps = {
     catalog?: string;
     databaseName?: string;
     tableName?: string;
+    initialTab?: SubTab;
 };
 
-export default function UrlTableBrowser({ catalog, databaseName, tableName }: UrlTableBrowserProps) {
-    const [currentTab, setCurrentTab] = useState<SubTab>('overview');
+export default function UrlTableBrowser({ catalog, databaseName, tableName, initialTab = 'overview' }: UrlTableBrowserProps) {
+    const [currentTab, setCurrentTab] = useState<SubTab>(initialTab);
     const t = useTranslations('TableBrowser');
 
     useEffect(() => {
-        setCurrentTab('overview');
-    }, [catalog, databaseName, tableName]);
+        setCurrentTab(initialTab);
+    }, [catalog, databaseName, initialTab, tableName]);
 
     if (!databaseName || !tableName) {
         return (
             <Card className="m-6">
-                <CardContent className="text-sm text-muted-foreground">
-                    {t('Select table to browse schema')}
-                </CardContent>
+                <CardContent className="text-sm text-muted-foreground">{t('Select table to browse schema')}</CardContent>
             </Card>
         );
     }

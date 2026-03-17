@@ -12,13 +12,9 @@ type ObjectViewProps = {
 
 export function ObjectView({ catalog, resource }: ObjectViewProps) {
     if (resource.objectKind === 'table' || resource.objectKind === 'view' || resource.objectKind === 'materializedView') {
-        return (
-            <UrlTableBrowser
-                catalog={catalog}
-                databaseName={resource.database}
-                tableName={resource.name}
-            />
-        );
+        const tableName = resource.schema ? `${resource.schema}.${resource.name}` : resource.name;
+
+        return <UrlTableBrowser catalog={catalog} databaseName={resource.database} tableName={tableName} />;
     }
 
     return (
@@ -28,9 +24,7 @@ export function ObjectView({ catalog, resource }: ObjectViewProps) {
                     <CardTitle>{resource.name}</CardTitle>
                     <CardDescription>{formatObjectKindLabel(resource.objectKind)}</CardDescription>
                 </CardHeader>
-                <CardContent className="text-sm text-muted-foreground">
-                    This object kind does not have a dedicated explorer view yet.
-                </CardContent>
+                <CardContent className="text-sm text-muted-foreground">This object kind does not have a dedicated explorer view yet.</CardContent>
             </Card>
         </div>
     );

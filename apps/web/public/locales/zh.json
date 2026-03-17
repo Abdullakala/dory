@@ -449,6 +449,60 @@
             "Name": "名称"
         }
     },
+    "PostgresExplorer": {
+        "Tabs": {
+            "summary": "Summary",
+            "schemas": "Schemas",
+            "search": "Search",
+            "extensions": "Extensions",
+            "tables": "Tables",
+            "views": "Views",
+            "functions": "Functions",
+            "sequences": "Sequences",
+            "overview": "Overview",
+            "data": "Data",
+            "structure": "Structure",
+            "stats": "Stats",
+            "indexes": "Indexes"
+        },
+        "Schemas": {
+            "SearchPlaceholder": "搜索 Schema",
+            "Empty": "暂无 Schema",
+            "FilteredEmpty": "未找到匹配的 Schema"
+        },
+        "Search": {
+            "Placeholder": "搜索 Schema、表、视图、函数或序列",
+            "Empty": "未找到匹配对象"
+        },
+        "Extensions": {
+            "SearchPlaceholder": "搜索扩展",
+            "Empty": "暂无扩展",
+            "FilteredEmpty": "未找到匹配的扩展"
+        },
+        "Tables": {
+            "SearchPlaceholder": "搜索表",
+            "Empty": "暂无表",
+            "FilteredEmpty": "未找到匹配的表"
+        },
+        "Views": {
+            "SearchPlaceholder": "搜索视图",
+            "Empty": "暂无视图",
+            "FilteredEmpty": "未找到匹配的视图"
+        },
+        "Functions": {
+            "SearchPlaceholder": "搜索函数",
+            "Empty": "暂无函数",
+            "FilteredEmpty": "未找到匹配的函数"
+        },
+        "Sequences": {
+            "SearchPlaceholder": "搜索序列",
+            "Empty": "暂无序列",
+            "FilteredEmpty": "未找到匹配的序列"
+        },
+        "Indexes": {
+            "Empty": "暂无索引"
+        }
+    },
     "TableStats": {
         "No available connection": "未找到可用的数据源连接。",
         "Select table to view stats": "请选择一张表查看统计信息。",
@@ -1451,21 +1505,21 @@
         "Connection": {
             "Errors": {
                 "Unauthorized": "用户未登录或无权限",
-            "FetchCatalogFailed": "获取目录对象失败",
-            "NotFound": "数据源不存在或无权限",
-            "MissingHost": "数据源缺少主机信息",
-            "MissingConnectionId": "缺少数据源 ID",
-            "MissingUsername": "缺少用户名",
-            "MissingIdentity": "未找到可用身份",
-            "MissingIdentityInfo": "缺少身份信息",
-            "MissingPassword": "缺少身份密码",
-            "MissingSshPassword": "缺少 SSH 密码",
-            "MissingSshPrivateKey": "缺少 SSH 私钥",
-            "UnsupportedType": "暂不支持该类型的数据库",
-            "ConnectFailed": "连接失败",
-            "SchemaReadFailed": "读取 schema 失败",
-            "TestFailed": "连接测试失败"
-        },
+                "FetchCatalogFailed": "获取目录对象失败",
+                "NotFound": "数据源不存在或无权限",
+                "MissingHost": "数据源缺少主机信息",
+                "MissingConnectionId": "缺少数据源 ID",
+                "MissingUsername": "缺少用户名",
+                "MissingIdentity": "未找到可用身份",
+                "MissingIdentityInfo": "缺少身份信息",
+                "MissingPassword": "缺少身份密码",
+                "MissingSshPassword": "缺少 SSH 密码",
+                "MissingSshPrivateKey": "缺少 SSH 私钥",
+                "UnsupportedType": "暂不支持该类型的数据库",
+                "ConnectFailed": "连接失败",
+                "SchemaReadFailed": "读取 schema 失败",
+                "TestFailed": "连接测试失败"
+            },
             "Validation": {
                 "DatabaseRequired": "数据库名称不能为空",
                 "TableRequired": "数据表名不能为空"
@@ -1673,8 +1727,7 @@
                 "DatabaseRequired": "缺少数据库信息",
                 "UnsupportedType": "不支持的类型",
                 "FetchFailed": "获取权限对象失败"
-            }
-            ,
+            },
             "Clusters": {
                 "FetchFailed": "获取集群信息失败"
             }

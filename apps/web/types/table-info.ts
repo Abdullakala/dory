@@ -39,3 +39,12 @@ export type TableStats = {
     activeMutations: TableMutationInfo[];
     ttlExpression?: string | null;
 };
+
+export type TableIndexInfo = {
+    name: string;
+    method?: string | null;
+    isPrimary?: boolean | null;
+    isUnique?: boolean | null;
+    sizeBytes?: number | null;
+    definition?: string | null;
+};

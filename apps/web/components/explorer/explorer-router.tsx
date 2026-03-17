@@ -4,10 +4,8 @@ import { buildExplorerBreadcrumbs, getExplorerHeaderBadgeLabel } from '@/lib/exp
 import type { ExplorerBaseParams, ExplorerResolvedRoute } from '@/lib/explorer/types';
 import { ExplorerHeader } from './explorer-header';
 import { ObjectNotFound } from './object-not-found';
-import { NamespaceView } from './views/namespace-view';
-import { ObjectView } from './views/object-view';
 import { RootView } from './views/root-view';
-import { SchemaSummaryView } from './views/schema-summary-view';
+import { getExplorerViewRegistry } from './views/view-registry';
 
 type ExplorerRouterProps = {
     baseParams: ExplorerBaseParams;
@@ -21,6 +19,10 @@ export function ExplorerRouter({ baseParams, route }: ExplorerRouterProps) {
     };
     const breadcrumbs = buildExplorerBreadcrumbs(paramsWithCatalog, route.resource);
     const badgeLabel = getExplorerHeaderBadgeLabel(route.resource);
+    const views = getExplorerViewRegistry(route);
+    const NamespaceComponent = views.namespace;
+    const SchemaComponent = views.schema;
+    const ObjectComponent = views.object;
 
     return (
         <div className="flex h-full min-h-0 flex-col">
@@ -28,13 +30,21 @@ export function ExplorerRouter({ baseParams, route }: ExplorerRouterProps) {
             <div className="min-h-0 flex-1 overflow-auto">
                 {route.pageType === 'root' ? <RootView team={baseParams.team} connectionId={baseParams.connectionId} catalog={route.catalog} /> : null}
                 {route.pageType === 'namespace' && route.resource ? (
-                    <NamespaceView catalog={route.catalog} resource={route.resource as Extract<typeof route.resource, { kind: 'database' | 'list' }>} />
+                    <NamespaceComponent
+                        baseParams={paramsWithCatalog}
+                        catalog={route.catalog}
+                        resource={route.resource as Extract<typeof route.resource, { kind: 'database' | 'list' }>}
+                    />
                 ) : null}
                 {route.pageType === 'schemaSummary' && route.resource ? (
-                    <SchemaSummaryView baseParams={paramsWithCatalog} resource={route.resource as Extract<typeof route.resource, { kind: 'schema' | 'list' }>} />
+                    <SchemaComponent
+                        baseParams={paramsWithCatalog}
+                        catalog={route.catalog}
+                        resource={route.resource as Extract<typeof route.resource, { kind: 'schema' | 'list' }>}
+                    />
                 ) : null}
                 {route.pageType === 'object' && route.resource ? (
-                    <ObjectView catalog={route.catalog} resource={route.resource as Extract<typeof route.resource, { kind: 'object' }>} />
+                    <ObjectComponent catalog={route.catalog} resource={route.resource as Extract<typeof route.resource, { kind: 'object' }>} />
                 ) : null}
                 {route.pageType === 'notFound' ? <ObjectNotFound /> : null}
             </div>

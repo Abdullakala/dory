@@ -1,4 +1,5 @@
 import type {
+    DatabaseExtensionMeta,
     ConnectionMetadataAPI,
     ConnectionSchemaMap,
     DatabaseFunctionMeta,
@@ -17,6 +18,8 @@ export type PostgresMetadataAPI = ConnectionMetadataAPI & {
     getViews: (database: string) => Promise<DatabaseObjectRow[]>;
     getMaterializedViews: (database: string) => Promise<DatabaseObjectRow[]>;
     getFunctions: (database?: string) => Promise<DatabaseFunctionMeta[]>;
+    getSequences: (database?: string) => Promise<DatabaseObjectRow[]>;
+    getExtensions: (database?: string) => Promise<DatabaseExtensionMeta[]>;
     getDatabaseSummary: (options: DatabaseSummaryOptions) => Promise<DatabaseSummary>;
     getDatabaseTablesDetail: (database: string) => Promise<DatabaseObjectRow[]>;
 };
@@ -34,6 +37,14 @@ type ObjectRow = {
 type FunctionRow = {
     schemaName?: string;
     name?: string;
+};
+
+type ExtensionRow = {
+    name?: string;
+    schemaName?: string | null;
+    version?: string | null;
+    relocatable?: boolean | null;
+    comment?: string | null;
 };
 
 const SYSTEM_SCHEMA_FILTER = `
@@ -305,6 +316,55 @@ async function getFunctions(datasource: PostgresDatasource, database?: string) {
         .filter((row): row is DatabaseFunctionMeta => Boolean(row));
 }
 
+async function getSequences(datasource: PostgresDatasource, database?: string) {
+    const result = await datasource.queryWithContext<ObjectRow>(
+        `
+            SELECT
+                n.nspname AS "schemaName",
+                c.relname AS name,
+                c.relkind AS relkind,
+                obj_description(c.oid, 'pg_class') AS comment
+            FROM pg_class c
+            JOIN pg_namespace n
+              ON n.oid = c.relnamespace
+            WHERE ${SYSTEM_SCHEMA_FILTER}
+              AND c.relkind = 'S'
+            ORDER BY n.nspname, c.relname
+        `,
+        { database },
+    );
+
+    return result.rows.map(normalizeObjectRow).filter((row): row is DatabaseObjectRow => Boolean(row));
+}
+
+async function getExtensions(datasource: PostgresDatasource, database?: string): Promise<DatabaseExtensionMeta[]> {
+    const result = await datasource.queryWithContext<ExtensionRow>(
+        `
+            SELECT
+                ext.extname AS name,
+                ns.nspname AS "schemaName",
+                ext.extversion AS version,
+                ext.extrelocatable AS relocatable,
+                obj_description(ext.oid, 'pg_extension') AS comment
+            FROM pg_extension ext
+            LEFT JOIN pg_namespace ns
+              ON ns.oid = ext.extnamespace
+            ORDER BY ext.extname
+        `,
+        { database },
+    );
+
+    return result.rows
+        .filter(row => row.name)
+        .map(row => ({
+            name: row.name as string,
+            schema: row.schemaName ?? null,
+            version: row.version ?? null,
+            relocatable: row.relocatable ?? null,
+            comment: row.comment ?? null,
+        }));
+}
+
 async function getDatabaseSummary(datasource: PostgresDatasource, options: DatabaseSummaryOptions): Promise<DatabaseSummary> {
     const rows = await getDatabaseTablesDetail(datasource, options.database);
     const tables = rows.filter(row => isTableLike(row.engine));
@@ -375,6 +435,8 @@ export function createPostgresMetadataCapability(datasource: PostgresDatasource)
         getViews: database => getViews(datasource, database),
         getMaterializedViews: database => getMaterializedViews(datasource, database),
         getFunctions: database => getFunctions(datasource, database),
+        getSequences: database => getSequences(datasource, database),
+        getExtensions: database => getExtensions(datasource, database),
         getDatabaseSummary: options => getDatabaseSummary(datasource, options),
         getDatabaseTablesDetail: database => getDatabaseTablesDetail(datasource, database),
     };

@@ -1,5 +1,5 @@
 import { QueryInsightsFilters, QueryInsightsSummary, QueryTimelinePoint, QueryInsightsRow } from '@/types/monitoring';
-import { TablePropertiesRow, TableStats } from '@/types/table-info';
+import { TableIndexInfo, TablePropertiesRow, TableStats } from '@/types/table-info';
 
 export type ConnectionType = 'clickhouse' | 'postgres';
 
@@ -81,6 +81,14 @@ export type DatabaseFunctionMeta = {
     value: string;
 };
 
+export type DatabaseExtensionMeta = {
+    name: string;
+    schema?: string | null;
+    version?: string | null;
+    relocatable?: boolean | null;
+    comment?: string | null;
+};
+
 export type DatabaseSummaryTable = {
     name: string;
     bytes: number | null;
@@ -147,6 +155,7 @@ export type GetTableInfoAPI = {
     ddl: (database: string, table: string) => Promise<string | null>;
     stats: (database: string, table: string) => Promise<TableStats | null>;
     preview: (database: string, table: string, options?: TablePreviewOptions) => Promise<QueryResult<Record<string, unknown>>>;
+    indexes?: (database: string, table: string) => Promise<TableIndexInfo[]>;
 };
 
 export type ConnectionMetadataAPI = {
@@ -159,6 +168,8 @@ export type ConnectionMetadataAPI = {
     getViews?: (database: string) => Promise<DatabaseObjectRow[]>;
     getMaterializedViews?: (database: string) => Promise<DatabaseObjectRow[]>;
     getFunctions?: (database?: string) => Promise<DatabaseFunctionMeta[]>;
+    getSequences?: (database?: string) => Promise<DatabaseObjectRow[]>;
+    getExtensions?: (database?: string) => Promise<DatabaseExtensionMeta[]>;
     getDatabaseSummary?: (options: DatabaseSummaryOptions) => Promise<DatabaseSummary>;
     getDatabaseTablesDetail?: (database: string) => Promise<DatabaseObjectRow[]>;
 };

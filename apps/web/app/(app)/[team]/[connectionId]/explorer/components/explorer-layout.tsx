@@ -9,7 +9,7 @@ import { buildExplorerDatabasePath, buildExplorerListPath, buildExplorerObjectPa
 import { resolveExplorerRoute } from '@/lib/explorer/routing';
 import { activeDatabaseAtom, currentConnectionAtom } from '@/shared/stores/app.store';
 import { CatalogSchemaSidebar } from '../../../components/catalog-schema-sidebar/catalog-schema-sidebar';
-import { useDataExplorerLayout } from '../../catalog/hooks/use-layout';
+import { useDataExplorerLayout } from '../hooks/use-layout';
 
 function normalizeHorizontalLayout(layout: readonly number[] | undefined): [number, number] {
     if (!Array.isArray(layout) || layout.length === 0) return [25, 85];

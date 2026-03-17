@@ -36,9 +36,9 @@ export function AppSidebar({ initialUser = null, ...props }: AppSidebarProps) {
     const defaultDatabase = currentConnection && currentConnection.connection.id === connectionId ? currentConnection.connection.database : null;
     const schemaUrl =
         connectionId && defaultDatabase
-            ? `/${team}/${connectionId}/catalog/default/${encodeURIComponent(defaultDatabase)}`
+            ? buildExplorerDatabasePath({ team, connectionId }, defaultDatabase)
             : connectionId
-              ? `/${team}/${connectionId}/catalog/default`
+              ? buildExplorerBasePath({ team, connectionId })
               : `/${team}/connections`;
     const explorerUrl =
         connectionId && defaultDatabase

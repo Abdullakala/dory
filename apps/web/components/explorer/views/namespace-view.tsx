@@ -1,6 +1,6 @@
 'use client';
 
-import DatabaseTabs from '@/app/(app)/[team]/[connectionId]/explorer/catalog/[catalog]/database/[database]/components/database-tabs';
+import DatabaseTabs from '@/components/explorer/database/database-tabs';
 import type { ExplorerListKind, ExplorerResource } from '@/lib/explorer/types';
 
 type NamespaceViewProps = {

@@ -14,6 +14,7 @@ import type { ResponseObject } from '@/types';
 import { authFetch } from '@/lib/client/auth-fetch';
 import { isSuccess } from '@/lib/result';
 import { OverflowTooltip } from '@/components/overflow-tooltip';
+import { buildExplorerObjectPath } from '@/lib/explorer/build-path';
 import { currentConnectionAtom } from '@/shared/stores/app.store';
 import { cn } from '@/lib/utils';
 import { formatBytes, formatNumber } from '@/app/(app)/[team]/components/table-browser/components/stats/components/formatters';
@@ -140,12 +141,30 @@ export default function DatabaseSummary({ catalog, database, schema }: DatabaseS
 
     const tableHrefBase = useMemo(() => {
         if (!teamId || !connectionId || !catalogName || !databaseName) return null;
-        return `/${teamId}/${connectionId}/catalog/${catalogName}/${databaseName}`;
+        return {
+            team: teamId,
+            connectionId,
+            catalog: catalogName,
+            database: databaseName,
+        };
     }, [catalogName, connectionId, databaseName, teamId]);
 
     const renderQuickStartItem = useCallback(
         (item: DatabaseSummary['topTablesByBytes'][number] | DatabaseSummary['recentTables'][number], isRecent?: boolean) => {
-            const href = tableHrefBase ? `${tableHrefBase}/${encodeURIComponent(item.name)}` : null;
+            const href = tableHrefBase
+                ? buildExplorerObjectPath(
+                      {
+                          team: tableHrefBase.team,
+                          connectionId: tableHrefBase.connectionId,
+                          catalog: tableHrefBase.catalog,
+                      },
+                      {
+                          database: tableHrefBase.database,
+                          objectKind: 'table',
+                          name: item.name,
+                      },
+                  )
+                : null;
 
             if (isRecent) {
                 const recentItem = item as DatabaseSummary['recentTables'][number];

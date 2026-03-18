@@ -151,6 +151,24 @@ export class PostgresSavedQueriesRepository {
         return (row as SavedQueryRecord | undefined) ?? null;
     }
 
+    async listAll(params: { teamId: string; userId: string }): Promise<SavedQueryRecord[]> {
+        this.assertInited();
+
+        const rows = await this.db
+            .select()
+            .from(savedQueries)
+            .where(
+                and(
+                    eq(savedQueries.teamId, params.teamId),
+                    eq(savedQueries.userId, params.userId),
+                    isNull(savedQueries.archivedAt),
+                ),
+            )
+            .orderBy(asc(savedQueries.position), desc(savedQueries.updatedAt));
+
+        return rows as SavedQueryRecord[];
+    }
+
     async list(params: SavedQueryListParams): Promise<SavedQueryRecord[]> {
         this.assertInited();
 

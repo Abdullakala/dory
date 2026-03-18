@@ -1,5 +1,5 @@
 import type { ElementType } from 'react';
-import { Palette, Keyboard, Info, Code } from 'lucide-react';
+import { Palette, Keyboard, Info, Code, Database } from 'lucide-react';
 
 export type CategoryKey =
     | 'appearance'
@@ -33,6 +33,13 @@ export const CATEGORIES: Array<{
         title: 'Editor Settings',
         description: 'Customize the SQL editor appearance and behavior.',
         tag: 'SQL',
+    },
+    {
+        key: 'data',
+        label: 'Data',
+        icon: Database,
+        title: 'Data Management',
+        description: 'Export and import workspace data.',
     },
     // { key: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
     {

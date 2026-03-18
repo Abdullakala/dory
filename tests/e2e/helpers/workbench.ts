@@ -269,6 +269,18 @@ export async function mockWorkbenchApis(page: Page, options: MockWorkbenchOption
         await json(route, { code: 0, message: 'success', data: [] });
     });
 
+    await page.route('**/api/sql-console/saved-query-folders', async route => {
+        await json(route, { code: 0, message: 'success', data: [] });
+    });
+
+    await page.route('**/api/sql-console/saved-query-folders/reorder', async route => {
+        await json(route, { code: 0, message: 'success', data: { reordered: true } });
+    });
+
+    await page.route('**/api/sql-console/saved-queries/reorder', async route => {
+        await json(route, { code: 0, message: 'success', data: { reordered: true } });
+    });
+
     await page.route('**/api/ai/tab-title', async route => {
         await json(route, { title: 'SELECT 1' });
     });

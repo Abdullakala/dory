@@ -942,7 +942,21 @@
             "Saving": "Saving...",
             "OverrideTitle": "Replace current query?",
             "OverrideDescription": "This will replace the SQL in the current tab.",
-            "Override": "Replace"
+            "Override": "Replace",
+            "Folders": {
+                "CreateFolder": "New Folder",
+                "FolderName": "Folder name",
+                "FolderNamePlaceholder": "Enter folder name",
+                "CreateTitle": "Create Folder",
+                "RenameTitle": "Rename Folder",
+                "RenamePlaceholder": "Enter a new name",
+                "DeleteFolder": "Delete Folder",
+                "DeleteFolderConfirm": "Queries in this folder will be moved to root level. Continue?",
+                "MoveToFolder": "Move to Folder",
+                "MoveToRoot": "No Folder (Root)",
+                "Rename": "Rename",
+                "EmptyFolder": "No queries in this folder"
+            }
         },
         "SaveSql": {
             "Title": "Save Query",
@@ -1472,6 +1486,9 @@
             "SavedQueries": {
                 "NotFound": "Saved query not found or insufficient permissions",
                 "MissingId": "Missing saved query ID"
+            },
+            "SavedQueryFolders": {
+                "MissingId": "Missing folder ID"
             }
         },
         "Query": {
@@ -1941,6 +1958,9 @@
             "ConnectionIdentityUsernameRequired": "Username is required",
             "SaveQueryFailed": "Failed to save query",
             "SavedQueryNotFound": "Saved query not found or insufficient permissions",
+            "CreateFolderFailed": "Failed to create folder",
+            "FolderNotFound": "Folder not found or insufficient permissions",
+            "FolderLimitReached": "Maximum number of folders reached",
             "ChatSessionNotFound": "Session not found",
             "ChatSessionForbidden": "You do not have access to this session",
             "ChatSessionArchived": "Session is archived and cannot be modified",

@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, or } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, max, or } from 'drizzle-orm';
 
 import { savedQueries } from '@/lib/database/postgres/schemas';
 import { getClient } from '@/lib/database/postgres/client';
@@ -6,6 +6,12 @@ import { DatabaseError } from '@/lib/errors/DatabaseError';
 import { newEntityId } from '@/lib/id';
 import type { PostgresDBClient } from '@/types';
 import { translateDatabase } from '@/lib/database/i18n';
+
+// Position gap between items for ordering. Using 1000 allows ~10 consecutive
+// mid-point insertions before a rebalance is needed (1000→500→250→…→1).
+// With a max of 50 queries per scope this is more than sufficient.
+const POSITION_GAP = 1000;
+const MAX_QUERIES_PER_SCOPE = 50;
 
 export type SavedQueryRecord = typeof savedQueries.$inferSelect;
 
@@ -30,6 +36,8 @@ export type SavedQueryUpdateInput = {
     tags?: string[] | null;
     workId?: string | null;
     archivedAt?: string | Date | null;
+    folderId?: string | null;
+    position?: number | null;
 };
 
 export type SavedQueryListParams = {
@@ -74,6 +82,21 @@ export class PostgresSavedQueriesRepository {
         const now = new Date();
         const id = input.id ?? newEntityId();
 
+        // Get max position for root-level queries of this user
+        const [maxRow] = await this.db
+            .select({ maxPos: max(savedQueries.position) })
+            .from(savedQueries)
+            .where(
+                and(
+                    eq(savedQueries.teamId, input.teamId),
+                    eq(savedQueries.userId, input.userId),
+                    isNull(savedQueries.folderId),
+                    isNull(savedQueries.archivedAt),
+                ),
+            );
+
+        const position = (maxRow?.maxPos ?? 0) + POSITION_GAP;
+
         const [row] = await this.db
             .insert(savedQueries)
             .values({
@@ -87,6 +110,8 @@ export class PostgresSavedQueriesRepository {
                 tags: (input.tags ?? []) as any,
                 workId: input.workId ?? null,
                 connectionId: this.normalizeConnectionId(input.connectionId),
+                folderId: null,
+                position,
                 createdAt: now,
                 updatedAt: now,
                 archivedAt: null,
@@ -143,7 +168,7 @@ export class PostgresSavedQueriesRepository {
             .select()
             .from(savedQueries)
             .where(and(...conds))
-            .orderBy(desc(savedQueries.updatedAt), desc(savedQueries.createdAt));
+            .orderBy(asc(savedQueries.position), desc(savedQueries.updatedAt));
 
         if (params.limit && params.limit > 0) {
             query = (query as any).limit(params.limit);
@@ -180,6 +205,8 @@ export class PostgresSavedQueriesRepository {
         if (data.archivedAt !== undefined) {
             assign('archivedAt', data.archivedAt ? new Date(data.archivedAt) : null);
         }
+        if (data.folderId !== undefined) assign('folderId', data.folderId);
+        if (data.position !== undefined) assign('position', data.position ?? 0);
 
         if (hasChanges) {
             await this.db
@@ -226,5 +253,27 @@ export class PostgresSavedQueriesRepository {
                     this.buildConnectionScopeCondition(params.connectionId),
                 ),
             );
+    }
+
+    async reorder(params: {
+        teamId: string;
+        userId: string;
+        folderId: string | null;
+        orderedIds: string[];
+    }): Promise<void> {
+        this.assertInited();
+
+        for (let i = 0; i < params.orderedIds.length; i++) {
+            await this.db
+                .update(savedQueries)
+                .set({ position: (i + 1) * POSITION_GAP, updatedAt: new Date() } as any)
+                .where(
+                    and(
+                        eq(savedQueries.id, params.orderedIds[i]),
+                        eq(savedQueries.teamId, params.teamId),
+                        eq(savedQueries.userId, params.userId),
+                    ),
+                );
+        }
     }
 }

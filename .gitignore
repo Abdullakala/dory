@@ -55,6 +55,7 @@ apps/admin/.next/
 .env.local
 
 playwright-report
+playwright/.auth
 test-results
 .tmp/
 apps/web/.tmp/

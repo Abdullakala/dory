@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, jsonb, timestamp, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, jsonb, timestamp, integer, index } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { newEntityId } from '@/lib/id';
 
@@ -26,6 +26,9 @@ export const savedQueries = pgTable(
             .notNull()
             .default(sql`'{}'::text[]`),
 
+        folderId: text('folder_id'),
+        position: integer('position').notNull().default(0),
+
         workId: uuid('work_id'),
 
         createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -36,6 +39,7 @@ export const savedQueries = pgTable(
     (t) => ([
         index('idx_saved_queries_team_user').on(t.teamId, t.userId),
         index('idx_saved_queries_updated_at').on(t.updatedAt),
+        index('idx_saved_queries_folder_id').on(t.folderId),
     ]),
 );
 

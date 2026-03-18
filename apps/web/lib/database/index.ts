@@ -6,6 +6,7 @@ import { PostgresTeamsRepository } from './postgres/impl/team';
 import { PostgresConnectionsRepository } from './postgres/impl/connections';
 import { PostgresAiSchemaCacheRepository } from './postgres/impl/ai-schema-cache';
 import { PostgresSavedQueriesRepository } from './postgres/impl/sql-console/save-queries';
+import { PostgresSavedQueryFoldersRepository } from './postgres/impl/sql-console/saved-query-folders';
 import { PostgresAiUsageRepository } from './postgres/impl/ai-usage';
 import { PostgresSyncOperationsRepository } from './postgres/impl/sync-operations';
 import { translateDatabase } from './i18n';
@@ -23,6 +24,7 @@ export type PostgresDBService = {
     connections: PostgresConnectionsRepository;
     aiSchemaCache: PostgresAiSchemaCacheRepository;
     savedQueries: PostgresSavedQueriesRepository;
+    savedQueryFolders: PostgresSavedQueryFoldersRepository;
     aiUsage: AiUsageRepository;
     syncOperations: PostgresSyncOperationsRepository;
 };
@@ -64,6 +66,9 @@ export async function getDBService(): Promise<DBService> {
             const savedQueriesRepo = new PostgresSavedQueriesRepository();
             await savedQueriesRepo.init();
 
+            const savedQueryFoldersRepo = new PostgresSavedQueryFoldersRepository();
+            await savedQueryFoldersRepo.init();
+
             const aiUsageRepo = new PostgresAiUsageRepository();
             await aiUsageRepo.init();
 
@@ -78,6 +83,7 @@ export async function getDBService(): Promise<DBService> {
                 connections: connectionsRepo,
                 aiSchemaCache: aiSchemaCacheRepo,
                 savedQueries: savedQueriesRepo,
+                savedQueryFolders: savedQueryFoldersRepo,
                 aiUsage: aiUsageRepo,
                 syncOperations: syncOperationsRepo,
             };

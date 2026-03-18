@@ -7,6 +7,7 @@ import * as teamMemberSchema from './teams/team-members';
 import * as connectionsSchema from './connections';
 import * as aiSchemaCache from './ai-schema-cache';
 import * as savedQueriesSchema from './saved-queries';
+import * as savedQueryFoldersSchema from './saved-query-folders';
 import * as aiUsageSchema from './ai-usage';
 import * as syncOperationsSchema from './sync-operations';
 
@@ -20,6 +21,7 @@ export * from './teams/teams';
 export * from './connections';
 export * from './ai-schema-cache';
 export * from './saved-queries';
+export * from './saved-query-folders';
 export * from './ai-usage';
 export * from './sync-operations';
 
@@ -33,6 +35,7 @@ export const schema = {
     ...connectionsSchema,
     ...aiSchemaCache,
     ...savedQueriesSchema,
+    ...savedQueryFoldersSchema,
     ...aiUsageSchema,
     ...syncOperationsSchema,
 };

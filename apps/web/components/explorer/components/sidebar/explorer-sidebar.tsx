@@ -15,11 +15,11 @@ import { getSidebarConfig } from '@/app/(app)/[team]/components/sql-console-side
 import { authFetch } from '@/lib/client/auth-fetch';
 import { isSuccess } from '@/lib/result';
 import { activeDatabaseAtom, currentConnectionAtom } from '@/shared/stores/app.store';
-import { CatalogSchemaTree } from './catalog-schema-sidebar-tree';
+import { ExplorerSidebarTree } from './explorer-sidebar-tree';
 import { DEFAULT_GROUP_STATE, EMPTY_DATABASE_OBJECTS } from './types';
 import type { DatabaseObjects, GroupState, SchemaNode, SidebarListKind, SidebarListTarget, SidebarObjectTarget, SidebarSelection, TargetOption } from './types';
 
-type CatalogSchemaSidebarProps = {
+type ExplorerSidebarProps = {
     catalogName?: string;
     onSelectDatabase?: (database: string) => void;
     onSelectSchema?: (target: { database: string; schema: string }) => void;
@@ -83,7 +83,7 @@ function resolveSchemaName(entry: TargetOption, defaultSchemaName?: string | nul
     return schemaName || defaultSchemaName || null;
 }
 
-export function CatalogSchemaSidebar({
+export function ExplorerSidebar({
     catalogName = 'default',
     onSelectDatabase,
     onSelectSchema,
@@ -94,7 +94,7 @@ export function CatalogSchemaSidebar({
     selectedSchema,
     selectedList,
     selectedObject,
-}: CatalogSchemaSidebarProps) {
+}: ExplorerSidebarProps) {
     const [localFilter, setFilter] = useState('');
     const deferredFilter = useDeferredValue(localFilter);
     const [, setActiveDatabase] = useAtom(activeDatabaseAtom);
@@ -431,7 +431,7 @@ export function CatalogSchemaSidebar({
 
             <ScrollArea className="mt-1 min-h-0 flex-1 w-[calc(100%+0.75rem)] -mr-3 space-y-2">
                 <div className="pr-3">
-                    <CatalogSchemaTree
+                    <ExplorerSidebarTree
                         catalogName={catalogName}
                         showCatalog={showCatalog}
                         expandedCatalog={expandedCatalog}

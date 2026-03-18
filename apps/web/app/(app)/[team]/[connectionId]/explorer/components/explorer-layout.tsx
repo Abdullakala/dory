@@ -8,7 +8,7 @@ import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { buildExplorerDatabasePath, buildExplorerListPath, buildExplorerObjectPath, buildExplorerSchemaPath } from '@/lib/explorer/build-path';
 import { resolveExplorerRoute } from '@/lib/explorer/routing';
 import { activeDatabaseAtom, currentConnectionAtom } from '@/shared/stores/app.store';
-import { CatalogSchemaSidebar } from '../../../components/catalog-schema-sidebar/catalog-schema-sidebar';
+import { ExplorerSidebar } from '@/components/explorer/components/sidebar/explorer-sidebar';
 import { useDataExplorerLayout } from '../hooks/use-layout';
 
 function normalizeHorizontalLayout(layout: readonly number[] | undefined): [number, number] {
@@ -142,7 +142,7 @@ export function ExplorerLayout({ defaultLayout = [25, 85], children }: ExplorerL
             <PanelGroup direction="horizontal" autoSaveId="sql-console-horizontal" onLayout={onLayout}>
                 <Panel defaultSize={horizontalLayout[0]} minSize={15} maxSize={40}>
                     <div className="flex h-full min-h-0 flex-col bg-card">
-                        <CatalogSchemaSidebar
+                        <ExplorerSidebar
                             catalogName={catalog}
                             onSelectDatabase={handleSelectDatabase}
                             onSelectSchema={handleSelectSchema}

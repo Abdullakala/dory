@@ -4,13 +4,14 @@ import { Boxes, ChevronDown, ChevronRight, Database, Eye, FolderTree, Layers, Lo
 import { useTranslations } from 'next-intl';
 
 import { cn } from '@/lib/utils';
-import { ObjectGroup } from './catalog-object-group';
-import type { GroupConfig } from './catalog-object-group';
+
+import { ObjectGroup } from './object-group';
+import type { GroupConfig } from './object-group';
 import { SchemaNodeRow } from './schema-node-row';
 import { DEFAULT_GROUP_STATE, EMPTY_DATABASE_OBJECTS } from './types';
 import type { DatabaseObjects, GroupState, SchemaNode, SidebarListKind, SidebarListTarget, SidebarObjectTarget, SidebarSelection, TargetOption } from './types';
 
-type CatalogSchemaTreeProps = {
+type ExplorerSidebarTreeProps = {
     catalogName: string;
     showCatalog: boolean;
     expandedCatalog: boolean;
@@ -51,7 +52,7 @@ function isAnyGroupLoading(groupState?: GroupState) {
     return Object.values(groupState).some(Boolean);
 }
 
-export function CatalogSchemaTree({
+export function ExplorerSidebarTree({
     catalogName,
     showCatalog,
     expandedCatalog,
@@ -81,7 +82,7 @@ export function CatalogSchemaTree({
     onOpenObject,
     filterEntries,
     getSchemaObjects,
-}: CatalogSchemaTreeProps) {
+}: ExplorerSidebarTreeProps) {
     const t = useTranslations('CatalogSchemaSidebar');
     const groupConfigs: GroupConfig[] = [
         { key: 'tables', label: t('Tables'), icon: Table, emptyLabel: t('No tables') },
@@ -226,6 +227,7 @@ function DatabaseNode({
 }: DatabaseNodeProps) {
     const t = useTranslations('CatalogSchemaSidebar');
     const isDatabaseLoading = supportsSchemas ? Boolean(loadingSchemas[dbName]) : isAnyGroupLoading(loadingGroups[dbName]);
+    const isDbOnlySelected = selectedDatabase === dbName && !selectedSchema && !selectedObject;
     const visibleSchemas = schemaNodes.filter(schema => {
         if (!normalized) return true;
         if (schema.label.toLowerCase().includes(normalized) || schema.name.toLowerCase().includes(normalized)) {
@@ -238,11 +240,11 @@ function DatabaseNode({
 
     return (
         <div className="space-y-1">
-            <div className="flex items-center gap-2 px-2 py-1">
+            <div className="flex items-center gap-1 px-2 py-0.5">
                 <button
                     type="button"
                     onClick={() => onToggleDatabase(dbName)}
-                    className="rounded p-0.5 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    className="shrink-0 cursor-pointer rounded p-0.5 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     aria-label={`${isExpanded ? t('Collapse') : t('Expand')} ${dbName}`}
                 >
                     {isExpanded && isDatabaseLoading ? (
@@ -253,19 +255,19 @@ function DatabaseNode({
                         <ChevronRight className="h-3.5 w-3.5" />
                     )}
                 </button>
-                <Database className="h-3.5 w-3.5 text-sidebar-foreground/70" />
                 <button
                     type="button"
                     onClick={() => onSelectDatabase(dbName)}
                     className={cn(
-                        'flex-1 truncate rounded px-1 py-0.5 text-left text-sm',
-                        selectedDatabase === dbName
+                        'flex flex-1 cursor-pointer items-center gap-1.5 truncate rounded px-2 py-0.5 text-left text-sm',
+                        isDbOnlySelected
                             ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                             : 'text-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
                     )}
                     title={dbName}
                 >
-                    {label}
+                    <Database className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{label}</span>
                 </button>
             </div>
 

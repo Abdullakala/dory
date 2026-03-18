@@ -5,7 +5,7 @@ import type { LucideIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 import { cn } from '@/lib/utils';
-import type { GroupState, SidebarListKind, SidebarListTarget, SidebarObjectKind, SidebarObjectTarget, SidebarSelection, TargetOption } from './types';
+import type { GroupState, SidebarListTarget, SidebarObjectKind, SidebarObjectTarget, SidebarSelection, SidebarListKind, TargetOption } from './types';
 
 export type GroupConfig = {
     key: keyof GroupState;
@@ -59,7 +59,6 @@ export function ObjectGroup({
     onOpenObject,
 }: ObjectGroupProps) {
     const t = useTranslations('CatalogSchemaSidebar');
-    const isSelectedList = selectedDatabase === dbName && selectedSchema === listTarget.schema && selectedList === listTarget.listKind;
 
     return (
         <div className="space-y-1">
@@ -67,23 +66,14 @@ export function ObjectGroup({
                 <button
                     type="button"
                     onClick={onToggle}
-                    className="rounded p-0.5 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    className="cursor-pointer rounded p-0.5 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     aria-label={`${isExpanded ? t('Collapse') : t('Expand')} ${group.label}`}
                 >
                     {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                 </button>
-                <button
-                    type="button"
-                    onClick={() => onSelectList(listTarget)}
-                    className={cn(
-                        'flex-1 truncate rounded px-1 py-0.5 text-left text-xs',
-                        isSelectedList
-                            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-                    )}
-                >
+                <span className="flex-1 truncate px-1 py-0.5 text-xs text-sidebar-foreground/70 select-none">
                     {`${group.label} (${entries.length})`}
-                </button>
+                </span>
             </div>
 
             {isExpanded ? (
@@ -152,7 +142,10 @@ function ObjectItem({
             type="button"
             className={cn(
                 'flex w-full items-center gap-2 truncate rounded px-2 py-1 text-left text-sm',
-                isSelected ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                isSelected
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                    : 'text-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                'cursor-pointer',
             )}
             onClick={() =>
                 onSelectObject({

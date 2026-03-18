@@ -105,6 +105,7 @@ export class PostgresConnectionsRepository {
                 environment: row.environment,
                 tags: row.tags,
                 lastUsedAt: row.lastUsedAt,
+                database: row.database,
             });
         }
 

@@ -29,6 +29,8 @@ const updateSchema = z
         tags: z.array(z.string()).optional().nullable(),
         workId: z.string().optional().nullable(),
         archivedAt: z.union([z.string(), z.date()]).optional().nullable(),
+        folderId: z.string().optional().nullable(),
+        position: z.number().int().optional().nullable(),
     })
     .refine(
         (data) =>
@@ -38,7 +40,9 @@ const updateSchema = z
             data.context !== undefined ||
             data.tags !== undefined ||
             data.workId !== undefined ||
-            data.archivedAt !== undefined,
+            data.archivedAt !== undefined ||
+            data.folderId !== undefined ||
+            data.position !== undefined,
     );
 
 const normalizeConnectionId = (value?: string | null) => {

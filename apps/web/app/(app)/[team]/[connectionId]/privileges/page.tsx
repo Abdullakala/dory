@@ -47,8 +47,12 @@ const DEFAULT_TAB = 'users';
 
 export default function PrivilegesPage() {
     const t = useTranslations('Privileges');
-    const { connectionId, routeConnectionId, isConnectionReady } = usePrivilegesConnectionReady();
+    const { connectionId, isClickhouseConnection, isConnectionReady } = usePrivilegesConnectionReady();
     const queryClient = useQueryClient();
+
+    if (isConnectionReady && !isClickhouseConnection) {
+        return null;
+    }
 
     const usersQueryKey = useMemo(() => ['privileges', 'users', connectionId], [connectionId]);
     const rolesQueryKey = useMemo(() => ['privileges', 'roles', connectionId], [connectionId]);

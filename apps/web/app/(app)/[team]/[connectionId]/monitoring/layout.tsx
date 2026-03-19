@@ -1,5 +1,6 @@
 'use client';
 
+import { useAtomValue } from 'jotai';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Tabs, TabsList, TabsTrigger } from '@/registry/new-york-v4/ui/tabs';
 import { ReactNode, useMemo, useEffect } from 'react';
@@ -7,6 +8,7 @@ import { QueryInsightsFilterBar } from './components/filter-bar';
 import { useQueryClient } from '@tanstack/react-query';
 import { useQueryInsightsFiltersValue } from './state'; 
 import { useTranslations } from 'next-intl';
+import { currentConnectionAtom } from '@/shared/stores/app.store';
 
 interface QueryInsightsLayoutProps {
     children: ReactNode;
@@ -19,8 +21,11 @@ export default function QueryInsightsLayout({ children }: QueryInsightsLayoutPro
     const queryClient = useQueryClient();
     const t = useTranslations('Monitoring');
     const params = useParams();
+    const currentConnection = useAtomValue(currentConnectionAtom);
     console.log('QueryInsightsLayout params:', params);
     const { team, connectionId } = params as { team: string; connectionId: string };
+    const isCurrentRouteConnection = currentConnection?.connection.id === connectionId;
+    const isClickhouseConnection = isCurrentRouteConnection && currentConnection?.connection.type === 'clickhouse';
 
     
     const currentTab = useMemo<'overview' | 'logs' | 'slow-queries' | 'error-queries'>(() => {
@@ -60,11 +65,22 @@ export default function QueryInsightsLayout({ children }: QueryInsightsLayoutPro
         
     ]);
 
+    useEffect(() => {
+        if (!team || !connectionId || !isCurrentRouteConnection) return;
+        if (isClickhouseConnection) return;
+
+        router.replace(`/${team}/${connectionId}/sql-console`);
+    }, [connectionId, isClickhouseConnection, isCurrentRouteConnection, router, team]);
+
     
     const handleRefresh = () => {
         console.log('Manually refreshing Monitoring data...');
         queryClient.invalidateQueries({ queryKey: ['monitoring'] });
     };
+
+    if (isCurrentRouteConnection && !isClickhouseConnection) {
+        return null;
+    }
 
     return (
         <div className="p-6">

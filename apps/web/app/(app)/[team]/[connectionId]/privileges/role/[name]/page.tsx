@@ -59,7 +59,12 @@ export default function RolePrivilegesPage() {
     const params = useParams();
     const encodedName = getParamValue(params?.name);
     const roleName = decodeURIComponent(encodedName ?? '');
-    const { connectionId, routeConnectionId, isConnectionReady } = usePrivilegesConnectionReady();
+    const { connectionId, isClickhouseConnection, isConnectionReady } = usePrivilegesConnectionReady();
+
+    if (isConnectionReady && !isClickhouseConnection) {
+        return null;
+    }
+
     const queryClient = useQueryClient();
 
     const roleQueryKey = ['privileges', 'role', connectionId, roleName] as const;

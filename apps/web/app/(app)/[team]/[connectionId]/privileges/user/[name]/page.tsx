@@ -60,7 +60,11 @@ export default function UserPrivilegesPage() {
     const params = useParams();
     const encodedName = getParamValue(params?.name);
     const userName = decodeURIComponent(encodedName ?? '');
-    const { connectionId, routeConnectionId, isConnectionReady } = usePrivilegesConnectionReady();
+    const { connectionId, isClickhouseConnection, isConnectionReady } = usePrivilegesConnectionReady();
+
+    if (isConnectionReady && !isClickhouseConnection) {
+        return null;
+    }
 
     const queryClient = useQueryClient();
 

@@ -39,7 +39,7 @@ export function SchemaResourceView({ baseParams, catalog, resource }: SchemaView
         {
             value: 'summary',
             label: t('Tabs.summary'),
-            content: <DatabaseSummary catalog={catalog} database={resource.database} schema={schemaName} />,
+            content: <DatabaseSummary baseParams={baseParams} catalog={catalog} database={resource.database} schema={schemaName} />,
         },
         {
             value: 'tables',
@@ -104,12 +104,5 @@ export function SchemaResourceView({ baseParams, catalog, resource }: SchemaView
         },
     ];
 
-    return (
-        <ExplorerTabsShell
-            initialTab={initialTab}
-            tabs={tabs}
-            resetKey={`${resource.database}:${schemaName}:${resource.kind === 'list' ? resource.listKind : 'summary'}`}
-        />
-    );
+    return <ExplorerTabsShell initialTab={initialTab} tabs={tabs} resetKey={`${resource.database}:${schemaName}:${resource.kind === 'list' ? resource.listKind : 'summary'}`} />;
 }
-

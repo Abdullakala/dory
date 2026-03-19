@@ -1,14 +1,13 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import DatabaseSummary from '@/components/explorer/resources/database/components/database-summary';
 import type { ExplorerBaseParams, ExplorerListKind, ExplorerResource } from '@/lib/explorer/types';
 import { ExtensionsTab } from '../tabs/extensions-tab';
 import { SchemasTab } from '../tabs/schemas-tab';
 import { SearchResourceTab } from '@/components/explorer/resources/search/tabs/search-tab';
 import { ExplorerTabsShell, type ExplorerTab } from '@/components/explorer/resources/shared/components/explorer-tabs-shell';
 
-type DatabaseTab = 'summary' | 'schemas' | 'search' | 'extensions';
+type DatabaseTab = 'schemas' | 'search' | 'extensions';
 
 type DatabaseViewProps = {
     baseParams: ExplorerBaseParams;
@@ -17,7 +16,7 @@ type DatabaseViewProps = {
 };
 
 function resolveInitialTab(resource: Extract<ExplorerResource, { kind: 'database' | 'list' }>): DatabaseTab {
-    if (resource.kind !== 'list') return 'summary';
+    if (resource.kind !== 'list') return 'schemas';
 
     const map: Partial<Record<ExplorerListKind, DatabaseTab>> = {
         schemas: 'schemas',
@@ -28,18 +27,13 @@ function resolveInitialTab(resource: Extract<ExplorerResource, { kind: 'database
         sequences: 'search',
     };
 
-    return map[resource.listKind] ?? 'summary';
+    return map[resource.listKind] ?? 'schemas';
 }
 
-export function DatabaseResourceView({ baseParams, catalog, resource }: DatabaseViewProps) {
+export function DatabaseResourceView({ baseParams, resource }: DatabaseViewProps) {
     const t = useTranslations('PostgresExplorer');
     const initialTab = resolveInitialTab(resource);
     const tabs: ExplorerTab<DatabaseTab>[] = [
-        {
-            value: 'summary',
-            label: t('Tabs.summary'),
-            content: <DatabaseSummary catalog={catalog} database={resource.database} />,
-        },
         {
             value: 'schemas',
             label: t('Tabs.schemas'),
@@ -83,7 +77,7 @@ export function DatabaseResourceView({ baseParams, catalog, resource }: Database
         <ExplorerTabsShell
             initialTab={initialTab}
             tabs={tabs}
-            resetKey={`${resource.database}:${resource.kind === 'list' ? resource.listKind : 'summary'}`}
+            resetKey={`${resource.database}:${resource.kind === 'list' ? resource.listKind : 'schemas'}`}
         />
     );
 }

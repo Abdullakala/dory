@@ -115,6 +115,7 @@ export function ExplorerSidebar({
     const [expandedGroups, setExpandedGroups] = useState<Record<string, GroupState>>({});
     const [expandedSchemas, setExpandedSchemas] = useState<Record<string, boolean>>({});
     const skipAutoExpandRef = useRef(false);
+    const lastAutoExpandedTargetRef = useRef<string | null>(null);
 
     const databaseEntries = useMemo(() => {
         return (databases ?? [])
@@ -335,13 +336,41 @@ export function ExplorerSidebar({
     }, [selectedDatabase]);
 
     useEffect(() => {
-        if (!supportsSchemas || !selectedDatabase || !selectedObject?.name) return;
+        if (!selectedDatabase) return;
 
-        const selectedValue = selectedObject.schema ? `${selectedObject.schema}.${selectedObject.name}` : selectedObject.name;
-        const entrySchema = resolveSchemaName({ value: selectedValue, schema: selectedObject.schema }, defaultSchemaName);
-        if (!entrySchema) return;
+        if (!supportsSchemas) {
+            const targetKey = selectedObject?.name ? `${selectedDatabase}::${selectedObject.objectKind}::${selectedObject.name}` : selectedDatabase;
+            if (lastAutoExpandedTargetRef.current === targetKey) return;
+            lastAutoExpandedTargetRef.current = targetKey;
 
-        const scopeKey = buildScopeKey(selectedDatabase, entrySchema);
+            setExpandedGroups(prev => {
+                const current = prev[selectedDatabase] ?? DEFAULT_GROUP_STATE;
+                if (current.tables) return prev;
+                return {
+                    ...prev,
+                    [selectedDatabase]: {
+                        ...current,
+                        tables: true,
+                    },
+                };
+            });
+            return;
+        }
+
+        const selectedDatabaseSchemas = databaseSchemas[selectedDatabase] ?? [];
+        const schemaToExpand =
+            selectedSchema ?? selectedObject?.schema ?? selectedDatabaseSchemas.find(schema => schema.name === defaultSchemaName)?.name ?? selectedDatabaseSchemas[0]?.name;
+
+        if (!schemaToExpand) return;
+
+        const scopeKey = buildScopeKey(selectedDatabase, schemaToExpand);
+        const targetKey = [selectedDatabase, schemaToExpand, selectedList ?? '', selectedObject?.objectKind ?? '', selectedObject?.schema ?? '', selectedObject?.name ?? ''].join(
+            '::',
+        );
+
+        if (lastAutoExpandedTargetRef.current === targetKey) return;
+        lastAutoExpandedTargetRef.current = targetKey;
+
         setExpandedSchemas(prev => {
             if (prev[scopeKey]) return prev;
             return {
@@ -349,7 +378,29 @@ export function ExplorerSidebar({
                 [scopeKey]: true,
             };
         });
-    }, [defaultSchemaName, selectedDatabase, selectedObject, supportsSchemas]);
+
+        setExpandedGroups(prev => {
+            const current = prev[scopeKey] ?? DEFAULT_GROUP_STATE;
+            if (current.tables) return prev;
+            return {
+                ...prev,
+                [scopeKey]: {
+                    ...current,
+                    tables: true,
+                },
+            };
+        });
+    }, [
+        databaseSchemas,
+        defaultSchemaName,
+        selectedDatabase,
+        selectedList,
+        selectedObject?.name,
+        selectedObject?.objectKind,
+        selectedObject?.schema,
+        selectedSchema,
+        supportsSchemas,
+    ]);
 
     const toggleDatabase = useCallback((database: string) => {
         setExpandedDatabases(prev => {
@@ -457,6 +508,20 @@ export function ExplorerSidebar({
                         onSelectDatabase={dbName => {
                             skipAutoExpandRef.current = true;
                             setActiveDatabase(dbName);
+
+                            if (supportsSchemas) {
+                                const schemas = databaseSchemas[dbName] ?? [];
+                                const schemaTarget = schemas.find(schema => schema.name === defaultSchemaName)?.name ?? schemas[0]?.name;
+
+                                if (schemaTarget) {
+                                    onSelectSchema?.({
+                                        database: dbName,
+                                        schema: schemaTarget,
+                                    });
+                                    return;
+                                }
+                            }
+
                             onSelectDatabase?.(dbName);
                         }}
                         onSelectSchema={target => {

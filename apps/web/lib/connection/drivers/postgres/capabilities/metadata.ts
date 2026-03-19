@@ -5,6 +5,7 @@ import type {
     DatabaseFunctionMeta,
     DatabaseObjectRow,
     DatabaseSummary,
+    DatabaseSummaryRecommendation,
     DatabaseSummaryOptions,
     TableColumnInfo,
 } from '@/lib/connection/base/types';
@@ -45,6 +46,23 @@ type ExtensionRow = {
     version?: string | null;
     relocatable?: boolean | null;
     comment?: string | null;
+};
+
+type TableColumnCountRow = {
+    schemaName?: string;
+    name?: string;
+    columnCount?: number | string | null;
+};
+
+type RelationshipRow = {
+    sourceSchemaName?: string;
+    sourceTableName?: string;
+    targetSchemaName?: string;
+    targetTableName?: string;
+};
+
+type OwnerRow = {
+    owner?: string | null;
 };
 
 const SYSTEM_SCHEMA_FILTER = `
@@ -100,6 +118,199 @@ function parseTableName(table: string): { schema: string | null; name: string } 
         schema,
         name: rest.join('.'),
     };
+}
+
+function buildSchemaClause(alias: string) {
+    return `AND ($1::text IS NULL OR ${alias} = $1)`;
+}
+
+function summarizeReason(input: { hasRelationships: boolean; isLargestByRows: boolean; isLargestByBytes: boolean; isRecent: boolean }) {
+    if (input.hasRelationships && input.isLargestByRows) return 'centralAndHighRowVolume' as const;
+    if (input.hasRelationships && input.isLargestByBytes) return 'centralAndHighStorage' as const;
+    if (input.hasRelationships) return 'centralInRelationships' as const;
+    if (input.isLargestByRows) return 'highRowVolume' as const;
+    if (input.isLargestByBytes) return 'largeStorageFootprint' as const;
+    if (input.isRecent) return 'recentlyUpdated' as const;
+    return 'goodStartingPoint' as const;
+}
+
+function detectNamingPatterns(tables: DatabaseObjectRow[]) {
+    const domainCounts = new Map<string, number>();
+    const partitionCounts = new Map<string, number>();
+
+    for (const table of tables) {
+        const baseName = table.name.includes('.') ? table.name.split('.').slice(1).join('.') : table.name;
+        const domainPrefix = baseName.split('_')[0]?.trim();
+        if (domainPrefix && domainPrefix.length > 1 && baseName.includes('_')) {
+            domainCounts.set(domainPrefix, (domainCounts.get(domainPrefix) ?? 0) + 1);
+        }
+
+        const partitionMatch = baseName.match(/^(.+)_p\d{4}.*$/i);
+        if (partitionMatch?.[1]) {
+            partitionCounts.set(partitionMatch[1], (partitionCounts.get(partitionMatch[1]) ?? 0) + 1);
+        }
+    }
+
+    const patterns = [
+        ...Array.from(partitionCounts.entries())
+            .filter(([, count]) => count >= 2)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 2)
+            .map(([prefix]) => ({
+                kind: 'partition' as const,
+                label: `${prefix}_p*`,
+            })),
+        ...Array.from(domainCounts.entries())
+            .filter(([, count]) => count >= 2)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3)
+            .map(([prefix]) => ({
+                kind: 'domain' as const,
+                label: `${prefix}_*`,
+            })),
+    ];
+
+    return patterns.slice(0, 4);
+}
+
+function buildRelationshipPaths(rows: RelationshipRow[]) {
+    const edges = rows
+        .map(row => {
+            const source = qualifyName(row.sourceSchemaName, row.sourceTableName);
+            const target = qualifyName(row.targetSchemaName, row.targetTableName);
+            if (!source || !target) return null;
+            return { source, target };
+        })
+        .filter((row): row is NonNullable<typeof row> => Boolean(row));
+
+    const incoming = new Map<string, Set<string>>();
+    const outgoing = new Map<string, Set<string>>();
+    const degree = new Map<string, number>();
+
+    for (const edge of edges) {
+        if (!incoming.has(edge.target)) incoming.set(edge.target, new Set());
+        if (!outgoing.has(edge.source)) outgoing.set(edge.source, new Set());
+        incoming.get(edge.target)?.add(edge.source);
+        outgoing.get(edge.source)?.add(edge.target);
+        degree.set(edge.source, (degree.get(edge.source) ?? 0) + 1);
+        degree.set(edge.target, (degree.get(edge.target) ?? 0) + 1);
+    }
+
+    const candidates = new Map<string, number>();
+
+    for (const [middle, sources] of incoming.entries()) {
+        const targets = outgoing.get(middle);
+        if (!targets?.size) continue;
+        for (const source of sources) {
+            for (const target of targets) {
+                if (source === target) continue;
+                const path = `${source} -> ${middle} -> ${target}`;
+                const score = (degree.get(source) ?? 0) + (degree.get(middle) ?? 0) + (degree.get(target) ?? 0);
+                candidates.set(path, Math.max(candidates.get(path) ?? 0, score));
+            }
+        }
+    }
+
+    for (const edge of edges) {
+        const path = `${edge.source} -> ${edge.target}`;
+        const score = (degree.get(edge.source) ?? 0) + (degree.get(edge.target) ?? 0);
+        candidates.set(path, Math.max(candidates.get(path) ?? 0, score));
+    }
+
+    return Array.from(candidates.entries())
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .slice(0, 3)
+        .map(([path]) => ({ path }));
+}
+
+async function getSchemaOwner(datasource: PostgresDatasource, database: string, schemaName?: string | null) {
+    if (!schemaName) return null;
+
+    const result = await datasource.queryWithContext<OwnerRow>(
+        `
+            SELECT pg_get_userbyid(n.nspowner) AS owner
+            FROM pg_namespace n
+            WHERE n.nspname = $1
+            LIMIT 1
+        `,
+        {
+            database,
+            params: [schemaName],
+        },
+    );
+
+    return result.rows[0]?.owner ?? null;
+}
+
+async function getColumnCountsByTable(datasource: PostgresDatasource, database: string, schemaName?: string | null) {
+    const result = await datasource.queryWithContext<TableColumnCountRow>(
+        `
+            SELECT
+                n.nspname AS "schemaName",
+                c.relname AS name,
+                COUNT(a.attnum) AS "columnCount"
+            FROM pg_class c
+            JOIN pg_namespace n
+              ON n.oid = c.relnamespace
+            JOIN pg_attribute a
+              ON a.attrelid = c.oid
+            WHERE ${SYSTEM_SCHEMA_FILTER}
+              ${buildSchemaClause('n.nspname')}
+              AND c.relkind IN ('r', 'p', 'f')
+              AND a.attnum > 0
+              AND NOT a.attisdropped
+            GROUP BY n.nspname, c.relname
+            ORDER BY n.nspname, c.relname
+        `,
+        {
+            database,
+            params: [schemaName ?? null],
+        },
+    );
+
+    return result.rows
+        .map(row => {
+            const name = qualifyName(row.schemaName, row.name);
+            if (!name) return null;
+            return {
+                name,
+                columnCount: toNumberOrNull(row.columnCount),
+            };
+        })
+        .filter((row): row is NonNullable<typeof row> => Boolean(row));
+}
+
+async function getForeignKeyRelationships(datasource: PostgresDatasource, database: string, schemaName?: string | null) {
+    const result = await datasource.queryWithContext<RelationshipRow>(
+        `
+            SELECT
+                src_ns.nspname AS "sourceSchemaName",
+                src.relname AS "sourceTableName",
+                tgt_ns.nspname AS "targetSchemaName",
+                tgt.relname AS "targetTableName"
+            FROM pg_constraint con
+            JOIN pg_class src
+              ON src.oid = con.conrelid
+            JOIN pg_namespace src_ns
+              ON src_ns.oid = src.relnamespace
+            JOIN pg_class tgt
+              ON tgt.oid = con.confrelid
+            JOIN pg_namespace tgt_ns
+              ON tgt_ns.oid = tgt.relnamespace
+            WHERE con.contype = 'f'
+              AND ${SYSTEM_SCHEMA_FILTER.replaceAll('n.', 'src_ns.')}
+              AND ${SYSTEM_SCHEMA_FILTER.replaceAll('n.', 'tgt_ns.')}
+              ${buildSchemaClause('src_ns.nspname')}
+              AND ($1::text IS NULL OR tgt_ns.nspname = $1)
+            ORDER BY src_ns.nspname, src.relname, tgt_ns.nspname, tgt.relname
+        `,
+        {
+            database,
+            params: [schemaName ?? null],
+        },
+    );
+
+    return result.rows;
 }
 
 async function getDatabases(datasource: PostgresDatasource) {
@@ -251,7 +462,7 @@ async function getTableColumns(datasource: PostgresDatasource, database: string,
     return Array.isArray(result.rows) ? result.rows : [];
 }
 
-async function getDatabaseTablesDetail(datasource: PostgresDatasource, database: string): Promise<DatabaseObjectRow[]> {
+async function getDatabaseTablesDetail(datasource: PostgresDatasource, database: string, schemaName?: string | null): Promise<DatabaseObjectRow[]> {
     const result = await datasource.queryWithContext<ObjectRow>(
         `
             SELECT
@@ -268,10 +479,14 @@ async function getDatabaseTablesDetail(datasource: PostgresDatasource, database:
             LEFT JOIN pg_stat_user_tables s
               ON s.relid = c.oid
             WHERE ${SYSTEM_SCHEMA_FILTER}
+              ${buildSchemaClause('n.nspname')}
               AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
             ORDER BY n.nspname, c.relname
         `,
-        { database },
+        {
+            database,
+            params: [schemaName ?? null],
+        },
     );
 
     return result.rows.map(normalizeObjectRow).filter((row): row is DatabaseObjectRow => Boolean(row));
@@ -292,7 +507,7 @@ async function getMaterializedViews(datasource: PostgresDatasource, database: st
     return rows.filter(row => row.engine === 'materialized_view');
 }
 
-async function getFunctions(datasource: PostgresDatasource, database?: string) {
+async function getFunctions(datasource: PostgresDatasource, database?: string, schemaName?: string | null) {
     const result = await datasource.queryWithContext<FunctionRow>(
         `
             SELECT
@@ -302,9 +517,13 @@ async function getFunctions(datasource: PostgresDatasource, database?: string) {
             JOIN pg_namespace n
               ON n.oid = p.pronamespace
             WHERE ${SYSTEM_SCHEMA_FILTER}
+              ${buildSchemaClause('n.nspname')}
             ORDER BY n.nspname, p.proname
         `,
-        { database },
+        {
+            database,
+            params: [schemaName ?? null],
+        },
     );
 
     return result.rows
@@ -366,10 +585,16 @@ async function getExtensions(datasource: PostgresDatasource, database?: string):
 }
 
 async function getDatabaseSummary(datasource: PostgresDatasource, options: DatabaseSummaryOptions): Promise<DatabaseSummary> {
-    const rows = await getDatabaseTablesDetail(datasource, options.database);
+    const rows = await getDatabaseTablesDetail(datasource, options.database, options.schemaName);
     const tables = rows.filter(row => isTableLike(row.engine));
     const views = rows.filter(row => row.engine === 'view');
     const materializedViews = rows.filter(row => row.engine === 'materialized_view');
+    const [functions, columnCounts, relationshipRows, owner] = await Promise.all([
+        getFunctions(datasource, options.database, options.schemaName),
+        getColumnCountsByTable(datasource, options.database, options.schemaName),
+        getForeignKeyRelationships(datasource, options.database, options.schemaName),
+        getSchemaOwner(datasource, options.database, options.schemaName),
+    ]);
     const recentTables = [...rows]
         .sort((a, b) => {
             const left = a.lastModified ? new Date(a.lastModified).getTime() : 0;
@@ -403,6 +628,65 @@ async function getDatabaseSummary(datasource: PostgresDatasource, options: Datab
         }));
 
     const lastUpdatedAt = recentTables[0]?.lastUpdatedAt ?? null;
+    const rowsForDistribution = tables.map(row => row.totalRows ?? 0);
+    const smallTablesCount = rowsForDistribution.filter(rowCount => rowCount < 1000).length;
+    const mediumTablesCount = rowsForDistribution.filter(rowCount => rowCount >= 1000 && rowCount <= 100000).length;
+    const largeTablesCount = rowsForDistribution.filter(rowCount => rowCount > 100000).length;
+    const averageColumnsPerTable = columnCounts.length > 0 ? Number((columnCounts.reduce((sum, row) => sum + (row.columnCount ?? 0), 0) / columnCounts.length).toFixed(1)) : null;
+    const widestTable =
+        [...columnCounts]
+            .sort((a, b) => (b.columnCount ?? 0) - (a.columnCount ?? 0))
+            .map(row => ({
+                name: row.name,
+                columnCount: row.columnCount ?? null,
+            }))[0] ?? null;
+    const relationshipPaths = buildRelationshipPaths(relationshipRows);
+    const relationshipDegree = new Map<string, number>();
+
+    for (const row of relationshipRows) {
+        const source = qualifyName(row.sourceSchemaName, row.sourceTableName);
+        const target = qualifyName(row.targetSchemaName, row.targetTableName);
+        if (source) relationshipDegree.set(source, (relationshipDegree.get(source) ?? 0) + 1);
+        if (target) relationshipDegree.set(target, (relationshipDegree.get(target) ?? 0) + 1);
+    }
+
+    const largestByRowsName = topTablesByRows[0]?.name ?? null;
+    const largestByBytesName = topTablesByBytes[0]?.name ?? null;
+    const recentNames = new Set(recentTables.slice(0, 3).map(row => row.name));
+    const recommendationCandidates = [...tables]
+        .map(row => {
+            const degree = relationshipDegree.get(row.name) ?? 0;
+            const rowScore = row.totalRows ?? 0;
+            const byteScore = row.totalBytes ?? 0;
+            const recentBoost = recentNames.has(row.name) ? 1 : 0;
+            return {
+                ...row,
+                score: degree * 1_000_000_000 + rowScore + byteScore / 1024 + recentBoost * 100_000_000,
+                reason: summarizeReason({
+                    hasRelationships: degree > 0,
+                    isLargestByRows: row.name === largestByRowsName,
+                    isLargestByBytes: row.name === largestByBytesName,
+                    isRecent: recentNames.has(row.name),
+                }),
+            };
+        })
+        .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+    const coreTables: DatabaseSummaryRecommendation[] = recommendationCandidates.slice(0, 3).map(row => ({
+        name: row.name,
+        reason: row.reason,
+        bytes: row.totalBytes ?? null,
+        rowsEstimate: row.totalRows ?? null,
+    }));
+    const startHere: DatabaseSummaryRecommendation[] =
+        coreTables.length > 0
+            ? coreTables
+            : topTablesByBytes.slice(0, 3).map(row => ({
+                  name: row.name,
+                  reason: row.name === largestByBytesName ? 'largeStorageFootprint' : 'goodStartingPoint',
+                  bytes: row.bytes,
+                  rowsEstimate: row.rowsEstimate,
+              }));
+    const detectedPatterns = detectNamingPatterns(tables);
 
     return {
         databaseName: options.database,
@@ -410,16 +694,33 @@ async function getDatabaseSummary(datasource: PostgresDatasource, options: Datab
         schemaName: options.schemaName ?? null,
         engine: options.engine ?? 'postgres',
         cluster: options.cluster ?? null,
+        owner,
         tablesCount: tables.length,
         viewsCount: views.length,
         materializedViewsCount: materializedViews.length,
+        functionsCount: functions.length,
         totalBytes: tables.reduce<number>((sum, row) => sum + (row.totalBytes ?? 0), 0),
         totalRowsEstimate: tables.reduce<number>((sum, row) => sum + (row.totalRows ?? 0), 0),
         lastUpdatedAt,
         lastQueriedAt: null,
+        tableSizeDistribution: {
+            smallTablesCount,
+            mediumTablesCount,
+            largeTablesCount,
+        },
+        columnComplexity: {
+            averageColumnsPerTable,
+            maxColumns: widestTable?.columnCount ?? null,
+            maxColumnsTable: widestTable?.name ?? null,
+        },
+        foreignKeyLinksCount: relationshipRows.length,
+        relationshipPaths,
+        detectedPatterns,
+        coreTables,
         topTablesByBytes,
         topTablesByRows,
         recentTables,
+        startHere,
         oneLineSummary: null,
     };
 }

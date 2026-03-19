@@ -101,6 +101,34 @@ export type DatabaseRecentTable = {
     lastUpdatedAt: string | null;
 };
 
+export type DatabaseSummaryDistribution = {
+    smallTablesCount: number | null;
+    mediumTablesCount: number | null;
+    largeTablesCount: number | null;
+};
+
+export type DatabaseSummaryColumnComplexity = {
+    averageColumnsPerTable: number | null;
+    maxColumns: number | null;
+    maxColumnsTable: string | null;
+};
+
+export type DatabaseSummaryRelationshipPath = {
+    path: string;
+};
+
+export type DatabaseSummaryPattern = {
+    label: string;
+    kind: 'domain' | 'partition';
+};
+
+export type DatabaseSummaryRecommendation = {
+    name: string;
+    reason: 'centralAndHighRowVolume' | 'centralAndHighStorage' | 'centralInRelationships' | 'highRowVolume' | 'largeStorageFootprint' | 'recentlyUpdated' | 'goodStartingPoint';
+    bytes: number | null;
+    rowsEstimate: number | null;
+};
+
 export type DatabaseSummaryEngine = 'clickhouse' | 'doris' | 'mysql' | 'postgres' | 'unknown';
 
 export type DatabaseSummary = {
@@ -109,16 +137,25 @@ export type DatabaseSummary = {
     schemaName: string | null;
     engine: DatabaseSummaryEngine;
     cluster: string | null;
+    owner: string | null;
     tablesCount: number | null;
     viewsCount: number | null;
     materializedViewsCount: number | null;
+    functionsCount: number | null;
     totalBytes: number | null;
     totalRowsEstimate: number | null;
     lastUpdatedAt: string | null;
     lastQueriedAt: string | null;
+    tableSizeDistribution: DatabaseSummaryDistribution;
+    columnComplexity: DatabaseSummaryColumnComplexity;
+    foreignKeyLinksCount: number | null;
+    relationshipPaths: DatabaseSummaryRelationshipPath[];
+    detectedPatterns: DatabaseSummaryPattern[];
+    coreTables: DatabaseSummaryRecommendation[];
     topTablesByBytes: DatabaseSummaryTable[];
     topTablesByRows: DatabaseSummaryTable[];
     recentTables: DatabaseRecentTable[];
+    startHere: DatabaseSummaryRecommendation[];
     oneLineSummary: string | null;
 };
 

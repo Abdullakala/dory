@@ -78,8 +78,9 @@ export function SQLConsoleSidebar({ onOpenTableTab, onSelectTable, selectedTable
             return;
         }
 
-        setActiveSchema(schemaOptions[0]?.value ?? '');
-    }, [activeSchema, schemaOptions, sidebarConfig.supportsSchemas]);
+        const defaultSchema = schemaOptions.find(schema => schema.value === sidebarConfig.defaultSchemaName)?.value ?? schemaOptions[0]?.value ?? '';
+        setActiveSchema(defaultSchema);
+    }, [activeSchema, schemaOptions, sidebarConfig.defaultSchemaName, sidebarConfig.supportsSchemas]);
 
     const filteredTables = useMemo(() => {
         const normalizedFilter = deferredFilter.trim().toLowerCase();

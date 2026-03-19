@@ -509,19 +509,6 @@ export function ExplorerSidebar({
                             skipAutoExpandRef.current = true;
                             setActiveDatabase(dbName);
 
-                            if (supportsSchemas) {
-                                const schemas = databaseSchemas[dbName] ?? [];
-                                const schemaTarget = schemas.find(schema => schema.name === defaultSchemaName)?.name ?? schemas[0]?.name;
-
-                                if (schemaTarget) {
-                                    onSelectSchema?.({
-                                        database: dbName,
-                                        schema: schemaTarget,
-                                    });
-                                    return;
-                                }
-                            }
-
                             onSelectDatabase?.(dbName);
                         }}
                         onSelectSchema={target => {

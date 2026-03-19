@@ -34,6 +34,8 @@ export function AppSidebar({ initialUser = null, ...props }: AppSidebarProps) {
     const connectionId = params.connectionId;
     const currentConnection = useAtomValue(currentConnectionAtom);
     const defaultDatabase = currentConnection && currentConnection.connection.id === connectionId ? currentConnection.connection.database : null;
+    const currentConnectionType = currentConnection && currentConnection.connection.id === connectionId ? currentConnection.connection.type : null;
+    const supportsOperationalPages = currentConnectionType === 'clickhouse';
     const explorerUrl =
         connectionId && defaultDatabase
             ? buildExplorerDatabasePath({ team, connectionId }, defaultDatabase)
@@ -68,18 +70,22 @@ export function AppSidebar({ initialUser = null, ...props }: AppSidebarProps) {
             icon: IconFileAi,
             requiresConnection: true,
         },
-        {
-            title: t('Monitoring'),
-            url: connectionId ? `/${team}/${connectionId}/monitoring` : `/${team}/connections`,
-            icon: FileChartColumnIncreasing,
-            requiresConnection: true,
-        },
-        {
-            title: t('Privileges'),
-            url: connectionId ? `/${team}/${connectionId}/privileges` : `/${team}/privileges`,
-            icon: IconUsers,
-            requiresConnection: true,
-        },
+        ...(supportsOperationalPages
+            ? [
+                  {
+                      title: t('Monitoring'),
+                      url: connectionId ? `/${team}/${connectionId}/monitoring` : `/${team}/connections`,
+                      icon: FileChartColumnIncreasing,
+                      requiresConnection: true,
+                  },
+                  {
+                      title: t('Privileges'),
+                      url: connectionId ? `/${team}/${connectionId}/privileges` : `/${team}/privileges`,
+                      icon: IconUsers,
+                      requiresConnection: true,
+                  },
+              ]
+            : []),
     ];
 
     const navSecondary = [

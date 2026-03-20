@@ -35,6 +35,23 @@ function slugifyOrganizationName(name: string) {
     return normalized || 'workspace';
 }
 
+async function syncLegacyDefaultTeamId(db: PostgresDBClient, userId: string, organizationId: string) {
+    const [dbUser] = await db
+        .select({ defaultTeamId: schema.user.defaultTeamId })
+        .from(schema.user)
+        .where(eq(schema.user.id, userId));
+
+    if (dbUser?.defaultTeamId === organizationId) {
+        return organizationId;
+    }
+
+    if (!dbUser?.defaultTeamId) {
+        await db.update(schema.user).set({ defaultTeamId: organizationId }).where(eq(schema.user.id, userId));
+    }
+
+    return organizationId;
+}
+
 function createAuth() {
     return (async () => {
         const db = (await getClient()) as PostgresDBClient;
@@ -64,9 +81,7 @@ function createAuth() {
                 return null;
             }
 
-            await db.update(schema.user).set({ defaultTeamId: existingMembership.organizationId }).where(eq(schema.user.id, userId));
-
-            return existingMembership.organizationId;
+            return syncLegacyDefaultTeamId(db, userId, existingMembership.organizationId);
         }
 
         async function hasExistingOrganization(userId: string): Promise<boolean> {
@@ -106,7 +121,7 @@ function createAuth() {
                 throw new Error(`failed_to_create_default_organization_for_${userId}`);
             }
 
-            await db.update(schema.user).set({ defaultTeamId: organizationId }).where(eq(schema.user.id, userId));
+            await syncLegacyDefaultTeamId(db, userId, organizationId);
             console.log(`[auth] default organization ${organizationId} created for user ${userId}`);
         }
 
@@ -188,14 +203,7 @@ function createAuth() {
                             };
                         },
                         afterCreateOrganization: async ({ organization, user }) => {
-                            const [dbUser] = await db
-                                .select({ defaultTeamId: schema.user.defaultTeamId })
-                                .from(schema.user)
-                                .where(eq(schema.user.id, user.id));
-
-                            if (!dbUser?.defaultTeamId) {
-                                await db.update(schema.user).set({ defaultTeamId: organization.id }).where(eq(schema.user.id, user.id));
-                            }
+                            await syncLegacyDefaultTeamId(db, user.id, organization.id);
                         },
                     },
                 }),

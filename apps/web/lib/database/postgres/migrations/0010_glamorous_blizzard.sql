@@ -212,11 +212,11 @@ DROP INDEX IF EXISTS "idx_chat_messages_session_time";--> statement-breakpoint
 DROP INDEX IF EXISTS "idx_chat_messages_session_id";--> statement-breakpoint
 DROP INDEX IF EXISTS "idx_chat_sessions_list";--> statement-breakpoint
 DROP INDEX IF EXISTS "uidx_chat_sessions_copilot_tab";--> statement-breakpoint
-ALTER TABLE "organization_members" ALTER COLUMN "status" DROP DEFAULT;--> statement-breakpoint
-ALTER TABLE "organization_members" ALTER COLUMN "status" DROP NOT NULL;--> statement-breakpoint
-ALTER TABLE "organization_members" ALTER COLUMN "joined_at" DROP DEFAULT;--> statement-breakpoint
-ALTER TABLE "organization_members" ALTER COLUMN "joined_at" DROP NOT NULL;--> statement-breakpoint
-ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "metadata" text;--> statement-breakpoint
+ALTER TABLE IF EXISTS "organization_members" ALTER COLUMN "status" DROP DEFAULT;--> statement-breakpoint
+ALTER TABLE IF EXISTS "organization_members" ALTER COLUMN "status" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE IF EXISTS "organization_members" ALTER COLUMN "joined_at" DROP DEFAULT;--> statement-breakpoint
+ALTER TABLE IF EXISTS "organization_members" ALTER COLUMN "joined_at" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE IF EXISTS "organizations" ADD COLUMN IF NOT EXISTS "metadata" text;--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_chat_messages_organization_conn_time" ON "chat_messages" USING btree ("organization_id","connection_id","created_at");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_chat_state_organization_conn" ON "chat_session_state" USING btree ("organization_id","connection_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_chat_state_organization_tab" ON "chat_session_state" USING btree ("organization_id","active_tab_id");--> statement-breakpoint
@@ -225,8 +225,26 @@ CREATE INDEX IF NOT EXISTS "idx_chat_sessions_organization_user_type" ON "chat_s
 CREATE INDEX IF NOT EXISTS "idx_chat_sessions_organization_conn" ON "chat_sessions" USING btree ("organization_id","connection_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_chat_sessions_organization_db" ON "chat_sessions" USING btree ("organization_id","active_database");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_organization_created" ON "query_audit" USING btree ("organization_id","created_at");--> statement-breakpoint
-CREATE UNIQUE INDEX IF NOT EXISTS "organization_members_organization_id_user_id_unique" ON "organization_members" USING btree ("organization_id","user_id");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "idx_organization_members_organization" ON "organization_members" USING btree ("organization_id");--> statement-breakpoint
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'organization_members'
+    ) THEN
+        EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS "organization_members_organization_id_user_id_unique" ON "organization_members" USING btree ("organization_id","user_id")';
+    END IF;
+END $$;--> statement-breakpoint
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'organization_members'
+    ) THEN
+        EXECUTE 'CREATE INDEX IF NOT EXISTS "idx_organization_members_organization" ON "organization_members" USING btree ("organization_id")';
+    END IF;
+END $$;--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_conn_identity_organization_id" ON "connection_identities" USING btree ("organization_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_conn_identity_organization_cloud_id" ON "connection_identities" USING btree ("organization_id","cloud_id");--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "uniq_connections_organization_name" ON "connections" USING btree ("organization_id","name") WHERE "connections"."deleted_at" IS NULL;--> statement-breakpoint

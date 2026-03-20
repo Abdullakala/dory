@@ -1,9 +1,16 @@
-// scripts/migrate.ts
+import 'dotenv/config';
 import { getClient } from '../lib/database/postgres/client';
 import { getDatabaseProvider } from '../lib/database/provider';
 
 (async () => {
     console.log('[Init] Initializing database connection...');
+    const provider = getDatabaseProvider();
+    console.log(`[Init] Database provider: ${provider}`);
+
+    if (provider === 'postgres') {
+        console.log(`[Init] Database URL: ${process.env.DATABASE_URL ?? '<missing>'}`);
+    }
+
     const db = await getClient();
 
     if (!db) {
@@ -12,7 +19,6 @@ import { getDatabaseProvider } from '../lib/database/provider';
     }
 
     console.log('[Init] Running database migrations...');
-    const provider = getDatabaseProvider();
 
     if (provider === 'postgres') {
         const { migrateDB } = await import('../lib/database/postgres/migrate');

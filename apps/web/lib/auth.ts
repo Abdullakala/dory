@@ -1,25 +1,41 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { jwt } from 'better-auth/plugins';
+import { jwt, organization, role } from 'better-auth/plugins';
 import { schema } from '@/lib/database/schema';
 import { getDatabaseProvider } from '@/lib/database/provider';
 import { sendEmail } from './email';
 import { PostgresDBClient } from '@/types';
 import { eq } from 'drizzle-orm';
-import { v7 as uuidv7 } from 'uuid';
 import { getClient } from './database/postgres/client';
 import { getServerLocale } from './i18n/server-locale';
 import { translate } from './i18n/i18n';
 import { createCachedAsyncFactory } from '@dory/auth-core';
 import { isDesktopRuntime } from './runtime/runtime';
+import {
+    resolveOrganizationIdForSession,
+    shouldCreateDefaultOrganization,
+} from './auth/migration-state';
 
-// User type with defaultTeamId, used for narrowing in hooks
-type UserWithDefaultTeam = {
+type AuthUser = {
     id: string;
     email: string | null;
     emailVerified: boolean;
-    defaultTeamId?: string | null;
 };
+
+type SessionWithActiveOrganization = {
+    userId: string;
+    activeOrganizationId?: string | null;
+};
+
+function slugifyOrganizationName(name: string) {
+    const normalized = name
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
+    return normalized || 'workspace';
+}
 
 function createAuth() {
     return (async () => {
@@ -33,55 +49,143 @@ function createAuth() {
 
         console.log('[auth] TRUSTED_ORIGINS =', process.env.TRUSTED_ORIGINS);
 
+        async function findInitialOrganizationId(userId: string): Promise<string | null> {
+            const [existingMembership] = await db
+                .select({ organizationId: schema.teamMembers.teamId })
+                .from(schema.teamMembers)
+                .where(eq(schema.teamMembers.userId, userId))
+                .limit(1);
+
+            const resolvedOrganizationId = resolveOrganizationIdForSession({
+                membershipOrganizationId: existingMembership?.organizationId ?? null,
+            });
+
+            if (!resolvedOrganizationId) {
+                return null;
+            }
+
+            return resolvedOrganizationId;
+        }
+
+        async function hasExistingOrganization(userId: string): Promise<boolean> {
+            return Boolean(await findInitialOrganizationId(userId));
+        }
+
         /**
-         * Shared helper: create a default team + teamMembers relation, then set defaultTeamId
-         * - Used for both email signup and social login
+         * Shared helper: create a default organization + member relation through better-auth.
+         * The plugin owns the organization/member writes.
          */
-        async function ensureDefaultTeamForUser(userId: string, email: string | null | undefined) {
+        async function ensureDefaultOrganizationForUser(auth: any, userId: string, email: string | null | undefined) {
             if (isDesktop) {
+                return;
+            }
+
+            const existingOrganizationId = await findInitialOrganizationId(userId);
+            if (existingOrganizationId) {
                 return;
             }
 
             const locale = await getServerLocale();
             const t = (key: string, values?: Record<string, unknown>) => translate(locale, key, values);
+            const name = t('Auth.TeamName', { name: email ?? t('Auth.TeamDefaultName') });
 
-            // Guard: skip if defaultTeamId already exists
-            const [existingUser] = await db.select({ defaultTeamId: schema.user.defaultTeamId }).from(schema.user).where(eq(schema.user.id, userId));
-
-            if (existingUser?.defaultTeamId) {
-                return;
-            }
-
-            const teamId = uuidv7();
-            const userTeamRelId = uuidv7();
-
-            await db.transaction(async tx => {
-                // 1) Create team
-                await tx.insert(schema.teams).values({
-                    id: teamId,
-                    name: t('Auth.TeamName', { name: email ?? t('Auth.TeamDefaultName') }),
-                    // Adjust fields for your schema
-                    ownerUserId: userId,
-                });
-
-                // 2) teamMembers relation: owner
-                await tx.insert(schema.teamMembers).values({
-                    id: userTeamRelId,
+            const created = await auth.api.createOrganization({
+                body: {
+                    name,
+                    slug: `${slugifyOrganizationName(name)}-${userId.slice(0, 8)}`,
                     userId,
-                    teamId,
-                    role: 'owner',
-                });
-
-                // 3) Update user.defaultTeamId
-                await tx.update(schema.user).set({ defaultTeamId: teamId }).where(eq(schema.user.id, userId));
+                    keepCurrentActiveOrganization: false,
+                },
             });
 
-            console.log(`[auth] default team ${teamId} created for user ${userId}`);
+            const organizationId = created?.id ?? null;
+            if (!organizationId) {
+                throw new Error(`failed_to_create_default_organization_for_${userId}`);
+            }
+
+            console.log(`[auth] default organization ${organizationId} created for user ${userId}`);
         }
 
-        return betterAuth({
+        const auth = betterAuth({
             database: drizzleAdapter(db, { provider, schema }),
-            plugins: [jwt()],
+            plugins: [
+                jwt(),
+                organization({
+                    roles: {
+                        owner: role({}),
+                        admin: role({}),
+                        member: role({}),
+                        viewer: role({}),
+                    },
+                    schema: {
+                        session: {
+                            fields: {
+                                activeOrganizationId: 'activeOrganizationId',
+                            },
+                        },
+                        organization: {
+                            modelName: 'teams',
+                            fields: {
+                                name: 'name',
+                                slug: 'slug',
+                                logo: 'logo',
+                                createdAt: 'createdAt',
+                                updatedAt: 'updatedAt',
+                            },
+                            additionalFields: {
+                                ownerUserId: {
+                                    type: 'string',
+                                    required: false,
+                                    input: false,
+                                },
+                            },
+                        },
+                        member: {
+                            modelName: 'teamMembers',
+                            fields: {
+                                organizationId: 'teamId',
+                                userId: 'userId',
+                                role: 'role',
+                                createdAt: 'createdAt',
+                            },
+                            additionalFields: {
+                                status: {
+                                    type: 'string',
+                                    required: false,
+                                    input: false,
+                                },
+                                joinedAt: {
+                                    type: 'date',
+                                    required: false,
+                                    input: false,
+                                },
+                            },
+                        },
+                        invitation: {
+                            modelName: 'invitation',
+                            fields: {
+                                organizationId: 'organizationId',
+                                email: 'email',
+                                role: 'role',
+                                status: 'status',
+                                expiresAt: 'expiresAt',
+                                createdAt: 'createdAt',
+                                inviterId: 'inviterId',
+                            },
+                        },
+                    },
+                    organizationHooks: {
+                        beforeCreateOrganization: async ({ organization, user }) => {
+                            return {
+                                data: {
+                                    ...organization,
+                                    ownerUserId: user.id,
+                                },
+                            };
+                        },
+                    },
+                }),
+            ],
             baseURL: isDesktop && desktopOrigin ? desktopOrigin : undefined,
             advanced: isDesktop ? { useSecureCookies: false } : undefined,
             account: {
@@ -98,20 +202,6 @@ function createAuth() {
             ],
 
             /**
-             * Extra user field: defaultTeamId
-             */
-            user: {
-                additionalFields: {
-                    defaultTeamId: {
-                        type: 'string',
-                        required: false,
-                        input: false, // Disallow client input
-                        defaultValue: null,
-                    },
-                },
-            },
-
-            /**
              * ✅ Database hooks:
              * user.create.after: runs after any new-user creation (email / social / magic link, etc.)
              *
@@ -123,22 +213,43 @@ function createAuth() {
                 user: {
                     create: {
                         after: async rawUser => {
-                            // Explicitly narrow type to include defaultTeamId
-                            const user = rawUser as UserWithDefaultTeam;
+                            const user = rawUser as AuthUser;
 
-                            // Skip if default team already exists
-                            if (user.defaultTeamId) return;
+                            // Skip if the user is already attached to an organization.
+                            const existingOrganizationId = await findInitialOrganizationId(user.id);
 
                             // For social login:
                             //   - If SSO marks email as verified, emailVerified is true
-                            //   → Create the team immediately here
+                            //   → Create the organization immediately here
                             //
                             // For email+password signup:
                             //   - With requireEmailVerification, emailVerified is usually false
-                            //   → Create the team in afterEmailVerification instead
-                            if (user.emailVerified) {
-                                await ensureDefaultTeamForUser(user.id, user.email);
+                            //   → Create the organization in afterEmailVerification instead
+                            if (shouldCreateDefaultOrganization({
+                                isDesktop,
+                                existingOrganizationId,
+                                emailVerified: user.emailVerified,
+                            })) {
+                                await ensureDefaultOrganizationForUser(auth as any, user.id, user.email);
                             }
+                        },
+                    },
+                },
+                session: {
+                    create: {
+                        before: async rawSession => {
+                            const session = rawSession as SessionWithActiveOrganization;
+                            const activeOrganizationId = resolveOrganizationIdForSession({
+                                activeOrganizationId: session.activeOrganizationId ?? null,
+                                membershipOrganizationId: await findInitialOrganizationId(session.userId),
+                            });
+
+                            return {
+                                data: {
+                                    ...session,
+                                    activeOrganizationId,
+                                },
+                            };
                         },
                     },
                 },
@@ -223,21 +334,22 @@ function createAuth() {
 
                 /**
                  * ✅ After email verification:
-                 * - Create team only if defaultTeamId is missing
+                 * - Create organization only if the user has not joined any organization yet
                  * - Covers two cases:
                  *   1) Standard email+password signup
                  *   2) Social login where SSO doesn't mark emailVerified
                  */
                 afterEmailVerification: async (rawUser, request) => {
-                    const user = rawUser as UserWithDefaultTeam;
+                    const user = rawUser as AuthUser;
 
-                    if (user.defaultTeamId) {
-                        // Possibly created via databaseHooks during social login
+                    if (await hasExistingOrganization(user.id)) {
+                        // Possibly created via databaseHooks during social login,
+                        // or backfilled from an existing membership.
                         return;
                     }
 
-                    await ensureDefaultTeamForUser(user.id, user.email);
-                    console.log(`[auth] user ${user.email} verified by email, default team created via afterEmailVerification`);
+                    await ensureDefaultOrganizationForUser(auth as any, user.id, user.email);
+                    console.log(`[auth] user ${user.email} verified by email, default organization created via afterEmailVerification`);
                 },
             },
 
@@ -252,6 +364,8 @@ function createAuth() {
                 },
             },
         });
+
+        return auth;
     })();
 }
 

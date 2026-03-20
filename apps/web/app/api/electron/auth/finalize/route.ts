@@ -6,6 +6,8 @@ import { getApiLocale, translateApi } from '@/app/api/utils/i18n';
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { resolveCurrentOrganizationIdStrict } from '@/lib/auth/current-organization';
+import { buildElectronTicketUser } from '@/lib/auth/migration-state';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,7 +21,7 @@ type TicketUser = {
     name: string | null;
     image: string | null;
     emailVerified: boolean;
-    defaultTeamId?: string | null;
+    activeOrganizationId?: string | null;
 };
 
 function normalizeCookieName(name: string): string[] {
@@ -273,14 +275,15 @@ export async function GET(req: Request) {
 
     const db = (await getClient()) as PostgresDBClient;
     const [dbUser] = await db.select().from(schema.user).where(eq(schema.user.id, session.user.id));
-    const user = {
+    const activeOrganizationId = resolveCurrentOrganizationIdStrict(activeSession);
+    const user = buildElectronTicketUser({
         id: dbUser?.id ?? session.user.id,
         email: dbUser?.email ?? session.user.email ?? null,
         name: dbUser?.name ?? session.user.name ?? null,
         image: dbUser?.image ?? session.user.image ?? null,
         emailVerified: dbUser?.emailVerified ?? session.user.emailVerified ?? false,
-        defaultTeamId: dbUser?.defaultTeamId ?? (session.user as TicketUser).defaultTeamId ?? null,
-    } satisfies TicketUser;
+        activeOrganizationId,
+    }) satisfies TicketUser;
     const ticket = await createTicket(auth, { user });
     const deepLinkUrl = buildDeepLinkUrl({ ticket });
 

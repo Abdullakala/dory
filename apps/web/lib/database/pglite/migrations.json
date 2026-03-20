@@ -233,5 +233,28 @@
     "bps": true,
     "folderMillis": 1774021104177,
     "hash": "6dfe7adb5dec4a5e41b61ae95c95b921dd01b32c8afb90e757c35478eecda155"
+  },
+  {
+    "sql": [
+      "DO $$\nBEGIN\n    IF EXISTS (\n        SELECT 1\n        FROM information_schema.tables\n        WHERE table_schema = 'public' AND table_name = 'teams'\n    ) AND NOT EXISTS (\n        SELECT 1\n        FROM information_schema.tables\n        WHERE table_schema = 'public' AND table_name = 'organizations'\n    ) THEN\n        EXECUTE 'ALTER TABLE \"teams\" RENAME TO \"organizations\"';\n    END IF;\nEND $$;",
+      "\nDO $$\nBEGIN\n    IF EXISTS (\n        SELECT 1\n        FROM information_schema.tables\n        WHERE table_schema = 'public' AND table_name = 'team_members'\n    ) AND NOT EXISTS (\n        SELECT 1\n        FROM information_schema.tables\n        WHERE table_schema = 'public' AND table_name = 'organization_members'\n    ) THEN\n        EXECUTE 'ALTER TABLE \"team_members\" RENAME TO \"organization_members\"';\n    END IF;\nEND $$;",
+      "\nDO $$\nBEGIN\n    IF EXISTS (\n        SELECT 1\n        FROM information_schema.columns\n        WHERE table_schema = 'public' AND table_name = 'organization_members' AND column_name = 'team_id'\n    ) AND NOT EXISTS (\n        SELECT 1\n        FROM information_schema.columns\n        WHERE table_schema = 'public' AND table_name = 'organization_members' AND column_name = 'organization_id'\n    ) THEN\n        EXECUTE 'ALTER TABLE \"organization_members\" RENAME COLUMN \"team_id\" TO \"organization_id\"';\n    END IF;\nEND $$;",
+      "\nDROP INDEX IF EXISTS \"teams_slug_unique\";",
+      "\nDROP INDEX IF EXISTS \"team_members_team_id_user_id_unique\";",
+      "\nDROP INDEX IF EXISTS \"idx_team_members_team\";",
+      "\nDROP INDEX IF EXISTS \"idx_team_members_user\";",
+      "\nALTER TABLE IF EXISTS \"organizations\" ADD COLUMN IF NOT EXISTS \"metadata\" text;",
+      "\nALTER TABLE IF EXISTS \"organization_members\" ALTER COLUMN \"status\" DROP DEFAULT;",
+      "\nALTER TABLE IF EXISTS \"organization_members\" ALTER COLUMN \"status\" DROP NOT NULL;",
+      "\nALTER TABLE IF EXISTS \"organization_members\" ALTER COLUMN \"joined_at\" DROP DEFAULT;",
+      "\nALTER TABLE IF EXISTS \"organization_members\" ALTER COLUMN \"joined_at\" DROP NOT NULL;",
+      "\nCREATE UNIQUE INDEX IF NOT EXISTS \"organizations_slug_unique\" ON \"organizations\" USING btree (\"slug\");",
+      "\nCREATE UNIQUE INDEX IF NOT EXISTS \"organization_members_organization_id_user_id_unique\" ON \"organization_members\" USING btree (\"organization_id\",\"user_id\");",
+      "\nCREATE INDEX IF NOT EXISTS \"idx_organization_members_organization\" ON \"organization_members\" USING btree (\"organization_id\");",
+      "\nCREATE INDEX IF NOT EXISTS \"idx_organization_members_user\" ON \"organization_members\" USING btree (\"user_id\");\n"
+    ],
+    "bps": true,
+    "folderMillis": 1774031200001,
+    "hash": "bf2f96029bba15215cff36e1ab412620346f9c7b4908bc20118baf1d536b3c2f"
   }
 ]

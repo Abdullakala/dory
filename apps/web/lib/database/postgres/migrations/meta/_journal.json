@@ -50,6 +50,13 @@
       "when": 1774021147746,
       "tag": "0010_glamorous_blizzard",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1774031200000,
+      "tag": "0011_steady_raven",
+      "breakpoints": true
     }
   ]
 }

@@ -101,6 +101,7 @@ AI that understands your database — not just text completion.
 - Supports multi-table joins and subqueries  
 
 ---
+<img width="3024" height="1898" alt="image" src="https://github.com/user-attachments/assets/c1775613-5773-4552-a188-90442f8f82ad" />
 
 ### ✍️ Intelligent SQL Editor
 
@@ -110,6 +111,7 @@ AI that understands your database — not just text completion.
 - Instant query visualization with built-in charts
 
 ---
+<img width="3024" height="1898" alt="image" src="https://github.com/user-attachments/assets/d3e0b7a7-8c16-44d0-b248-685f7e386b6b" />
 
 ### 💬 Database Chatbot
 

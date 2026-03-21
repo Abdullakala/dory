@@ -8,6 +8,13 @@
       "when": 1774064729618,
       "tag": "0000_fantastic_thanos",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1774065386733,
+      "tag": "0001_mighty_nomad",
+      "breakpoints": true
     }
   ]
 }

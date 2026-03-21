@@ -12,6 +12,7 @@ import { resolveOrganizationIdForSession, shouldCreateDefaultOrganization } from
 import { translate } from './i18n/i18n';
 import { getServerLocale } from './i18n/server-locale';
 import { isDesktopRuntime } from './runtime/runtime';
+import { dash } from "@better-auth/infra";
 
 type AuthUser = {
     id: string;
@@ -105,6 +106,13 @@ function createAuth() {
             database: drizzleAdapter(db, { provider, schema }),
             plugins: [
                 jwt(),
+                dash({
+                    apiKey: process.env.BETTER_AUTH_API_KEY,
+                    activityTracking: {
+                        enabled: true,
+                        updateInterval: 300000,  // Update interval in ms (default: 5 minutes)
+                    },
+                }),
                 organization({
                     roles: {
                         owner: role({}),

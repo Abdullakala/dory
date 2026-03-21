@@ -1,5 +1,6 @@
 // lib/auth/client.ts — only import in client components
 'use client';
+import { dashClient } from '@better-auth/infra/client';
 import { createAuthClient } from 'better-auth/react';
 import { inferOrgAdditionalFields, organizationClient } from 'better-auth/client/plugins';
 import { translate } from '@/lib/i18n/i18n';
@@ -14,6 +15,7 @@ export const authClient = createAuthClient({
     // Cross-origin (gateway/subdomain): baseURL: process.env.NEXT_PUBLIC_AUTH_ORIGIN,
     ...(authBaseUrl ? { baseURL: authBaseUrl } : {}),
     plugins: [
+        dashClient(),
         organizationClient({
             schema: inferOrgAdditionalFields<Awaited<ReturnType<typeof getAuth>>>(),
         }),

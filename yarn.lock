@@ -1854,6 +1854,23 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@better-auth/infra@npm:^0.1.12":
+  version: 0.1.12
+  resolution: "@better-auth/infra@npm:0.1.12"
+  dependencies:
+    "@better-fetch/fetch": "npm:^1.1.21"
+    better-call: "npm:^1.3.3"
+    jose: "npm:^6.1.0"
+    libphonenumber-js: "npm:^1.12.36"
+  peerDependencies:
+    "@better-auth/core": ">=1.4.0"
+    "@better-auth/sso": ">=1.4.0"
+    better-auth: ">=1.4.0"
+    zod: ">=4.1.12"
+  checksum: 10c0/ea821e26ac6bb23668d992d4496ea85d0044d6225dfccad82b42d275fd3ab217dce6bfc84129785933fd52ba98e8d29924b54221d54dfe47906ab7e985708373
+  languageName: node
+  linkType: hard
+
 "@better-auth/kysely-adapter@npm:1.5.5":
   version: 1.5.5
   resolution: "@better-auth/kysely-adapter@npm:1.5.5"
@@ -9862,6 +9879,23 @@ __metadata:
   languageName: node
   linkType: hard
 
+"better-call@npm:^1.3.3":
+  version: 1.3.4
+  resolution: "better-call@npm:1.3.4"
+  dependencies:
+    "@better-auth/utils": "npm:^0.3.1"
+    "@better-fetch/fetch": "npm:^1.1.21"
+    rou3: "npm:^0.7.12"
+    set-cookie-parser: "npm:^3.0.1"
+  peerDependencies:
+    zod: ^4.0.0
+  peerDependenciesMeta:
+    zod:
+      optional: true
+  checksum: 10c0/f67043c22d478b2f6b3580d4ee5cd426f17cb2008cad4d3d5a9dc6b28dd8ed119cbdfc960b21dae3b7f5488a51bd2c3fa42a753da8ec1f46e212f918d7fd7e75
+  languageName: node
+  linkType: hard
+
 "better-sqlite3@npm:^12.5.0":
   version: 12.8.0
   resolution: "better-sqlite3@npm:12.8.0"
@@ -15515,6 +15549,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"jose@npm:^6.1.0":
+  version: 6.2.2
+  resolution: "jose@npm:6.2.2"
+  checksum: 10c0/201f4776d77eccd339de99fb3ba940fdf03db15e64be7a99b511e53c232e3f3818e3f21b95223d62f99315a2ab76b4251cedd94e067de56893e45273a8d2151b
+  languageName: node
+  linkType: hard
+
 "jose@npm:^6.1.3":
   version: 6.2.1
   resolution: "jose@npm:6.2.1"
@@ -16017,6 +16058,13 @@ __metadata:
     proc-log: "npm:^6.0.0"
     semver: "npm:^7.3.7"
   checksum: 10c0/c280dc1fb50e3868a858f29633387565df49635a1fae8fc30f5d6fd5559057352c7bee95516f649b5b24cf5d15343d5bf230031cc26619a6205b05c469caa5eb
+  languageName: node
+  linkType: hard
+
+"libphonenumber-js@npm:^1.12.36":
+  version: 1.12.40
+  resolution: "libphonenumber-js@npm:1.12.40"
+  checksum: 10c0/bd4aaa2052d76abeb58c6febf737e22562b7e5abf7a6a8708b7f9fa0ed8cef5a74f2a616163425fb220b49062a0d311d87869c566b547915fd8a3b5c85b275e2
   languageName: node
   linkType: hard
 
@@ -22799,6 +22847,7 @@ __metadata:
     "@ai-sdk/openai-compatible": "npm:^2.0.0"
     "@ai-sdk/react": "npm:^3.0.61"
     "@ai-sdk/xai": "npm:^3.0.23"
+    "@better-auth/infra": "npm:^0.1.12"
     "@clickhouse/client": "npm:^1.12.0"
     "@dnd-kit/core": "npm:^6.3.1"
     "@dnd-kit/modifiers": "npm:^9.0.0"

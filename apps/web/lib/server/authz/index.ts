@@ -1,4 +1,5 @@
 import { shouldProxyAuthRequest } from '@/lib/auth/auth-proxy';
+import { canManageOrganizationRole } from '@/lib/auth/organization-ac';
 import { resolveDesktopOrganizationAccess } from './authz.desktop';
 import { resolveLocalOrganizationAccess } from './authz.local';
 import type { OrganizationAccess, OrganizationAccessRole } from './types';
@@ -57,5 +58,22 @@ export function canManageOrganization(access: Pick<OrganizationAccess, 'isMember
         return false;
     }
 
-    return access.role === 'owner' || access.role === 'admin';
+    return canManageOrganizationRole(access.role);
+}
+
+export function canReadWorkspace(access: Pick<OrganizationAccess, 'isMember' | 'permissions'> | null): boolean {
+    return Boolean(access?.isMember && access.permissions.workspace.read);
+}
+
+export function canWriteWorkspace(access: Pick<OrganizationAccess, 'isMember' | 'permissions'> | null): boolean {
+    return Boolean(access?.isMember && access.permissions.workspace.write);
+}
+
+export function canManageConnections(access: Pick<OrganizationAccess, 'isMember' | 'permissions'> | null): boolean {
+    return Boolean(
+        access?.isMember &&
+            (access.permissions.connection.create ||
+                access.permissions.connection.update ||
+                access.permissions.connection.delete),
+    );
 }

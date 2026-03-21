@@ -5,7 +5,7 @@ import { SidebarProvider, SidebarInset } from '@/registry/new-york-v4/ui/sidebar
 import { AppContentShell } from './components/app-sidebar/app-content-shell';
 import { AppSidebar } from './components/app-sidebar/app-sidebar';
 import { getSessionFromRequest } from '@/lib/auth/session';
-import { getOrganizationBySlugOrId } from '@/lib/server/organization';
+import { getFirstOrganizationForUser, getOrganizationBySlugOrId } from '@/lib/server/organization';
 import { resolveCurrentOrganizationId } from '@/lib/auth/current-organization';
 
 
@@ -21,6 +21,11 @@ export default async function TeamLayout({ children, params }: { children: React
     const currentOrganizationId = resolveCurrentOrganizationId(session);
 
     if (!currentOrganizationId) {
+        const fallbackOrganization = await getFirstOrganizationForUser(session.user.id);
+        if (fallbackOrganization) {
+            redirect(`/${fallbackOrganization.slug}/connections`);
+        }
+
         redirect('/create-organization');
     }
 
@@ -35,12 +40,13 @@ export default async function TeamLayout({ children, params }: { children: React
     });
 
     if (!organization) {
+        const fallbackOrganization = await getFirstOrganizationForUser(session.user.id);
         console.log('[organization][layout] redirect', {
             fromOrganization: teamParam,
-            toOrganization: currentOrganizationId,
+            toOrganization: fallbackOrganization?.slug ?? currentOrganizationId,
             sessionUserId: session.user.id,
         });
-        redirect(`/${currentOrganizationId}/connections`);
+        redirect(`/${fallbackOrganization?.slug ?? currentOrganizationId}/connections`);
     }
 
     return (

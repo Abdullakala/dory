@@ -7,6 +7,7 @@ import { translate } from '@/lib/i18n/i18n';
 import { getClientLocale } from '@/lib/i18n/client-locale';
 import { getAuthBaseUrl } from '@/lib/client/auth-runtime';
 import type { getAuth } from './auth';
+import { organizationAc, organizationRoles } from './auth/organization-ac';
 
 const authBaseUrl = getAuthBaseUrl();
 
@@ -17,6 +18,8 @@ export const authClient = createAuthClient({
     plugins: [
         dashClient(),
         organizationClient({
+            ac: organizationAc,
+            roles: organizationRoles,
             schema: inferOrgAdditionalFields<Awaited<ReturnType<typeof getAuth>>>(),
         }),
     ],

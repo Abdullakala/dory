@@ -5,7 +5,7 @@ import { getDBService } from '@/lib/database';
 import { ErrorCodes } from '@/lib/errors';
 import { ResponseUtil } from '@/lib/result';
 import { getApiLocale, translateApi } from '@/app/api/utils/i18n';
-import { canManageOrganization, resolveOrganizationAccess } from '@/lib/server/authz';
+import { canManageOrganization, canWriteWorkspace, resolveOrganizationAccess } from '@/lib/server/authz';
 import { resolveCurrentOrganizationId } from '@/lib/auth/current-organization';
 
 type OrganizationHandlerContext = {
@@ -108,6 +108,16 @@ export function withOrganizationHandler(handler: OrganizationHandlerFn) {
         const organizationId = resolveCurrentOrganizationId(session);
         const userId = session?.user?.id ?? null;
 
+        if (!userId) {
+            return NextResponse.json(
+                ResponseUtil.error({
+                    code: ErrorCodes.UNAUTHORIZED,
+                    message: translateApi('Api.Errors.Unauthorized', undefined, locale),
+                }),
+                { status: 401 },
+            );
+        }
+
         if (!organizationId) {
             return NextResponse.json(
                 ResponseUtil.error({
@@ -121,6 +131,17 @@ export function withOrganizationHandler(handler: OrganizationHandlerFn) {
         const db = await getDBService();
 
         return withHandlerErrorBoundary(async () => {
+            const access = await resolveOrganizationAccess(organizationId, userId);
+            if (!access?.isMember) {
+                return NextResponse.json(
+                    ResponseUtil.error({
+                        code: ErrorCodes.FORBIDDEN,
+                        message: translateApi('Api.Errors.Unauthorized', undefined, locale),
+                    }),
+                    { status: 403 },
+                );
+            }
+
             return handler({
                 req,
                 db,
@@ -162,6 +183,29 @@ export function withUserAndOrganizationHandler(handler: UserOrganizationHandlerF
         const db = await getDBService();
 
         return withHandlerErrorBoundary(async () => {
+            const access = await resolveOrganizationAccess(organizationId, userId);
+            if (!access?.isMember) {
+                return NextResponse.json(
+                    ResponseUtil.error({
+                        code: ErrorCodes.FORBIDDEN,
+                        message: translateApi('Api.Errors.Unauthorized', undefined, locale),
+                    }),
+                    { status: 403 },
+                );
+            }
+
+            const method = req.method.toUpperCase();
+            const isReadRequest = method === 'GET' || method === 'HEAD' || method === 'OPTIONS';
+            if (!isReadRequest && !canWriteWorkspace(access)) {
+                return NextResponse.json(
+                    ResponseUtil.error({
+                        code: ErrorCodes.FORBIDDEN,
+                        message: translateApi('Api.Errors.Unauthorized', undefined, locale),
+                    }),
+                    { status: 403 },
+                );
+            }
+
             return handler({
                 req,
                 db,
@@ -221,7 +265,7 @@ export function withManagedOrganizationHandler(handler: ManagedOrganizationHandl
             return NextResponse.json(
                 ResponseUtil.error({
                     code: ErrorCodes.FORBIDDEN,
-                    message: translateApi('ErrorCodes.FORBIDDEN', undefined, locale),
+                    message: translateApi('Api.Errors.Unauthorized', undefined, locale),
                 }),
                 { status: 403 },
             );

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSessionFromRequest } from '@/lib/auth/session';
 import { resolveCurrentOrganizationId } from '@/lib/auth/current-organization';
+import { getFirstOrganizationForUser } from '@/lib/server/organization';
 
 export default async function Page() {
     const session = await getSessionFromRequest();
@@ -9,6 +10,11 @@ export default async function Page() {
     const currentOrganizationId = resolveCurrentOrganizationId(session);
 
     if (!currentOrganizationId) {
+        const fallbackOrganization = await getFirstOrganizationForUser(session.user.id);
+        if (fallbackOrganization) {
+            redirect(`/${fallbackOrganization.slug}/connections`);
+        }
+
         redirect('/create-organization');
     }
 

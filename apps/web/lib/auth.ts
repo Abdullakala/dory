@@ -1,6 +1,6 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { jwt, organization, role } from 'better-auth/plugins';
+import { jwt, organization } from 'better-auth/plugins';
 import { eq } from 'drizzle-orm';
 import { createCachedAsyncFactory } from '@dory/auth-core';
 import type { PostgresDBClient } from '../types';
@@ -12,7 +12,8 @@ import { resolveOrganizationIdForSession, shouldCreateDefaultOrganization } from
 import { translate } from './i18n/i18n';
 import { getServerLocale } from './i18n/server-locale';
 import { isDesktopRuntime } from './runtime/runtime';
-import { dash } from "@better-auth/infra";
+import { dash } from '@better-auth/infra';
+import { organizationAc, organizationRoles } from './auth/organization-ac';
 
 type AuthUser = {
     id: string;
@@ -42,6 +43,7 @@ function createAuth() {
         const isDesktop = isDesktopRuntime();
         const desktopOrigin =
             process.env.DORY_ELECTRON_ORIGIN?.trim() || process.env.NEXT_PUBLIC_DORY_ELECTRON_ORIGIN?.trim() || (isDesktop ? `http://127.0.0.1:${process.env.PORT ?? 3000}` : '');
+        const publicAuthBaseUrl = process.env.BETTER_AUTH_URL?.trim() || desktopOrigin || null;
 
         console.log('[auth] TRUSTED_ORIGINS =', process.env.TRUSTED_ORIGINS);
 
@@ -110,16 +112,15 @@ function createAuth() {
                     apiKey: process.env.BETTER_AUTH_API_KEY,
                     activityTracking: {
                         enabled: true,
-                        updateInterval: 300000,  // Update interval in ms (default: 5 minutes)
+                        updateInterval: 300000,
                     },
                 }),
                 organization({
-                    roles: {
-                        owner: role({}),
-                        admin: role({}),
-                        member: role({}),
-                        viewer: role({}),
-                    },
+                    ac: organizationAc,
+                    roles: organizationRoles,
+                    creatorRole: 'owner',
+                    invitationExpiresIn: 60 * 60 * 48,
+                    cancelPendingInvitationsOnReInvite: true,
                     schema: {
                         session: {
                             fields: {
@@ -187,6 +188,49 @@ function createAuth() {
                                 },
                             };
                         },
+                    },
+                    sendInvitationEmail: async ({ id, email, role, organization, inviter }) => {
+                        if (!publicAuthBaseUrl) {
+                            console.warn('[auth] missing BETTER_AUTH_URL, skipping invitation email', {
+                                invitationId: id,
+                                email,
+                            });
+                            return;
+                        }
+
+                        const locale = await getServerLocale();
+                        const t = (key: string, values?: Record<string, unknown>) => translate(locale, key, values);
+                        const invitationUrl = new URL('/organization/accept-invitation', publicAuthBaseUrl);
+                        invitationUrl.searchParams.set('invitationId', id);
+
+                        await sendEmail({
+                            to: email,
+                            subject: `Invitation to join ${organization.name}`,
+                            text: `You've been invited to join ${organization.name} as ${role}. Accept the invitation: ${invitationUrl.toString()}`,
+                            html: `
+                                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #0f172a; padding: 24px;">
+                                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+                                        <img src="https://app.getdory.dev/logo.png" width="32" height="32" alt="Dory" style="display: inline-block; border-radius: 6px;" />
+                                        <span style="font-size: 16px; font-weight: 600; color: #0f172a;">Dory</span>
+                                    </div>
+                                    <h2 style="margin: 0 0 12px; font-size: 20px;">Invitation to join ${organization.name}</h2>
+                                    <p style="margin: 0 0 12px; font-size: 14px; color: #334155;">
+                                        ${inviter.user.name || inviter.user.email} invited you to join <strong>${organization.name}</strong> as <strong>${role}</strong>.
+                                    </p>
+                                    <p style="margin: 0 0 24px;">
+                                        <a href="${invitationUrl.toString()}" style="display: inline-block; padding: 10px 18px; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 14px;">
+                                            Accept invitation
+                                        </a>
+                                    </p>
+                                    <p style="margin: 0 0 8px; font-size: 12px; color: #64748b;">
+                                        If you do not have an account yet, sign up with this email address first, then accept the invitation.
+                                    </p>
+                                    <p style="margin: 0; font-size: 12px; color: #2563eb; word-break: break-all;">
+                                        <a href="${invitationUrl.toString()}" style="color: #2563eb; text-decoration: underline;">${invitationUrl.toString()}</a>
+                                    </p>
+                                </div>
+                            `.trim(),
+                        });
                     },
                 }),
             ],

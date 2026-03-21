@@ -3,7 +3,7 @@ import { ResponseUtil } from '@/lib/result';
 import { ErrorCodes } from '@/lib/errors';
 import { handleApiError } from '../utils/handle-error';
 import { parseJsonBody } from '../utils/parse-json';
-import { withOrganizationHandler, withUserAndOrganizationHandler } from '../utils/with-organization-handler';
+import { withManagedOrganizationHandler, withOrganizationHandler } from '../utils/with-organization-handler';
 import { getApiLocale, translateApi } from '@/app/api/utils/i18n';
 
 // GET /api/connections?id=xxx
@@ -35,7 +35,7 @@ export const GET = withOrganizationHandler(async ({ req, db, organizationId }) =
 });
 
 // POST /api/connections
-export const POST = withUserAndOrganizationHandler(async ({ req, db, userId, organizationId }) => {
+export const POST = withManagedOrganizationHandler(async ({ req, db, userId, organizationId }) => {
     try {
         const payload = await req.json();
         const created = await db.connections.create(userId!, organizationId, payload);
@@ -53,7 +53,7 @@ export const POST = withUserAndOrganizationHandler(async ({ req, db, userId, org
 });
 
 // PATCH /api/connections?id=xxx
-export const PATCH = withUserAndOrganizationHandler(async ({ req, db, organizationId }) => {
+export const PATCH = withManagedOrganizationHandler(async ({ req, db, organizationId }) => {
     const locale = await getApiLocale();
     const t = (key: string, values?: Record<string, unknown>) => translateApi(key, values, locale);
 
@@ -89,7 +89,7 @@ export const PATCH = withUserAndOrganizationHandler(async ({ req, db, organizati
 });
 
 // DELETE /api/connections?id=xxx
-export const DELETE = withUserAndOrganizationHandler(async ({ req, db, organizationId }) => {
+export const DELETE = withManagedOrganizationHandler(async ({ req, db, organizationId }) => {
     const locale = await getApiLocale();
     const t = (key: string, values?: Record<string, unknown>) => translateApi(key, values, locale);
 

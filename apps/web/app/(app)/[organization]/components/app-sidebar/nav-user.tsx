@@ -1,35 +1,51 @@
 'use client';
 
-import { IconChartBar, IconCreditCard, IconDotsVertical, IconLogout, IconNotification, IconUserCircle } from '@tabler/icons-react';
+import { IconDotsVertical, IconLogout } from '@tabler/icons-react';
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/registry/new-york-v4/ui/avatar';
+import { Avatar, AvatarImage } from '@/registry/new-york-v4/ui/avatar';
 import BoringAvatar from 'boring-avatars';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuGroup,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/registry/new-york-v4/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/registry/new-york-v4/ui/dropdown-menu';
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarTrigger, useSidebar } from '@/registry/new-york-v4/ui/sidebar';
 import { signOut } from '@/lib/auth-client';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { ModeToggle } from '@/components/mode-toggle';
 import { User } from 'better-auth';
 
-
-export function NavUser({
-    user,
-}: {
-    user: User | null
-}) {
+export function NavUser({ user }: { user: User | null }) {
     const { isMobile, state } = useSidebar();
-    const params = useParams<{ organization: string }>();
     const router = useRouter();
-    const organization = params.organization;
     const collapsed = state === 'collapsed';
+
+    const renderMenuContent = () => (
+        <DropdownMenuContent className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg" side={isMobile ? 'bottom' : 'right'} align="end" sideOffset={4}>
+            <DropdownMenuLabel className="p-0 font-normal">
+                <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                    <Avatar className="h-8 w-8 rounded-lg">
+                        <AvatarImage src={user?.image || ''} alt={user?.name} />
+                        <BoringAvatar size={32} name={user?.name || ''} variant="beam" />
+                    </Avatar>
+                    <div className="grid flex-1 text-left text-sm leading-tight">
+                        <span className="truncate font-medium">{user?.name}</span>
+                        <span className="text-muted-foreground truncate text-xs">{user?.email}</span>
+                    </div>
+                </div>
+            </DropdownMenuLabel>
+            <DropdownMenuItem
+                onClick={async e => {
+                    e.preventDefault();
+                    const res = await signOut();
+                    console.log(res);
+                    if (res.data?.success) {
+                        router.push('/sign-in');
+                    }
+                }}
+            >
+                <IconLogout />
+                Log out
+            </DropdownMenuItem>
+        </DropdownMenuContent>
+    );
+
     if (collapsed) {
         return (
             <div className="flex w-full flex-col items-center gap-2 px-2">
@@ -53,63 +69,7 @@ export function NavUser({
                             <IconDotsVertical className="ml-auto size-4" />
                         </SidebarMenuButton>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg" side={isMobile ? 'bottom' : 'right'} align="end" sideOffset={4}>
-                        <DropdownMenuLabel className="p-0 font-normal">
-                            <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                                <Avatar className="h-8 w-8 rounded-lg">
-                                    <AvatarImage src={user?.image || ''} alt={user?.name} />
-                                    <BoringAvatar size={32} name={user?.name || ''} variant="beam" />
-                                    {/* <AvatarFallback className="rounded-lg">{user?.name ? user.name.charAt(0) : 'U'}</AvatarFallback> */}
-                                </Avatar>
-                                <div className="grid flex-1 text-left text-sm leading-tight">
-                                    <span className="truncate font-medium">{user?.name}</span>
-                                    <span className="text-muted-foreground truncate text-xs">{user?.email}</span>
-                                </div>
-                            </div>
-                        </DropdownMenuLabel>
-                        {/* <DropdownMenuSeparator /> */}
-                        {/* <DropdownMenuGroup>
-                            <DropdownMenuItem>
-                                <IconUserCircle />
-                                Account
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                                <IconCreditCard />
-                                Billing
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                                <IconNotification />
-                                Notifications
-                            </DropdownMenuItem>
-                        </DropdownMenuGroup> */}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuGroup>
-                            <DropdownMenuItem
-                                onClick={e => {
-                                    e.preventDefault();
-                                    if (!organization) return;
-                                    router.push(`/${organization}/ai-usage`);
-                                }}
-                            >
-                                <IconChartBar />
-                                AI Usage
-                            </DropdownMenuItem>
-                        </DropdownMenuGroup>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                            onClick={async e => {
-                                e.preventDefault();
-                                const res = await signOut();
-                                console.log(res);
-                                if (res.data?.success) {
-                                    router.push('/sign-in');
-                                }
-                            }}
-                        >
-                            <IconLogout />
-                            Log out
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
+                    {renderMenuContent()}
                 </DropdownMenu>
             </div>
         );
@@ -131,54 +91,7 @@ export function NavUser({
                                 </div>
                             </SidebarMenuButton>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-                            side={isMobile ? 'bottom' : 'right'}
-                            align="end"
-                            sideOffset={4}
-                        >
-                            <DropdownMenuLabel className="p-0 font-normal">
-                                <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                                    <Avatar className="h-8 w-8 rounded-lg">
-                                        <AvatarImage src={user?.image || ''} alt={user?.name} />
-                                        <BoringAvatar size={32} name={user?.name || ''} variant="beam" />
-                                    </Avatar>
-                                    <div className="grid flex-1 text-left text-sm leading-tight">
-                                        <span className="truncate font-medium">{user?.name}</span>
-                                        <span className="text-muted-foreground truncate text-xs">{user?.email}</span>
-                                    </div>
-                                </div>
-                            </DropdownMenuLabel>
-                            {/* <DropdownMenuSeparator />
-                            <DropdownMenuGroup>
-                                <DropdownMenuItem>
-                                    <IconUserCircle />
-                                    Account
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                    <IconCreditCard />
-                                    Billing
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                    <IconNotification />
-                                    Notifications
-                                </DropdownMenuItem>
-                            </DropdownMenuGroup> */}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                onClick={async e => {
-                                    e.preventDefault();
-                                    const res = await signOut();
-                                    console.log(res);
-                                    if (res.data?.success) {
-                                        router.push('/sign-in');
-                                    }
-                                }}
-                            >
-                                <IconLogout />
-                                Log out
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
+                        {renderMenuContent()}
                     </DropdownMenu>
                     <ModeToggle />
                     <SidebarTrigger className="ml-2 cursor-pointer" />

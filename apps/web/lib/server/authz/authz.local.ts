@@ -1,4 +1,5 @@
 import { getDBService } from '@/lib/database';
+import { getOrganizationPermissionMap } from '@/lib/auth/organization-ac';
 import type { OrganizationAccess } from './types';
 
 export async function resolveLocalOrganizationAccess(organizationId: string, userId: string): Promise<OrganizationAccess | null> {
@@ -19,6 +20,7 @@ export async function resolveLocalOrganizationAccess(organizationId: string, use
         userId,
         isMember: true,
         role: member?.role ?? (organization?.ownerUserId === userId ? 'owner' : null),
+        permissions: getOrganizationPermissionMap(member?.role ?? (organization?.ownerUserId === userId ? 'owner' : null)),
         organization: organization
             ? {
                   id: organization.id,

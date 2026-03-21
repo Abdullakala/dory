@@ -100,6 +100,13 @@ export async function resolveDesktopOrganizationAccess(organizationId: string, u
         userId,
         isMember: true,
         role: null,
+        permissions: {
+            organization: { read: false, update: false, delete: false },
+            member: { read: false, create: false, update: false, delete: false },
+            invitation: { read: false, create: false, cancel: false },
+            workspace: { read: false, write: false },
+            connection: { read: false, create: false, update: false, delete: false },
+        },
         organization: {
             id: organizationId,
             slug: organizationId,

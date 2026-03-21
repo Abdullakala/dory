@@ -192,11 +192,11 @@
       "\nDROP INDEX IF EXISTS \"idx_chat_messages_session_id\";",
       "\nDROP INDEX IF EXISTS \"idx_chat_sessions_list\";",
       "\nDROP INDEX IF EXISTS \"uidx_chat_sessions_copilot_tab\";",
-      "\nALTER TABLE \"organization_members\" ALTER COLUMN \"status\" DROP DEFAULT;",
-      "\nALTER TABLE \"organization_members\" ALTER COLUMN \"status\" DROP NOT NULL;",
-      "\nALTER TABLE \"organization_members\" ALTER COLUMN \"joined_at\" DROP DEFAULT;",
-      "\nALTER TABLE \"organization_members\" ALTER COLUMN \"joined_at\" DROP NOT NULL;",
-      "\nALTER TABLE \"organizations\" ADD COLUMN IF NOT EXISTS \"metadata\" text;",
+      "\nALTER TABLE IF EXISTS \"organization_members\" ALTER COLUMN \"status\" DROP DEFAULT;",
+      "\nALTER TABLE IF EXISTS \"organization_members\" ALTER COLUMN \"status\" DROP NOT NULL;",
+      "\nALTER TABLE IF EXISTS \"organization_members\" ALTER COLUMN \"joined_at\" DROP DEFAULT;",
+      "\nALTER TABLE IF EXISTS \"organization_members\" ALTER COLUMN \"joined_at\" DROP NOT NULL;",
+      "\nALTER TABLE IF EXISTS \"organizations\" ADD COLUMN IF NOT EXISTS \"metadata\" text;",
       "\nCREATE INDEX IF NOT EXISTS \"idx_chat_messages_organization_conn_time\" ON \"chat_messages\" USING btree (\"organization_id\",\"connection_id\",\"created_at\");",
       "\nCREATE INDEX IF NOT EXISTS \"idx_chat_state_organization_conn\" ON \"chat_session_state\" USING btree (\"organization_id\",\"connection_id\");",
       "\nCREATE INDEX IF NOT EXISTS \"idx_chat_state_organization_tab\" ON \"chat_session_state\" USING btree (\"organization_id\",\"active_tab_id\");",
@@ -205,8 +205,8 @@
       "\nCREATE INDEX IF NOT EXISTS \"idx_chat_sessions_organization_conn\" ON \"chat_sessions\" USING btree (\"organization_id\",\"connection_id\");",
       "\nCREATE INDEX IF NOT EXISTS \"idx_chat_sessions_organization_db\" ON \"chat_sessions\" USING btree (\"organization_id\",\"active_database\");",
       "\nCREATE INDEX IF NOT EXISTS \"idx_organization_created\" ON \"query_audit\" USING btree (\"organization_id\",\"created_at\");",
-      "\nCREATE UNIQUE INDEX IF NOT EXISTS \"organization_members_organization_id_user_id_unique\" ON \"organization_members\" USING btree (\"organization_id\",\"user_id\");",
-      "\nCREATE INDEX IF NOT EXISTS \"idx_organization_members_organization\" ON \"organization_members\" USING btree (\"organization_id\");",
+      "\nDO $$\nBEGIN\n    IF EXISTS (\n        SELECT 1\n        FROM information_schema.tables\n        WHERE table_schema = 'public' AND table_name = 'organization_members'\n    ) THEN\n        EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS \"organization_members_organization_id_user_id_unique\" ON \"organization_members\" USING btree (\"organization_id\",\"user_id\")';\n    END IF;\nEND $$;",
+      "\nDO $$\nBEGIN\n    IF EXISTS (\n        SELECT 1\n        FROM information_schema.tables\n        WHERE table_schema = 'public' AND table_name = 'organization_members'\n    ) THEN\n        EXECUTE 'CREATE INDEX IF NOT EXISTS \"idx_organization_members_organization\" ON \"organization_members\" USING btree (\"organization_id\")';\n    END IF;\nEND $$;",
       "\nCREATE INDEX IF NOT EXISTS \"idx_conn_identity_organization_id\" ON \"connection_identities\" USING btree (\"organization_id\");",
       "\nCREATE INDEX IF NOT EXISTS \"idx_conn_identity_organization_cloud_id\" ON \"connection_identities\" USING btree (\"organization_id\",\"cloud_id\");",
       "\nCREATE UNIQUE INDEX IF NOT EXISTS \"uniq_connections_organization_name\" ON \"connections\" USING btree (\"organization_id\",\"name\") WHERE \"connections\".\"deleted_at\" IS NULL;",
@@ -232,7 +232,7 @@
     ],
     "bps": true,
     "folderMillis": 1774021104177,
-    "hash": "6dfe7adb5dec4a5e41b61ae95c95b921dd01b32c8afb90e757c35478eecda155"
+    "hash": "d5df240d0896e9976758968c2b8491835dd3f80cf53c1d685ede629ae0e0e865"
   },
   {
     "sql": [

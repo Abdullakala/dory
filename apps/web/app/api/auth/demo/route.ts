@@ -7,10 +7,12 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const DEMO_USER = {
-    email: 'demo@dory.local',
+    email: 'demo@getdory.dev',
     password: 'demo',
     name: 'Demo User',
 };
+
+const LEGACY_DEMO_EMAILS = ['demo@example.com', 'demo@dory.local'];
 
 function slugifyOrganizationName(name: string) {
     const normalized = name
@@ -74,9 +76,30 @@ export async function POST(req: NextRequest) {
     const auth = await getAuth();
     const ctx = await auth.$context;
 
-    const existing = await ctx.internalAdapter.findUserByEmail(DEMO_USER.email, {
+    let existing = await ctx.internalAdapter.findUserByEmail(DEMO_USER.email, {
         includeAccounts: true,
     });
+
+    if (!existing) {
+        for (const legacyEmail of LEGACY_DEMO_EMAILS) {
+            const legacyUser = await ctx.internalAdapter.findUserByEmail(legacyEmail, {
+                includeAccounts: true,
+            });
+
+            if (!legacyUser) {
+                continue;
+            }
+
+            await ctx.internalAdapter.updateUser(legacyUser.user.id, {
+                email: DEMO_USER.email,
+            });
+
+            existing = await ctx.internalAdapter.findUserByEmail(DEMO_USER.email, {
+                includeAccounts: true,
+            });
+            break;
+        }
+    }
 
     const passwordHash = await ctx.password.hash(DEMO_USER.password);
 

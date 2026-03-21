@@ -61,6 +61,16 @@ let rendererUpdaterState: RendererUpdaterState = {
     version: null,
 };
 let activeUpdateChannel: UpdateChannel = 'latest';
+let lastCheckTime = 0;
+let autoUpdateStartupTimer: NodeJS.Timeout | null = null;
+let autoUpdateIntervalTimer: NodeJS.Timeout | null = null;
+let autoUpdateChecksStarted = false;
+let autoUpdateStartupCheckPending = false;
+
+const INITIAL_AUTO_UPDATE_DELAY_MS = 15 * 1000;
+const STABLE_UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const BETA_UPDATE_INTERVAL_MS = STABLE_UPDATE_INTERVAL_MS;
+const FOCUS_CHECK_THRESHOLD_MS = 60 * 60 * 1000;
 
 function getChannelLabel(channel: UpdateChannel, t: MainTranslator) {
     return channel === 'beta' ? t('menu.updateChannelBeta') : t('menu.updateChannelStable');
@@ -84,6 +94,14 @@ function applyUpdateChannel(log: LogFn, channel: UpdateChannel) {
     autoUpdater.allowDowngrade = false;
     updaterPreferenceStore.set('updateChannel', channel);
     log('[updater] update channel set:', channel);
+}
+
+function getAutoUpdateIntervalMs(channel: UpdateChannel) {
+    if (channel === 'beta') {
+        return BETA_UPDATE_INTERVAL_MS;
+    }
+
+    return STABLE_UPDATE_INTERVAL_MS;
 }
 
 interface UpdaterController {
@@ -765,7 +783,31 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
         }
     });
 
-    const runCheckForUpdates = async (manual: boolean) => {
+    const clearAutoUpdateIntervalTimer = () => {
+        if (!autoUpdateIntervalTimer) {
+            return;
+        }
+
+        clearTimeout(autoUpdateIntervalTimer);
+        autoUpdateIntervalTimer = null;
+    };
+
+    const scheduleNextAutoUpdateCheck = () => {
+        if (!autoUpdateChecksStarted) {
+            return;
+        }
+
+        clearAutoUpdateIntervalTimer();
+
+        const intervalMs = getAutoUpdateIntervalMs(activeUpdateChannel);
+        log('[updater] next background update check scheduled in(ms):', intervalMs, 'channel:', activeUpdateChannel);
+        autoUpdateIntervalTimer = setTimeout(() => {
+            void runCheckForUpdates(false, 'interval');
+            scheduleNextAutoUpdateCheck();
+        }, intervalMs);
+    };
+
+    const runCheckForUpdates = async (manual: boolean, source: 'menu' | 'startup' | 'interval' | 'focus' | 'channel-change') => {
         if (checkInProgress || downloadInProgress) {
             if (manual) {
                 logWarn('[updater] check ignored: update flow already in progress');
@@ -787,6 +829,8 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
         }
 
         try {
+            lastCheckTime = Date.now();
+            log('[updater] run check for updates, source:', source, 'manual:', manual);
             showCheckingDialog = manual;
             isManualCheck = manual;
             if (!manual) {
@@ -810,21 +854,46 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
     };
 
     const startAutoUpdateChecks = () => {
-        const initialDelayMs = 10 * 1000;
-        const intervalMs = 6 * 60 * 60 * 1000;
-        log('[updater] schedule auto update checks, initial delay(ms):', initialDelayMs, 'interval(ms):', intervalMs);
-        setTimeout(() => {
-            void runCheckForUpdates(false);
-            setInterval(() => {
-                void runCheckForUpdates(false);
-            }, intervalMs);
-        }, initialDelayMs);
+        if (autoUpdateChecksStarted) {
+            return;
+        }
+
+        autoUpdateChecksStarted = true;
+        autoUpdateStartupCheckPending = true;
+        log(
+            '[updater] schedule auto update checks, initial delay(ms):',
+            INITIAL_AUTO_UPDATE_DELAY_MS,
+            'interval(ms):',
+            getAutoUpdateIntervalMs(activeUpdateChannel),
+            'focus threshold(ms):',
+            FOCUS_CHECK_THRESHOLD_MS,
+        );
+
+        autoUpdateStartupTimer = setTimeout(() => {
+            autoUpdateStartupCheckPending = false;
+            autoUpdateStartupTimer = null;
+            void runCheckForUpdates(false, 'startup');
+            scheduleNextAutoUpdateCheck();
+        }, INITIAL_AUTO_UPDATE_DELAY_MS);
+
+        app.on('browser-window-focus', () => {
+            if (autoUpdateStartupCheckPending) {
+                return;
+            }
+
+            if (Date.now() - lastCheckTime <= FOCUS_CHECK_THRESHOLD_MS) {
+                return;
+            }
+
+            void runCheckForUpdates(false, 'focus');
+            scheduleNextAutoUpdateCheck();
+        });
     };
 
     return {
         checkForUpdatesFromMenu: async () => {
             debugPreviewMode = false;
-            await runCheckForUpdates(true);
+            await runCheckForUpdates(true, 'menu');
         },
         getUpdateChannel: () => activeUpdateChannel,
         setUpdateChannelFromMenu: async (channel: UpdateChannel) => {
@@ -850,6 +919,7 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
             }
 
             applyUpdateChannel(log, channel);
+            scheduleNextAutoUpdateCheck();
             updaterPreferenceStore.set('skippedVersion', null);
             updaterPreferenceStore.set('remindLaterUntil', 0);
 
@@ -869,7 +939,7 @@ export function setupUpdater({ log, logWarn, logError, locale, t }: SetupUpdater
                 await dialog.showMessageBox(options);
             }
 
-            await runCheckForUpdates(true);
+            await runCheckForUpdates(true, 'channel-change');
         },
         clearSkippedVersionFromMenu: () => {
             clearSkippedVersion();

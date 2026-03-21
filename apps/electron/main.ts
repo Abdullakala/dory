@@ -76,6 +76,23 @@ function createUpdateChannelMenuItems(options: {
   ];
 }
 
+function createUpdateChannelSubmenuIfVisible(options: {
+  getUpdateChannel: () => UpdateChannel;
+  onSelectUpdateChannel: (channel: UpdateChannel) => void | Promise<void>;
+  updateChannelLabel: string;
+  stableChannelLabel: string;
+  betaChannelLabel: string;
+}): MenuItemConstructorOptions[] {
+  if (!isDev) {
+    return [];
+  }
+
+  return [{
+    label: options.updateChannelLabel,
+    submenu: createUpdateChannelMenuItems(options),
+  } satisfies MenuItemConstructorOptions];
+}
+
 function setupAppMenu(options: {
   onCheckUpdate: () => void;
   onSelectUpdateChannel: (channel: UpdateChannel) => void | Promise<void>;
@@ -93,6 +110,7 @@ function setupAppMenu(options: {
 }) {
   const logFilePath = getMainLogFilePath();
   const debugMenuItems: MenuItemConstructorOptions[] = [];
+  const updateChannelMenuItems = createUpdateChannelSubmenuIfVisible(options);
   if (options.onOpenUpdateDialogDebug) {
     const onOpenUpdateDialogDebug = options.onOpenUpdateDialogDebug;
     debugMenuItems.push({
@@ -116,10 +134,7 @@ function setupAppMenu(options: {
                 options.onCheckUpdate();
               },
             },
-            {
-              label: options.updateChannelLabel,
-              submenu: createUpdateChannelMenuItems(options),
-            },
+            ...updateChannelMenuItems,
             {
               label: options.resetSkippedUpdateLabel,
               click: () => {
@@ -146,20 +161,22 @@ function setupAppMenu(options: {
       role: 'help',
       submenu: [
         ...(process.platform !== 'darwin'
-          ? [{
-              label: options.checkForUpdatesLabel,
-              click: () => {
-                options.onCheckUpdate();
+          ? [
+              {
+                label: options.checkForUpdatesLabel,
+                click: () => {
+                  options.onCheckUpdate();
+                },
               },
-            }, {
-              label: options.updateChannelLabel,
-              submenu: createUpdateChannelMenuItems(options),
-            }, {
-              label: options.resetSkippedUpdateLabel,
-              click: () => {
-                options.onResetSkippedUpdate();
+              ...updateChannelMenuItems,
+              {
+                label: options.resetSkippedUpdateLabel,
+                click: () => {
+                  options.onResetSkippedUpdate();
+                },
               },
-            }, ...debugMenuItems]
+              ...debugMenuItems,
+            ]
           : []),
         { type: 'separator' },
         {

@@ -11597,22 +11597,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"desktop@workspace:apps/electron":
-  version: 0.0.0-use.local
-  resolution: "desktop@workspace:apps/electron"
-  dependencies:
-    "@types/node": "npm:^24.3.1"
-    dotenv: "npm:^17.2.3"
-    electron: "npm:38.7.2"
-    electron-builder: "npm:^25.1.8"
-    electron-log: "npm:^5.4.3"
-    electron-notarize: "npm:^1.2.2"
-    electron-store: "npm:^9.0.0"
-    electron-updater: "npm:^6.6.2"
-    typescript: "npm:^5.9.3"
-  languageName: unknown
-  linkType: soft
-
 "detect-libc@npm:^2.0.0, detect-libc@npm:^2.0.1, detect-libc@npm:^2.0.3, detect-libc@npm:^2.1.2":
   version: 2.1.2
   resolution: "detect-libc@npm:2.1.2"
@@ -11807,9 +11791,25 @@ __metadata:
   languageName: node
   linkType: hard
 
-"dory@workspace:.":
+"dory@workspace:apps/electron":
   version: 0.0.0-use.local
-  resolution: "dory@workspace:."
+  resolution: "dory@workspace:apps/electron"
+  dependencies:
+    "@types/node": "npm:^24.3.1"
+    dotenv: "npm:^17.2.3"
+    electron: "npm:38.7.2"
+    electron-builder: "npm:^25.1.8"
+    electron-log: "npm:^5.4.3"
+    electron-notarize: "npm:^1.2.2"
+    electron-store: "npm:^9.0.0"
+    electron-updater: "npm:^6.6.2"
+    typescript: "npm:^5.9.3"
+  languageName: unknown
+  linkType: soft
+
+"doryporoject@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "doryporoject@workspace:."
   dependencies:
     "@playwright/test": "npm:^1.54.2"
   languageName: unknown

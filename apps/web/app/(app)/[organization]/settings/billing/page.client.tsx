@@ -22,7 +22,11 @@ function formatDate(value: string | null) {
     return date.toLocaleString();
 }
 
-function getStatusDescription(status: string | null) {
+function getStatusDescription(status: string | null, cancelAtPeriodEnd: boolean, periodEnd: string | null) {
+    if (cancelAtPeriodEnd) {
+        return `Pro remains active until ${formatDate(periodEnd)}. Cancellation is scheduled at the end of the current billing period.`;
+    }
+
     if (!status) {
         return 'No paid subscription is active for this organization.';
     }
@@ -140,7 +144,13 @@ export default function BillingSettingsPageClient() {
                     <div className="text-sm font-medium">Current plan</div>
                     <div className="mt-2 text-2xl font-semibold">{isLoading ? 'Loading...' : currentPlanLabel}</div>
                     <p className="mt-2 text-sm text-muted-foreground">
-                        {isLoading ? 'Loading billing status...' : getStatusDescription(billingStatus?.subscriptionStatus ?? null)}
+                        {isLoading
+                            ? 'Loading billing status...'
+                            : getStatusDescription(
+                                  billingStatus?.subscriptionStatus ?? null,
+                                  billingStatus?.cancelAtPeriodEnd ?? false,
+                                  billingStatus?.periodEnd ?? null,
+                              )}
                     </p>
                 </div>
 

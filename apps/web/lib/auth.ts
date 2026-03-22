@@ -54,6 +54,7 @@ function createAuth() {
         const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim() || '';
         const stripeProMonthlyPriceId = process.env.STRIPE_PRO_MONTHLY_PRICE_ID?.trim() || '';
         const stripeBillingEnabled = isBillingEnabledForServer();
+        const stripeClient = stripeBillingEnabled ? new Stripe(stripeSecretKey) : null;
         const betterAuthInfraOptions = {
             ...(betterAuthApiKey ? { apiKey: betterAuthApiKey } : {}),
             ...(betterAuthApiUrl ? { apiUrl: betterAuthApiUrl } : {}),
@@ -310,12 +311,15 @@ function createAuth() {
                 }),
                 ...(stripeBillingEnabled
                     ? [
-                          stripePlugin({
-                              stripeClient: new Stripe(stripeSecretKey),
+                      stripePlugin({
+                              stripeClient: stripeClient!,
                               stripeWebhookSecret,
                               createCustomerOnSignUp: false,
                               organization: {
                                   enabled: true,
+                                  getCustomerCreateParams: async (_organization, ctx) => ({
+                                      email: ctx.context.session?.user.email ?? undefined,
+                                  }),
                               },
                               subscription: {
                                   enabled: true,
@@ -325,6 +329,35 @@ function createAuth() {
                                           priceId: stripeProMonthlyPriceId,
                                       },
                                   ],
+                                  getCheckoutSessionParams: async ({ user, session, subscription }) => {
+                                      if (!stripeClient || !subscription.stripeCustomerId) {
+                                          return {};
+                                      }
+
+                                      const isOrganizationSubscription = session.activeOrganizationId === subscription.referenceId;
+                                      const ownerEmail = user.email?.trim() || '';
+
+                                      if (!isOrganizationSubscription || !ownerEmail) {
+                                          return {};
+                                      }
+
+                                      try {
+                                          const stripeCustomer = await stripeClient.customers.retrieve(subscription.stripeCustomerId);
+                                          if (!stripeCustomer.deleted && stripeCustomer.email !== ownerEmail) {
+                                              await stripeClient.customers.update(subscription.stripeCustomerId, {
+                                                  email: ownerEmail,
+                                              });
+                                          }
+                                      } catch (error) {
+                                          console.warn('[auth] failed to sync organization Stripe customer email before checkout', {
+                                              customerId: subscription.stripeCustomerId,
+                                              referenceId: subscription.referenceId,
+                                              error,
+                                          });
+                                      }
+
+                                      return {};
+                                  },
                                   authorizeReference: async ({ user, referenceId }) => {
                                       const role = await getOrganizationMemberRole(referenceId, user.id);
                                       return canManageOrganizationBilling(role);

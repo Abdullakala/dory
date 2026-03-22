@@ -4,6 +4,7 @@ import { authClient } from '@/lib/auth-client';
 import type { OrganizationBillingStatus } from './types';
 
 type FetchMethod = 'GET' | 'POST';
+const REQUEST_TIMEOUT_MS = 10000;
 
 type StripeRedirectResponse = {
     url?: string | null;
@@ -21,6 +22,18 @@ async function parseResponse<T>(response: Response): Promise<T> {
     }
 
     return payload as T;
+}
+
+function createRequestSignal(timeoutMs: number): AbortSignal | undefined {
+    if (typeof AbortSignal === 'undefined') {
+        return undefined;
+    }
+
+    if (typeof AbortSignal.timeout === 'function') {
+        return AbortSignal.timeout(timeoutMs);
+    }
+
+    return undefined;
 }
 
 async function appApiRequest<T>(
@@ -41,6 +54,7 @@ async function appApiRequest<T>(
     const response = await fetch(url.toString(), {
         method,
         credentials: 'include',
+        signal: createRequestSignal(REQUEST_TIMEOUT_MS),
     });
 
     return parseResponse<T>(response);

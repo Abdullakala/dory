@@ -49,16 +49,19 @@ export default function BillingSettingsPageClient() {
     const organizationQuery = useQuery({
         queryKey: ['organization-full', organizationSlug],
         queryFn: () => getFullOrganization({ organizationSlug }),
+        retry: false,
     });
     const accessQuery = useQuery({
         queryKey: ['organization-access', organizationSlug, organizationQuery.data?.id],
         queryFn: () => getOrganizationAccess(organizationQuery.data!.id),
         enabled: Boolean(organizationQuery.data?.id),
+        retry: false,
     });
     const billingStatusQuery = useQuery({
         queryKey: ['organization-billing', organizationSlug, organizationQuery.data?.id],
         queryFn: () => getOrganizationBillingStatus(organizationQuery.data!.id),
         enabled: Boolean(organizationQuery.data?.id),
+        retry: false,
     });
 
     const upgradeMutation = useMutation({
@@ -90,8 +93,21 @@ export default function BillingSettingsPageClient() {
     const canManageBilling = accessQuery.data?.role === 'owner';
     const billingStatus = billingStatusQuery.data;
     const organization = organizationQuery.data;
-    const isLoading = organizationQuery.isLoading || accessQuery.isLoading || billingStatusQuery.isLoading;
+    const isOrganizationLoading = organizationQuery.isLoading;
+    const isBillingLoading = organizationQuery.isSuccess && billingStatusQuery.isLoading;
+    const isLoading = isOrganizationLoading || isBillingLoading;
     const currentPlanLabel = billingStatus?.plan === 'pro' ? 'Pro' : 'Hobby';
+    const billingDescription = billingStatusQuery.isError
+        ? billingStatusQuery.error instanceof Error
+            ? billingStatusQuery.error.message
+            : 'Failed to load billing status.'
+        : isLoading
+          ? 'Loading billing status...'
+          : getStatusDescription(
+                billingStatus?.subscriptionStatus ?? null,
+                billingStatus?.cancelAtPeriodEnd ?? false,
+                billingStatus?.periodEnd ?? null,
+            );
 
     const detailRows = useMemo(
         () => [
@@ -143,15 +159,7 @@ export default function BillingSettingsPageClient() {
                 <div className="rounded-lg border bg-muted/30 px-4 py-4">
                     <div className="text-sm font-medium">Current plan</div>
                     <div className="mt-2 text-2xl font-semibold">{isLoading ? 'Loading...' : currentPlanLabel}</div>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                        {isLoading
-                            ? 'Loading billing status...'
-                            : getStatusDescription(
-                                  billingStatus?.subscriptionStatus ?? null,
-                                  billingStatus?.cancelAtPeriodEnd ?? false,
-                                  billingStatus?.periodEnd ?? null,
-                              )}
-                    </p>
+                    <p className="mt-2 text-sm text-muted-foreground">{billingDescription}</p>
                 </div>
 
                 <div className="grid gap-3">

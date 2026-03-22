@@ -3,6 +3,7 @@
 import type { OrganizationRole } from '@/types/organization';
 
 type FetchMethod = 'GET' | 'POST';
+const REQUEST_TIMEOUT_MS = 10000;
 
 async function parseResponse<T>(response: Response): Promise<T> {
     const payload = await response.json().catch(() => null);
@@ -15,6 +16,18 @@ async function parseResponse<T>(response: Response): Promise<T> {
     }
 
     return payload as T;
+}
+
+function createRequestSignal(timeoutMs: number): AbortSignal | undefined {
+    if (typeof AbortSignal === 'undefined') {
+        return undefined;
+    }
+
+    if (typeof AbortSignal.timeout === 'function') {
+        return AbortSignal.timeout(timeoutMs);
+    }
+
+    return undefined;
 }
 
 async function authOrganizationRequest<T>(
@@ -38,6 +51,7 @@ async function authOrganizationRequest<T>(
         headers: options?.body ? { 'Content-Type': 'application/json' } : undefined,
         body: options?.body ? JSON.stringify(options.body) : undefined,
         credentials: 'include',
+        signal: createRequestSignal(REQUEST_TIMEOUT_MS),
     });
 
     return parseResponse<T>(response);
@@ -64,6 +78,7 @@ async function appApiRequest<T>(
         headers: options?.body ? { 'Content-Type': 'application/json' } : undefined,
         body: options?.body ? JSON.stringify(options.body) : undefined,
         credentials: 'include',
+        signal: createRequestSignal(REQUEST_TIMEOUT_MS),
     });
 
     return parseResponse<T>(response);

@@ -1,8 +1,10 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { jwt, organization } from 'better-auth/plugins';
-import { eq } from 'drizzle-orm';
+import { stripe as stripePlugin } from '@better-auth/stripe';
 import { dash, sentinel } from '@better-auth/infra';
+import Stripe from 'stripe';
+import { and, eq, isNull, or } from 'drizzle-orm';
 import { createCachedAsyncFactory } from '@dory/auth-core';
 import type { PostgresDBClient } from '../types';
 import { getClient } from './database/postgres/client';
@@ -12,8 +14,9 @@ import { sendEmail } from './email';
 import { resolveOrganizationIdForSession, shouldCreateDefaultOrganization } from './auth/migration-state';
 import { translate } from './i18n/i18n';
 import { getServerLocale } from './i18n/server-locale';
-import { isDesktopRuntime } from './runtime/runtime';
+import { isBillingEnabledForServer, isDesktopRuntime } from './runtime/runtime';
 import { organizationAc, organizationRoles } from './auth/organization-ac';
+import { canManageOrganizationBilling } from './billing/authz';
 
 type AuthUser = {
     id: string;
@@ -47,11 +50,63 @@ function createAuth() {
         const betterAuthApiKey = process.env.BETTER_AUTH_API_KEY?.trim() || undefined;
         const betterAuthApiUrl = process.env.BETTER_AUTH_API_URL?.trim() || undefined;
         const betterAuthKvUrl = process.env.BETTER_AUTH_KV_URL?.trim() || undefined;
+        const stripeSecretKey = process.env.STRIPE_SECRET_KEY?.trim() || '';
+        const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim() || '';
+        const stripeProMonthlyPriceId = process.env.STRIPE_PRO_MONTHLY_PRICE_ID?.trim() || '';
+        const stripeBillingEnabled = isBillingEnabledForServer();
+        const stripeClient = stripeBillingEnabled ? new Stripe(stripeSecretKey) : null;
         const betterAuthInfraOptions = {
             ...(betterAuthApiKey ? { apiKey: betterAuthApiKey } : {}),
             ...(betterAuthApiUrl ? { apiUrl: betterAuthApiUrl } : {}),
             ...(betterAuthKvUrl ? { kvUrl: betterAuthKvUrl } : {}),
         };
+        const authPlugins = [
+            jwt(),
+            dash({
+                ...betterAuthInfraOptions,
+                activityTracking: {
+                    enabled: true,
+                    updateInterval: 300000,
+                },
+            }),
+            sentinel({
+                ...betterAuthInfraOptions,
+                security: {
+                    credentialStuffing: {
+                        enabled: true,
+                        thresholds: {
+                            challenge: 3,
+                            block: 5,
+                        },
+                        windowSeconds: 3600,
+                        cooldownSeconds: 900,
+                    },
+                    impossibleTravel: {
+                        enabled: true,
+                        action: 'log',
+                    },
+                    botBlocking: {
+                        action: 'challenge',
+                    },
+                    suspiciousIpBlocking: {
+                        action: 'challenge',
+                    },
+                    velocity: {
+                        enabled: true,
+                        thresholds: {
+                            challenge: 10,
+                            block: 20,
+                        },
+                        maxSignupsPerVisitor: 5,
+                        maxPasswordResetsPerIp: 10,
+                        maxSignInsPerIp: 50,
+                        windowSeconds: 3600,
+                        action: 'challenge',
+                    },
+                    challengeDifficulty: 18,
+                },
+            }),
+        ];
 
         console.log('[auth] TRUSTED_ORIGINS =', process.env.TRUSTED_ORIGINS);
 
@@ -75,6 +130,22 @@ function createAuth() {
 
         async function hasExistingOrganization(userId: string): Promise<boolean> {
             return Boolean(await findInitialOrganizationId(userId));
+        }
+
+        async function getOrganizationMemberRole(organizationId: string, userId: string) {
+            const [membership] = await db
+                .select({ role: schema.organizationMembers.role })
+                .from(schema.organizationMembers)
+                .where(
+                    and(
+                        eq(schema.organizationMembers.organizationId, organizationId),
+                        eq(schema.organizationMembers.userId, userId),
+                        or(eq(schema.organizationMembers.status, 'active'), isNull(schema.organizationMembers.status)),
+                    ),
+                )
+                .limit(1);
+
+            return membership?.role ?? null;
         }
 
         /**
@@ -119,51 +190,7 @@ function createAuth() {
             // },
             database: drizzleAdapter(db, { provider, schema }),
             plugins: [
-                jwt(),
-                dash({
-                    ...betterAuthInfraOptions,
-                    activityTracking: {
-                        enabled: true,
-                        updateInterval: 300000,
-                    },
-                }),
-                sentinel({
-                    ...betterAuthInfraOptions,
-                    security: {
-                        credentialStuffing: {
-                            enabled: true,
-                            thresholds: {
-                                challenge: 3,
-                                block: 5,
-                            },
-                            windowSeconds: 3600,
-                            cooldownSeconds: 900,
-                        },
-                        impossibleTravel: {
-                            enabled: true,
-                            action: 'log',
-                        },
-                        botBlocking: {
-                            action: 'challenge',
-                        },
-                        suspiciousIpBlocking: {
-                            action: 'challenge',
-                        },
-                        velocity: {
-                            enabled: true,
-                            thresholds: {
-                                challenge: 10,
-                                block: 20,
-                            },
-                            maxSignupsPerVisitor: 5,
-                            maxPasswordResetsPerIp: 10,
-                            maxSignInsPerIp: 50,
-                            windowSeconds: 3600,
-                            action: 'challenge',
-                        },
-                        challengeDifficulty: 18,
-                    },
-                }),
+                ...authPlugins,
                 organization({
                     ac: organizationAc,
                     roles: organizationRoles,
@@ -282,6 +309,99 @@ function createAuth() {
                         });
                     },
                 }),
+                ...(stripeBillingEnabled
+                    ? [
+                      stripePlugin({
+                              stripeClient: stripeClient!,
+                              stripeWebhookSecret,
+                              createCustomerOnSignUp: false,
+                              organization: {
+                                  enabled: true,
+                                  getCustomerCreateParams: async (_organization, ctx) => ({
+                                      email: ctx.context.session?.user.email ?? undefined,
+                                  }),
+                              },
+                              subscription: {
+                                  enabled: true,
+                                  plans: [
+                                      {
+                                          name: 'pro',
+                                          priceId: stripeProMonthlyPriceId,
+                                      },
+                                  ],
+                                  getCheckoutSessionParams: async ({ user, session, subscription }) => {
+                                      if (!stripeClient || !subscription.stripeCustomerId) {
+                                          return {};
+                                      }
+
+                                      const isOrganizationSubscription = session.activeOrganizationId === subscription.referenceId;
+                                      const ownerEmail = user.email?.trim() || '';
+
+                                      if (!isOrganizationSubscription || !ownerEmail) {
+                                          return {};
+                                      }
+
+                                      try {
+                                          const stripeCustomer = await stripeClient.customers.retrieve(subscription.stripeCustomerId);
+                                          if (!stripeCustomer.deleted && stripeCustomer.email !== ownerEmail) {
+                                              await stripeClient.customers.update(subscription.stripeCustomerId, {
+                                                  email: ownerEmail,
+                                              });
+                                          }
+                                      } catch (error) {
+                                          console.warn('[auth] failed to sync organization Stripe customer email before checkout', {
+                                              customerId: subscription.stripeCustomerId,
+                                              referenceId: subscription.referenceId,
+                                              error,
+                                          });
+                                      }
+
+                                      return {};
+                                  },
+                                  authorizeReference: async ({ user, referenceId }) => {
+                                      const role = await getOrganizationMemberRole(referenceId, user.id);
+                                      return canManageOrganizationBilling(role);
+                                  },
+                              },
+                              schema: {
+                                  user: {
+                                      fields: {
+                                          stripeCustomerId: 'stripeCustomerId',
+                                      },
+                                  },
+                                  organization: {
+                                      modelName: 'organizations',
+                                      fields: {
+                                          stripeCustomerId: 'stripeCustomerId',
+                                      },
+                                  },
+                                  subscription: {
+                                      modelName: 'subscription',
+                                      fields: {
+                                          plan: 'plan',
+                                          referenceId: 'referenceId',
+                                          stripeCustomerId: 'stripeCustomerId',
+                                          stripeSubscriptionId: 'stripeSubscriptionId',
+                                          status: 'status',
+                                          periodStart: 'periodStart',
+                                          periodEnd: 'periodEnd',
+                                          trialStart: 'trialStart',
+                                          trialEnd: 'trialEnd',
+                                          cancelAtPeriodEnd: 'cancelAtPeriodEnd',
+                                          cancelAt: 'cancelAt',
+                                          canceledAt: 'canceledAt',
+                                          endedAt: 'endedAt',
+                                          seats: 'seats',
+                                          billingInterval: 'billingInterval',
+                                          stripeScheduleId: 'stripeScheduleId',
+                                          createdAt: 'createdAt',
+                                          updatedAt: 'updatedAt',
+                                      },
+                                  },
+                              },
+                          }),
+                      ]
+                    : []),
             ],
             baseURL: isDesktop && desktopOrigin ? desktopOrigin : undefined,
             advanced: isDesktop ? { useSecureCookies: false } : undefined,

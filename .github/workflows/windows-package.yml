@@ -76,7 +76,7 @@ jobs:
                   elif [ -n "$INPUT_DISTRIBUTION" ]; then
                     DISTRIBUTION="$INPUT_DISTRIBUTION"
                   elif [ -n "$RESOLVED_TAG" ]; then
-                    IS_PRERELEASE="$(gh release view "$RESOLVED_TAG" --json isPrerelease -q '.isPrerelease')"
+                    IS_PRERELEASE="$(gh release view "$RESOLVED_TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease -q '.isPrerelease')"
                     echo "Resolved prerelease flag: ${IS_PRERELEASE}"
                     if [ "$IS_PRERELEASE" = "true" ]; then
                       DISTRIBUTION="beta"

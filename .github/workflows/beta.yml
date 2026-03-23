@@ -25,7 +25,7 @@ on:
 
 permissions:
   actions: write
-  contents: read
+  contents: write
 
 concurrency:
   group: beta-${{ inputs.git_ref }}
@@ -34,11 +34,12 @@ concurrency:
 jobs:
   beta:
     runs-on: ubuntu-latest
+    environment: beta
 
     env:
       GH_TOKEN: ${{ github.token }}
-      BETA_APP_DOMAIN: beta-app.getdory.dev
-      BETA_VERCEL_PROJECT_NAME: dory-beta
+      APP_DOMAIN: ${{ vars.APP_DOMAIN || 'beta-app.getdory.dev' }}
+      VERCEL_PROJECT_NAME: ${{ vars.VERCEL_PROJECT_NAME || 'dory-beta' }}
 
     steps:
       - name: Checkout
@@ -67,13 +68,13 @@ jobs:
         id: beta_meta
         shell: bash
         env:
-          INPUT_CLOUD_API_URL: ${{ secrets.BETA_CLOUD_API_URL }}
-          INPUT_AUTH_URL: ${{ secrets.BETA_AUTH_URL }}
-          INPUT_TRUSTED_ORIGINS: ${{ secrets.BETA_TRUSTED_ORIGINS }}
+          INPUT_CLOUD_API_URL: ${{ secrets.NEXT_PUBLIC_DORY_CLOUD_API_URL }}
+          INPUT_AUTH_URL: ${{ secrets.BETTER_AUTH_URL }}
+          INPUT_TRUSTED_ORIGINS: ${{ secrets.TRUSTED_ORIGINS }}
         run: |
           COMMIT_SHA="$(git rev-parse HEAD)"
           SHORT_SHA="$(git rev-parse --short=12 HEAD)"
-          AUTH_URL="${INPUT_AUTH_URL:-https://${BETA_APP_DOMAIN}}"
+          AUTH_URL="${INPUT_AUTH_URL:-https://${APP_DOMAIN}}"
           AUTH_URL="${AUTH_URL%/}"
           TRUSTED_ORIGINS="${INPUT_TRUSTED_ORIGINS:-$AUTH_URL}"
           CLOUD_API_URL="${INPUT_CLOUD_API_URL:-${AUTH_URL}/api}"
@@ -86,6 +87,78 @@ jobs:
           echo "cloud_api_url=$CLOUD_API_URL" >> "$GITHUB_OUTPUT"
           echo "neon_branch=beta" >> "$GITHUB_OUTPUT"
 
+      - name: Resolve beta release tag
+        if: ${{ inputs.build_desktop }}
+        id: release_meta
+        shell: bash
+        run: |
+          BASE_TAG="$(git describe --tags --abbrev=0 --match 'v*' HEAD 2>/dev/null || true)"
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          RELEASE_VERSION="$(
+            BASE_TAG="$BASE_TAG" PACKAGE_VERSION="$PACKAGE_VERSION" node <<'NODE'
+            const source = (process.env.BASE_TAG || '').trim() || `v${(process.env.PACKAGE_VERSION || '').trim()}`;
+
+            const match = source.match(/^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/);
+            if (!match) {
+                console.error(`Unsupported version source: ${source}`);
+                process.exit(1);
+            }
+
+            let major = Number(match[1]);
+            let minor = Number(match[2]);
+            let patch = Number(match[3]);
+            const prerelease = match[4] || '';
+
+            const betaMatch = prerelease.match(/^beta\.(\d+)$/);
+            if (betaMatch) {
+                process.stdout.write(`${major}.${minor}.${patch}-beta.${Number(betaMatch[1]) + 1}`);
+                process.exit(0);
+            }
+
+            patch += 1;
+            process.stdout.write(`${major}.${minor}.${patch}-beta.0`);
+            NODE
+          )"
+          RELEASE_TAG="v${RELEASE_VERSION}"
+
+          echo "base_tag=$BASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "release_version=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Generate beta release notes
+        if: ${{ inputs.build_desktop }}
+        id: release_notes
+        uses: ./.github/actions/release-notes
+        env:
+          RELEASE_NOTES_AI_PROVIDER: ${{ secrets.RELEASE_NOTES_AI_PROVIDER || 'openai' }}
+          RELEASE_NOTES_AI_MODEL: ${{ secrets.RELEASE_NOTES_AI_MODEL || 'gpt-4o-mini' }}
+          RELEASE_NOTES_AI_API_KEY: ${{ secrets.RELEASE_NOTES_AI_API_KEY }}
+          RELEASE_NOTES_AI_URL: ${{ secrets.RELEASE_NOTES_AI_URL }}
+        with:
+          tag: ${{ steps.release_meta.outputs.tag }}
+          to_ref: HEAD
+
+      - name: Create or update beta GitHub release
+        if: ${{ inputs.build_desktop }}
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag }}
+          NOTES_FILE: ${{ steps.release_notes.outputs.notes_file }}
+          TARGET_SHA: ${{ steps.beta_meta.outputs.commit_sha }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" \
+              --title "$RELEASE_TAG" \
+              --notes-file "$NOTES_FILE" \
+              --prerelease
+          else
+            gh release create "$RELEASE_TAG" \
+              --target "$TARGET_SHA" \
+              --title "$RELEASE_TAG" \
+              --notes-file "$NOTES_FILE" \
+              --prerelease
+          fi
+
       - name: Prepare beta web env
         if: ${{ inputs.deploy_web }}
         shell: bash
@@ -93,9 +166,9 @@ jobs:
           AUTH_URL: ${{ steps.beta_meta.outputs.auth_url }}
           TRUSTED_ORIGINS: ${{ steps.beta_meta.outputs.trusted_origins }}
           CLOUD_API_URL: ${{ steps.beta_meta.outputs.cloud_api_url }}
-          BETTER_AUTH_SECRET: ${{ secrets.BETA_BETTER_AUTH_SECRET }}
-          DS_SECRET_KEY: ${{ secrets.BETA_DS_SECRET_KEY }}
-          DATABASE_URL: ${{ secrets.NEON_BETA_DATABASE_URL }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          DS_SECRET_KEY: ${{ secrets.DS_SECRET_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           cat > apps/web/.env <<EOF
           BETTER_AUTH_SECRET=$BETTER_AUTH_SECRET
@@ -124,14 +197,14 @@ jobs:
         if: ${{ inputs.deploy_web || inputs.run_migrations }}
         env:
           DB_TYPE: postgres
-          DATABASE_URL: ${{ secrets.NEON_BETA_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: yarn workspace web run postgres:check
 
       - name: Run beta Postgres migrations
         if: ${{ inputs.run_migrations }}
         env:
           DB_TYPE: postgres
-          DATABASE_URL: ${{ secrets.NEON_BETA_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: yarn workspace web run drizzle:migrate
 
       - name: Install Vercel CLI
@@ -145,9 +218,9 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID_BETA: ${{ vars.VERCEL_PROJECT_ID_BETA }}
+          VERCEL_PROJECT_ID_BETA: ${{ vars.VERCEL_PROJECT_ID || vars.VERCEL_PROJECT_ID_BETA }}
         run: |
-          PROJECT_NAME="$BETA_VERCEL_PROJECT_NAME"
+          PROJECT_NAME="$VERCEL_PROJECT_NAME"
           PROJECT_ID="$VERCEL_PROJECT_ID_BETA"
 
           get_project_id() {
@@ -212,7 +285,7 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_NAME_BETA: ${{ steps.vercel_project.outputs.project_name }}
         run: |
-          if ! vercel domains add "$BETA_APP_DOMAIN" "$VERCEL_PROJECT_NAME_BETA" --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID"; then
+          if ! vercel domains add "$APP_DOMAIN" "$VERCEL_PROJECT_NAME_BETA" --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID"; then
             echo "Domain registration skipped; continuing with alias promotion."
           fi
 
@@ -224,9 +297,9 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ steps.vercel_project.outputs.project_id }}
-          DATABASE_URL: ${{ secrets.NEON_BETA_DATABASE_URL }}
-          BETTER_AUTH_SECRET: ${{ secrets.BETA_BETTER_AUTH_SECRET }}
-          DS_SECRET_KEY: ${{ secrets.BETA_DS_SECRET_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          DS_SECRET_KEY: ${{ secrets.DS_SECRET_KEY }}
           AUTH_URL: ${{ steps.beta_meta.outputs.auth_url }}
           TRUSTED_ORIGINS: ${{ steps.beta_meta.outputs.trusted_origins }}
           CLOUD_API_URL: ${{ steps.beta_meta.outputs.cloud_api_url }}
@@ -265,10 +338,10 @@ jobs:
             exit 1
           fi
 
-          vercel alias set "$DEPLOYMENT_URL" "$BETA_APP_DOMAIN" --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID"
+          vercel alias set "$DEPLOYMENT_URL" "$APP_DOMAIN" --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID"
 
           echo "deployment_url=$DEPLOYMENT_URL" >> "$GITHUB_OUTPUT"
-          echo "beta_url=https://${BETA_APP_DOMAIN}" >> "$GITHUB_OUTPUT"
+          echo "beta_url=https://${APP_DOMAIN}" >> "$GITHUB_OUTPUT"
 
       - name: Trigger beta desktop packaging workflows
         if: ${{ inputs.build_desktop }}
@@ -278,11 +351,13 @@ jobs:
           TARGET_REF: ${{ inputs.git_ref }}
           TARGET_SHA: ${{ steps.beta_meta.outputs.commit_sha }}
           AUTH_URL: ${{ steps.beta_meta.outputs.auth_url }}
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag }}
         run: |
           dispatch_workflow() {
             local workflow_path="$1"
             gh workflow run "$workflow_path" \
               --ref "$TARGET_REF" \
+              -f release_tag="$RELEASE_TAG" \
               -f distribution=beta \
               -f app_base_url="$AUTH_URL" \
               -f auth_base_url="$AUTH_URL"
@@ -320,6 +395,7 @@ jobs:
           BUILD_DESKTOP: ${{ inputs.build_desktop }}
           COMMIT_SHA: ${{ steps.beta_meta.outputs.commit_sha }}
           BETA_URL: ${{ steps.deploy_web.outputs.beta_url }}
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag }}
           VERCEL_PROJECT_ID: ${{ steps.vercel_project.outputs.project_id }}
           MACOS_RUN_URL: ${{ steps.desktop_runs.outputs.macos_run_url }}
           WINDOWS_RUN_URL: ${{ steps.desktop_runs.outputs.windows_run_url }}
@@ -337,6 +413,8 @@ jobs:
               echo "- Beta URL: skipped"
             fi
             if [ "$BUILD_DESKTOP" = "true" ]; then
+              echo "- Release tag: \`$RELEASE_TAG\`"
+              echo "- Release URL: https://github.com/${{ github.repository }}/releases/tag/$RELEASE_TAG"
               echo "- macOS packaging run: ${MACOS_RUN_URL:-pending}"
               echo "- Windows packaging run: ${WINDOWS_RUN_URL:-pending}"
             else

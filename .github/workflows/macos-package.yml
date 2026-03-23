@@ -125,7 +125,6 @@ jobs:
                   DISTRIBUTION: ${{ needs.resolve_context.outputs.distribution }}
                   INPUT_APP_BASE_URL: ${{ inputs.app_base_url }}
                   INPUT_AUTH_BASE_URL: ${{ inputs.auth_base_url }}
-                  DEFAULT_NEXT_PUBLIC_DORY_RUNTIME: ${{ secrets.NEXT_PUBLIC_DORY_RUNTIME }}
                   DEFAULT_NEXT_PUBLIC_DORY_CLOUD_API_URL: ${{ secrets.NEXT_PUBLIC_DORY_CLOUD_API_URL }}
                   DEFAULT_BETTER_AUTH_URL: ${{ secrets.BETTER_AUTH_URL }}
               run: |
@@ -134,7 +133,6 @@ jobs:
                     APP_BASE_URL="${APP_BASE_URL%/}"
                     AUTH_BASE_URL="${INPUT_AUTH_BASE_URL:-${DEFAULT_BETTER_AUTH_URL:-$APP_BASE_URL}}"
                     AUTH_BASE_URL="${AUTH_BASE_URL%/}"
-                    NEXT_PUBLIC_DORY_RUNTIME="${DEFAULT_NEXT_PUBLIC_DORY_RUNTIME:-desktop}"
                     NEXT_PUBLIC_DORY_CLOUD_API_URL="${DEFAULT_NEXT_PUBLIC_DORY_CLOUD_API_URL:-${APP_BASE_URL}/api}"
                     NEXT_PUBLIC_DORY_CLOUD_API_URL="${NEXT_PUBLIC_DORY_CLOUD_API_URL%/}"
                     DORY_UPDATE_CHANNEL="beta"
@@ -143,7 +141,6 @@ jobs:
                   else
                     APP_BASE_URL="${INPUT_APP_BASE_URL:-}"
                     AUTH_BASE_URL="${INPUT_AUTH_BASE_URL:-$DEFAULT_BETTER_AUTH_URL}"
-                    NEXT_PUBLIC_DORY_RUNTIME="$DEFAULT_NEXT_PUBLIC_DORY_RUNTIME"
                     NEXT_PUBLIC_DORY_CLOUD_API_URL="$DEFAULT_NEXT_PUBLIC_DORY_CLOUD_API_URL"
                     DORY_UPDATE_CHANNEL="latest"
                     DORY_ELECTRON_APP_ID=""
@@ -153,7 +150,6 @@ jobs:
                   echo "distribution=$DISTRIBUTION" >> "$GITHUB_OUTPUT"
                   echo "app_base_url=$APP_BASE_URL" >> "$GITHUB_OUTPUT"
                   echo "auth_base_url=$AUTH_BASE_URL" >> "$GITHUB_OUTPUT"
-                  echo "next_public_dory_runtime=$NEXT_PUBLIC_DORY_RUNTIME" >> "$GITHUB_OUTPUT"
                   echo "next_public_dory_cloud_api_url=$NEXT_PUBLIC_DORY_CLOUD_API_URL" >> "$GITHUB_OUTPUT"
                   echo "update_channel=$DORY_UPDATE_CHANNEL" >> "$GITHUB_OUTPUT"
                   echo "electron_app_id=$DORY_ELECTRON_APP_ID" >> "$GITHUB_OUTPUT"
@@ -170,40 +166,17 @@ jobs:
             - name: Prepare web env
               shell: bash
               env:
-                  DISTRIBUTION: ${{ needs.resolve_context.outputs.distribution }}
                   AUTH_BASE_URL: ${{ steps.build_config.outputs.auth_base_url }}
-                  NEXT_PUBLIC_DORY_RUNTIME: ${{ steps.build_config.outputs.next_public_dory_runtime }}
                   NEXT_PUBLIC_DORY_CLOUD_API_URL: ${{ steps.build_config.outputs.next_public_dory_cloud_api_url }}
-                  BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
-                  DS_SECRET_KEY: ${{ secrets.DS_SECRET_KEY }}
-                  DB_TYPE: ${{ secrets.DB_TYPE }}
-                  DATABASE_URL: ${{ secrets.DATABASE_URL }}
-                  TRUSTED_ORIGINS: ${{ secrets.TRUSTED_ORIGINS }}
-                  NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.NEXT_PUBLIC_POSTHOG_KEY }}
-                  NEXT_PUBLIC_POSTHOG_HOST: ${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}
-                  DORY_AI_CLOUD_URL: ${{ secrets.DORY_AI_CLOUD_URL }}
               run: |
-                  EFFECTIVE_DB_TYPE="${DB_TYPE:-}"
-                  if [ "$DISTRIBUTION" = "beta" ] && [ -z "$EFFECTIVE_DB_TYPE" ]; then
-                    EFFECTIVE_DB_TYPE="postgres"
-                  fi
-
                   cat > apps/web/.env <<EOF
-                  BETTER_AUTH_SECRET=$BETTER_AUTH_SECRET
                   BETTER_AUTH_URL=$AUTH_BASE_URL
 
-                  DS_SECRET_KEY=$DS_SECRET_KEY
-
-                  DB_TYPE=$EFFECTIVE_DB_TYPE
-                  DATABASE_URL=$DATABASE_URL
-                  TRUSTED_ORIGINS=$TRUSTED_ORIGINS
-
+                  DORY_RUNTIME=desktop
+                  DB_TYPE=pglite
                   DORY_CLOUD_API_URL=$NEXT_PUBLIC_DORY_CLOUD_API_URL
-                  NEXT_PUBLIC_DORY_RUNTIME=$NEXT_PUBLIC_DORY_RUNTIME
+                  NEXT_PUBLIC_DORY_RUNTIME=desktop
                   NEXT_PUBLIC_DORY_CLOUD_API_URL=$NEXT_PUBLIC_DORY_CLOUD_API_URL
-                  NEXT_PUBLIC_POSTHOG_KEY=$NEXT_PUBLIC_POSTHOG_KEY
-                  NEXT_PUBLIC_POSTHOG_HOST=$NEXT_PUBLIC_POSTHOG_HOST
-                  DORY_AI_CLOUD_URL=$DORY_AI_CLOUD_URL
                   EOF
 
             - name: Build Electron app (mac)

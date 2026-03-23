@@ -42,6 +42,7 @@ const { log, logWarn, logError } = setupMainLogger({
 
 const serverManager = createStandaloneServerManager({
   isDev,
+  userDataPath: getUserDataPath(),
   databasePath,
   log,
   logWarn,

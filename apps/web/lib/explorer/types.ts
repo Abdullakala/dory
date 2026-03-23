@@ -1,35 +1,10 @@
 export const DEFAULT_EXPLORER_CATALOG = 'default';
 
-export type ExplorerDriver =
-    | 'postgres'
-    | 'clickhouse'
-    | 'mysql'
-    | 'doris'
-    | 'duckdb'
-    | 'sqlite'
-    | 'trino'
-    | 'unknown';
+export type ExplorerDriver = 'postgres' | 'clickhouse' | 'mariadb' | 'mysql' | 'doris' | 'duckdb' | 'sqlite' | 'trino' | 'unknown';
 
-export type ExplorerObjectKind =
-    | 'database'
-    | 'schema'
-    | 'table'
-    | 'view'
-    | 'materializedView'
-    | 'function'
-    | 'sequence'
-    | 'dictionary'
-    | 'procedure';
+export type ExplorerObjectKind = 'database' | 'schema' | 'table' | 'view' | 'materializedView' | 'function' | 'sequence' | 'dictionary' | 'procedure';
 
-export type ExplorerListKind =
-    | 'tables'
-    | 'views'
-    | 'materializedViews'
-    | 'functions'
-    | 'sequences'
-    | 'dictionaries'
-    | 'procedures'
-    | 'schemas';
+export type ExplorerListKind = 'tables' | 'views' | 'materializedViews' | 'functions' | 'sequences' | 'dictionaries' | 'procedures' | 'schemas';
 
 export type ExplorerBaseParams = {
     organization: string;
@@ -63,11 +38,7 @@ export type ExplorerObjectResource = {
     name: string;
 };
 
-export type ExplorerResource =
-    | ExplorerDatabaseResource
-    | ExplorerSchemaResource
-    | ExplorerListResource
-    | ExplorerObjectResource;
+export type ExplorerResource = ExplorerDatabaseResource | ExplorerSchemaResource | ExplorerListResource | ExplorerObjectResource;
 
 export type ExplorerPageType = 'root' | 'namespace' | 'schemaSummary' | 'object' | 'notFound';
 

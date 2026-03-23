@@ -1,4 +1,4 @@
-export type ConnectionType = 'clickhouse' | 'doris' | 'mysql' | 'postgres';
+export type ConnectionType = 'clickhouse' | 'doris' | 'mariadb' | 'mysql' | 'postgres';
 export type ConnectionStatus = 'Connected' | 'Error' | 'Disconnected';
 export type ConnectionCheckStatus = 'unknown' | 'ok' | 'error';
 export type ConnectionIdentityStatus = 'active' | 'disabled';
@@ -69,7 +69,7 @@ export interface CreateConnectionIdentity {
     connectionId: string;
     organizationId: string;
 
-    name: string; 
+    name: string;
     username: string;
     password?: string;
 
@@ -101,7 +101,7 @@ export interface ConnectionSsh {
     updatedAt: Date;
 }
 
-export type ConnectionItem = Omit<Connection, 'deletedAt' | 'organizationId' | 'validationErrors' | 'createdByUserId'>
+export type ConnectionItem = Omit<Connection, 'deletedAt' | 'organizationId' | 'validationErrors' | 'createdByUserId'>;
 
 export interface ConnectionCreateInput {
     organizationId: string;
@@ -140,7 +140,6 @@ export interface ConnectionUpdateInput {
     status?: ConnectionStatus;
     environment?: string;
     tags?: string;
-
 }
 
 export interface ConnectionIdentityCreateInput {
@@ -242,14 +241,12 @@ export interface ConnectionDetail extends Connection {
     ssh: ConnectionSsh | null;
 }
 
-
 export interface ConnectionQueryParams {
     organizationId: string;
 
     status?: ConnectionStatus | ConnectionStatus[];
     environment?: string | string[];
     keyword?: string;
-
 }
 export interface ConnectionPayload {
     connection: ConnectionCreateInput;

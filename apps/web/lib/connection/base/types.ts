@@ -1,7 +1,7 @@
 import { QueryInsightsFilters, QueryInsightsSummary, QueryTimelinePoint, QueryInsightsRow } from '@/types/monitoring';
 import { TableIndexInfo, TablePropertiesRow, TableStats } from '@/types/table-info';
 
-export type ConnectionType = 'clickhouse' | 'mysql' | 'postgres';
+export type ConnectionType = 'clickhouse' | 'mariadb' | 'mysql' | 'postgres';
 
 export interface BaseConfig {
     id: string; // datasource_id
@@ -129,7 +129,7 @@ export type DatabaseSummaryRecommendation = {
     rowsEstimate: number | null;
 };
 
-export type DatabaseSummaryEngine = 'clickhouse' | 'doris' | 'mysql' | 'postgres' | 'unknown';
+export type DatabaseSummaryEngine = 'clickhouse' | 'doris' | 'mariadb' | 'mysql' | 'postgres' | 'unknown';
 
 export type DatabaseSummary = {
     databaseName: string;

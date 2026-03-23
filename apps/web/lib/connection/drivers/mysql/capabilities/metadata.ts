@@ -27,6 +27,7 @@ type TableMetaRow = {
     indexBytes?: number | string | null;
     comment?: string | null;
     lastModified?: string | null;
+    createdAt?: string | null;
 };
 
 type ColumnCountRow = {
@@ -51,7 +52,8 @@ const TABLE_DETAIL_SQL = `
         data_length AS dataBytes,
         index_length AS indexBytes,
         table_comment AS comment,
-        update_time AS lastModified
+        update_time AS lastModified,
+        create_time AS createdAt
     FROM information_schema.tables
     WHERE table_schema = ?
     ORDER BY
@@ -92,7 +94,7 @@ function normalizeObjectRow(row: TableMetaRow): DatabaseObjectRow | null {
         totalBytes: toTotalBytes(row),
         totalRows: toNumberOrNull(row.totalRows),
         comment: row.comment ?? null,
-        lastModified: toIsoString(row.lastModified),
+        lastModified: toIsoString(row.lastModified ?? row.createdAt),
     };
 }
 

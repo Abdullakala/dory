@@ -5,7 +5,7 @@ import { Input } from '@/registry/new-york-v4/ui/input';
 import { Switch } from '@/registry/new-york-v4/ui/switch';
 import { FieldHelp, PortField } from './shared';
 
-function parseMysqlHostDraft(rawHost: unknown): { host?: string; port?: number; database?: string; ssl?: boolean } {
+function parseMariaDbHostDraft(rawHost: unknown): { host?: string; port?: number; database?: string; ssl?: boolean } {
     if (typeof rawHost !== 'string') return {};
     const trimmed = rawHost.trim();
     if (!trimmed) return {};
@@ -13,7 +13,7 @@ function parseMysqlHostDraft(rawHost: unknown): { host?: string; port?: number; 
     const hasProtocol = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed);
 
     try {
-        const url = new URL(hasProtocol ? trimmed : `mysql://${trimmed}`);
+        const url = new URL(hasProtocol ? trimmed : `mariadb://${trimmed}`);
         const hostname = url.hostname.includes(':') && !url.hostname.startsWith('[') ? `[${url.hostname}]` : url.hostname;
         const protocol = url.protocol.toLowerCase();
 
@@ -21,7 +21,7 @@ function parseMysqlHostDraft(rawHost: unknown): { host?: string; port?: number; 
             host: hostname || trimmed,
             port: url.port ? Number(url.port) : undefined,
             database: url.pathname ? decodeURIComponent(url.pathname.replace(/^\//, '')) || undefined : undefined,
-            ssl: protocol === 'mysqls:',
+            ssl: protocol === 'mariadbs:',
         };
     } catch {
         return { host: trimmed };
@@ -44,9 +44,9 @@ function parseConnectionOptions(raw: unknown): Record<string, unknown> {
     return {};
 }
 
-export function createMysqlConnectionDefaults() {
+export function createMariaDbConnectionDefaults() {
     return {
-        type: 'mysql',
+        type: 'mariadb',
         name: '',
         description: '',
         host: '',
@@ -59,13 +59,13 @@ export function createMysqlConnectionDefaults() {
     };
 }
 
-export function normalizeMysqlConnectionForForm(connection: any) {
+export function normalizeMariaDbConnectionForForm(connection: any) {
     const options = parseConnectionOptions(connection?.options);
-    const parsedHost = parseMysqlHostDraft(connection?.host);
+    const parsedHost = parseMariaDbHostDraft(connection?.host);
     const ssl = parsedHost.ssl ?? (typeof options.ssl === 'boolean' ? options.ssl : Boolean(options.ssl && typeof options.ssl === 'object'));
 
     return {
-        ...createMysqlConnectionDefaults(),
+        ...createMariaDbConnectionDefaults(),
         ...connection,
         host: parsedHost.host ?? connection?.host ?? '',
         port: typeof connection?.port === 'number' ? connection.port : (parsedHost.port ?? 3306),
@@ -75,10 +75,10 @@ export function normalizeMysqlConnectionForForm(connection: any) {
     };
 }
 
-export function normalizeMysqlConnectionForSubmit(connection: any) {
+export function normalizeMariaDbConnectionForSubmit(connection: any) {
     const options = parseConnectionOptions(connection?.options);
     const { ssl: _ssl, ...restConnection } = connection ?? {};
-    const parsedHost = parseMysqlHostDraft(connection?.host);
+    const parsedHost = parseMariaDbHostDraft(connection?.host);
     const ssl = parsedHost.ssl ?? Boolean(connection?.ssl);
 
     options.ssl = ssl;
@@ -93,9 +93,9 @@ export function normalizeMysqlConnectionForSubmit(connection: any) {
     };
 }
 
-export function validateMysqlConnection(_value: any, _ctx: RefinementCtx) {}
+export function validateMariaDbConnection(_value: any, _ctx: RefinementCtx) {}
 
-export function MysqlConnectionFields({ form }: { form: UseFormReturn<any> }) {
+export function MariaDbConnectionFields({ form }: { form: UseFormReturn<any> }) {
     return (
         <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] items-start">
@@ -108,10 +108,10 @@ export function MysqlConnectionFields({ form }: { form: UseFormReturn<any> }) {
                                 <span>
                                     Host<span className="text-destructive"> *</span>
                                 </span>
-                                <FieldHelp text="Use your MySQL server hostname or IP address." />
+                                <FieldHelp text="Use your MariaDB server hostname or IP address." />
                             </FormLabel>
                             <FormControl>
-                                <Input placeholder="db.example.com or mysql://db.example.com/app_db" {...field} />
+                                <Input placeholder="db.example.com or mariadb://db.example.com/app_db" {...field} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -123,7 +123,7 @@ export function MysqlConnectionFields({ form }: { form: UseFormReturn<any> }) {
                     name="connection.port"
                     label="Port"
                     placeholder="3306"
-                    helpText="MySQL usually uses 3306 unless your server is configured differently."
+                    helpText="MariaDB usually uses 3306 unless your server is configured differently."
                     required
                 />
             </div>
@@ -135,7 +135,7 @@ export function MysqlConnectionFields({ form }: { form: UseFormReturn<any> }) {
                     <FormItem className="space-y-2">
                         <FormLabel className="flex items-center gap-1.5">
                             <span>Default Database</span>
-                            <FieldHelp text="Optional default MySQL database to connect to." />
+                            <FieldHelp text="Optional default MariaDB database to connect to." />
                         </FormLabel>
                         <FormControl>
                             <Input placeholder="app_db" {...field} value={field.value ?? ''} />
@@ -153,7 +153,7 @@ export function MysqlConnectionFields({ form }: { form: UseFormReturn<any> }) {
                         <div>
                             <div className="flex items-center gap-1.5">
                                 <FormLabel className="text-sm font-medium">SSL</FormLabel>
-                                <FieldHelp text="Turn this on when the MySQL server requires TLS." />
+                                <FieldHelp text="Turn this on when the MariaDB server requires TLS." />
                             </div>
                         </div>
                         <FormControl>

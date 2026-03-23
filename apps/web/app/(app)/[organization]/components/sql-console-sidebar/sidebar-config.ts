@@ -18,6 +18,11 @@ const SIDEBAR_CONFIG_BY_DIALECT: Record<ConnectionType, SidebarConfig> = {
         supportsSchemas: false,
         hiddenDatabases: ['information_schema'],
     },
+    mariadb: {
+        dialect: 'mariadb',
+        supportsSchemas: false,
+        hiddenDatabases: ['information_schema', 'mysql', 'performance_schema', 'sys'],
+    },
     mysql: {
         dialect: 'mysql',
         supportsSchemas: false,

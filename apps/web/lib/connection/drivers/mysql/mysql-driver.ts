@@ -64,9 +64,9 @@ function parseHostInput(host: string, fallbackPort?: number | string): ParsedHos
     const trimmedHost = host.trim();
     const hasProtocol = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmedHost);
 
-    try {
-        const url = new URL(hasProtocol ? trimmedHost : `mysql://${trimmedHost}`);
-        if (!/^mysqls?:$/i.test(url.protocol)) {
+    const parseWithScheme = (scheme: string) => {
+        const url = new URL(hasProtocol ? trimmedHost : `${scheme}://${trimmedHost}`);
+        if (!/^(mysql|mariadb)s?:$/i.test(url.protocol)) {
             throw new Error('unsupported protocol');
         }
 
@@ -76,13 +76,21 @@ function parseHostInput(host: string, fallbackPort?: number | string): ParsedHos
             database: url.pathname ? decodeURIComponent(url.pathname.replace(/^\//, '')) || undefined : undefined,
             user: url.username ? decodeURIComponent(url.username) : undefined,
             password: url.password ? decodeURIComponent(url.password) : undefined,
-            ssl: url.protocol.toLowerCase() === 'mysqls:',
+            ssl: ['mysqls:', 'mariadbs:'].includes(url.protocol.toLowerCase()),
         };
+    };
+
+    try {
+        return parseWithScheme('mysql');
     } catch {
-        return {
-            host: trimmedHost,
-            port: normalizePort(fallbackPort),
-        };
+        try {
+            return parseWithScheme('mariadb');
+        } catch {
+            return {
+                host: trimmedHost,
+                port: normalizePort(fallbackPort),
+            };
+        }
     }
 }
 

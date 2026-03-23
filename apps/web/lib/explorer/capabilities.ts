@@ -34,6 +34,14 @@ export const EXPLORER_CAPABILITIES: Record<ExplorerDriver, DriverCapabilities> =
         listKinds: ['tables', 'views'],
         objectKinds: ['database', 'table', 'view'],
     },
+    mariadb: {
+        driver: 'mariadb',
+        supportsSchema: false,
+        supportsDatabase: true,
+        supportsCatalog: false,
+        listKinds: ['tables', 'views'],
+        objectKinds: ['database', 'table', 'view'],
+    },
     doris: {
         driver: 'doris',
         supportsSchema: false,

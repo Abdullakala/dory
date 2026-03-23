@@ -12,9 +12,8 @@ on:
                 required: false
                 type: string
             distribution:
-                description: 'Build distribution.'
+                description: 'Build distribution. Leave empty to infer from release_tag.'
                 required: false
-                default: stable
                 type: choice
                 options:
                     - stable
@@ -36,8 +35,62 @@ concurrency:
     cancel-in-progress: false
 
 jobs:
+    resolve_context:
+        runs-on: ubuntu-latest
+
+        env:
+            GH_TOKEN: ${{ github.token }}
+
+        outputs:
+            tag: ${{ steps.tag.outputs.tag }}
+            distribution: ${{ steps.distribution.outputs.distribution }}
+            environment_name: ${{ steps.distribution.outputs.environment_name }}
+
+        steps:
+            - name: Resolve release tag
+              id: tag
+              shell: bash
+              run: |
+                  TAG=""
+                  if [ "${{ github.event_name }}" = "release" ]; then
+                    TAG="${{ github.event.release.tag_name }}"
+                  elif [ -n "${{ inputs.release_tag }}" ]; then
+                    TAG="${{ inputs.release_tag }}"
+                  fi
+                  echo "Resolved release tag: ${TAG:-<empty>}"
+                  echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+            - name: Resolve distribution
+              id: distribution
+              shell: bash
+              env:
+                  INPUT_DISTRIBUTION: ${{ inputs.distribution }}
+                  RESOLVED_TAG: ${{ steps.tag.outputs.tag }}
+              run: |
+                  DISTRIBUTION="stable"
+
+                  if [ "${{ github.event_name }}" = "release" ]; then
+                    if [ "${{ github.event.release.prerelease }}" = "true" ]; then
+                      DISTRIBUTION="beta"
+                    fi
+                  elif [ -n "$INPUT_DISTRIBUTION" ]; then
+                    DISTRIBUTION="$INPUT_DISTRIBUTION"
+                  elif [ -n "$RESOLVED_TAG" ]; then
+                    IS_PRERELEASE="$(gh release view "$RESOLVED_TAG" --json isPrerelease -q '.isPrerelease')"
+                    echo "Resolved prerelease flag: ${IS_PRERELEASE}"
+                    if [ "$IS_PRERELEASE" = "true" ]; then
+                      DISTRIBUTION="beta"
+                    fi
+                  fi
+
+                  echo "Resolved distribution: $DISTRIBUTION"
+                  echo "distribution=$DISTRIBUTION" >> "$GITHUB_OUTPUT"
+                  echo "environment_name=$DISTRIBUTION" >> "$GITHUB_OUTPUT"
+
     package:
+        needs: resolve_context
         runs-on: windows-latest
+        environment: ${{ needs.resolve_context.outputs.environment_name }}
 
         env:
             GH_TOKEN: ${{ github.token }}
@@ -46,7 +99,7 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v4
               with:
-                  ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.ref }}
+                  ref: ${{ needs.resolve_context.outputs.tag != '' && needs.resolve_context.outputs.tag || github.ref }}
                   fetch-depth: 0
 
             - name: Setup Node
@@ -86,70 +139,33 @@ jobs:
                   Write-Error "yarn install failed after $maxAttempts attempts"
                   exit 1
 
-            - name: Resolve release tag
-              id: tag
-              shell: bash
-              env:
-                  GH_TOKEN: ${{ github.token }}
-              run: |
-                  TAG=""
-                  if [ "${{ github.event_name }}" = "release" ]; then
-                    TAG="${{ github.event.release.tag_name }}"
-                  elif [ -n "${{ inputs.release_tag }}" ]; then
-                    TAG="${{ inputs.release_tag }}"
-                  fi
-                  echo "Resolved release tag: ${TAG:-<empty>}"
-                  echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-
-            - name: Resolve release kind
-              id: release_kind
-              if: steps.tag.outputs.tag != ''
-              shell: bash
-              env:
-                  GH_TOKEN: ${{ github.token }}
-              run: |
-                  if [ "${{ github.event_name }}" = "release" ]; then
-                    IS_PRERELEASE="${{ github.event.release.prerelease }}"
-                  else
-                    IS_PRERELEASE="$(gh release view "${{ steps.tag.outputs.tag }}" --json isPrerelease -q '.isPrerelease')"
-                  fi
-                  echo "Resolved prerelease flag: ${IS_PRERELEASE}"
-                  echo "is_prerelease=$IS_PRERELEASE" >> "$GITHUB_OUTPUT"
-
             - name: Resolve build config
               id: build_config
               shell: bash
               env:
-                  INPUT_DISTRIBUTION: ${{ inputs.distribution }}
+                  DISTRIBUTION: ${{ needs.resolve_context.outputs.distribution }}
                   INPUT_APP_BASE_URL: ${{ inputs.app_base_url }}
                   INPUT_AUTH_BASE_URL: ${{ inputs.auth_base_url }}
-                  STABLE_NEXT_PUBLIC_DORY_RUNTIME: ${{ secrets.NEXT_PUBLIC_DORY_RUNTIME }}
-                  STABLE_NEXT_PUBLIC_DORY_CLOUD_API_URL: ${{ secrets.NEXT_PUBLIC_DORY_CLOUD_API_URL }}
-                  STABLE_BETTER_AUTH_URL: ${{ secrets.BETTER_AUTH_URL }}
+                  DEFAULT_NEXT_PUBLIC_DORY_RUNTIME: ${{ secrets.NEXT_PUBLIC_DORY_RUNTIME }}
+                  DEFAULT_NEXT_PUBLIC_DORY_CLOUD_API_URL: ${{ secrets.NEXT_PUBLIC_DORY_CLOUD_API_URL }}
+                  DEFAULT_BETTER_AUTH_URL: ${{ secrets.BETTER_AUTH_URL }}
               run: |
-                  DISTRIBUTION="stable"
-                  if [ "${{ github.event_name }}" = "release" ]; then
-                    if [ "${{ github.event.release.prerelease }}" = "true" ]; then
-                      DISTRIBUTION="beta"
-                    fi
-                  elif [ -n "$INPUT_DISTRIBUTION" ]; then
-                    DISTRIBUTION="$INPUT_DISTRIBUTION"
-                  fi
-
                   if [ "$DISTRIBUTION" = "beta" ]; then
                     APP_BASE_URL="${INPUT_APP_BASE_URL:-https://beta-app.getdory.dev}"
                     APP_BASE_URL="${APP_BASE_URL%/}"
-                    AUTH_BASE_URL="${INPUT_AUTH_BASE_URL:-$APP_BASE_URL}"
-                    NEXT_PUBLIC_DORY_RUNTIME="desktop"
-                    NEXT_PUBLIC_DORY_CLOUD_API_URL="${APP_BASE_URL}/api"
+                    AUTH_BASE_URL="${INPUT_AUTH_BASE_URL:-${DEFAULT_BETTER_AUTH_URL:-$APP_BASE_URL}}"
+                    AUTH_BASE_URL="${AUTH_BASE_URL%/}"
+                    NEXT_PUBLIC_DORY_RUNTIME="${DEFAULT_NEXT_PUBLIC_DORY_RUNTIME:-desktop}"
+                    NEXT_PUBLIC_DORY_CLOUD_API_URL="${DEFAULT_NEXT_PUBLIC_DORY_CLOUD_API_URL:-${APP_BASE_URL}/api}"
+                    NEXT_PUBLIC_DORY_CLOUD_API_URL="${NEXT_PUBLIC_DORY_CLOUD_API_URL%/}"
                     DORY_UPDATE_CHANNEL="beta"
                     DORY_ELECTRON_APP_ID="com.dory.app.beta"
                     DORY_PROTOCOL_SCHEME="dory-beta"
                   else
                     APP_BASE_URL="${INPUT_APP_BASE_URL:-}"
-                    AUTH_BASE_URL="${INPUT_AUTH_BASE_URL:-$STABLE_BETTER_AUTH_URL}"
-                    NEXT_PUBLIC_DORY_RUNTIME="$STABLE_NEXT_PUBLIC_DORY_RUNTIME"
-                    NEXT_PUBLIC_DORY_CLOUD_API_URL="$STABLE_NEXT_PUBLIC_DORY_CLOUD_API_URL"
+                    AUTH_BASE_URL="${INPUT_AUTH_BASE_URL:-$DEFAULT_BETTER_AUTH_URL}"
+                    NEXT_PUBLIC_DORY_RUNTIME="$DEFAULT_NEXT_PUBLIC_DORY_RUNTIME"
+                    NEXT_PUBLIC_DORY_CLOUD_API_URL="$DEFAULT_NEXT_PUBLIC_DORY_CLOUD_API_URL"
                     DORY_UPDATE_CHANNEL="latest"
                     DORY_ELECTRON_APP_ID=""
                     DORY_PROTOCOL_SCHEME=""
@@ -167,41 +183,22 @@ jobs:
             - name: Prepare web env
               shell: bash
               env:
-                  DISTRIBUTION: ${{ steps.build_config.outputs.distribution }}
+                  DISTRIBUTION: ${{ needs.resolve_context.outputs.distribution }}
                   AUTH_BASE_URL: ${{ steps.build_config.outputs.auth_base_url }}
                   NEXT_PUBLIC_DORY_RUNTIME: ${{ steps.build_config.outputs.next_public_dory_runtime }}
                   NEXT_PUBLIC_DORY_CLOUD_API_URL: ${{ steps.build_config.outputs.next_public_dory_cloud_api_url }}
-                  STABLE_BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
-                  BETA_BETTER_AUTH_SECRET: ${{ secrets.BETA_BETTER_AUTH_SECRET }}
-                  STABLE_DS_SECRET_KEY: ${{ secrets.DS_SECRET_KEY }}
-                  BETA_DS_SECRET_KEY: ${{ secrets.BETA_DS_SECRET_KEY }}
-                  STABLE_DB_TYPE: ${{ secrets.DB_TYPE }}
-                  STABLE_DATABASE_URL: ${{ secrets.DATABASE_URL }}
-                  BETA_DATABASE_URL: ${{ secrets.NEON_BETA_DATABASE_URL }}
-                  STABLE_TRUSTED_ORIGINS: ${{ secrets.TRUSTED_ORIGINS }}
-                  BETA_TRUSTED_ORIGINS: ${{ secrets.BETA_TRUSTED_ORIGINS }}
-                  STABLE_POSTHOG_KEY: ${{ secrets.NEXT_PUBLIC_POSTHOG_KEY }}
-                  STABLE_POSTHOG_HOST: ${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}
-                  STABLE_DORY_AI_CLOUD_URL: ${{ secrets.DORY_AI_CLOUD_URL }}
+                  BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+                  DS_SECRET_KEY: ${{ secrets.DS_SECRET_KEY }}
+                  DB_TYPE: ${{ secrets.DB_TYPE }}
+                  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+                  TRUSTED_ORIGINS: ${{ secrets.TRUSTED_ORIGINS }}
+                  NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.NEXT_PUBLIC_POSTHOG_KEY }}
+                  NEXT_PUBLIC_POSTHOG_HOST: ${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}
+                  DORY_AI_CLOUD_URL: ${{ secrets.DORY_AI_CLOUD_URL }}
               run: |
-                  if [ "$DISTRIBUTION" = "beta" ]; then
-                    BETTER_AUTH_SECRET="$BETA_BETTER_AUTH_SECRET"
-                    DS_SECRET_KEY="$BETA_DS_SECRET_KEY"
-                    DB_TYPE="postgres"
-                    DATABASE_URL="$BETA_DATABASE_URL"
-                    TRUSTED_ORIGINS="$BETA_TRUSTED_ORIGINS"
-                    NEXT_PUBLIC_POSTHOG_KEY=""
-                    NEXT_PUBLIC_POSTHOG_HOST=""
-                    DORY_AI_CLOUD_URL=""
-                  else
-                    BETTER_AUTH_SECRET="$STABLE_BETTER_AUTH_SECRET"
-                    DS_SECRET_KEY="$STABLE_DS_SECRET_KEY"
-                    DB_TYPE="$STABLE_DB_TYPE"
-                    DATABASE_URL="$STABLE_DATABASE_URL"
-                    TRUSTED_ORIGINS="$STABLE_TRUSTED_ORIGINS"
-                    NEXT_PUBLIC_POSTHOG_KEY="$STABLE_POSTHOG_KEY"
-                    NEXT_PUBLIC_POSTHOG_HOST="$STABLE_POSTHOG_HOST"
-                    DORY_AI_CLOUD_URL="$STABLE_DORY_AI_CLOUD_URL"
+                  EFFECTIVE_DB_TYPE="${DB_TYPE:-}"
+                  if [ "$DISTRIBUTION" = "beta" ] && [ -z "$EFFECTIVE_DB_TYPE" ]; then
+                    EFFECTIVE_DB_TYPE="postgres"
                   fi
 
                   cat > apps/web/.env <<EOF
@@ -210,7 +207,7 @@ jobs:
 
                   DS_SECRET_KEY=$DS_SECRET_KEY
 
-                  DB_TYPE=$DB_TYPE
+                  DB_TYPE=$EFFECTIVE_DB_TYPE
                   DATABASE_URL=$DATABASE_URL
                   TRUSTED_ORIGINS=$TRUSTED_ORIGINS
 
@@ -226,7 +223,7 @@ jobs:
               shell: bash
               env:
                   DORY_UPDATE_CHANNEL: ${{ steps.build_config.outputs.update_channel }}
-                  DORY_DISTRIBUTION: ${{ steps.build_config.outputs.distribution }}
+                  DORY_DISTRIBUTION: ${{ needs.resolve_context.outputs.distribution }}
                   DORY_APP_BASE_URL: ${{ steps.build_config.outputs.app_base_url }}
                   DORY_ELECTRON_APP_ID: ${{ steps.build_config.outputs.electron_app_id }}
                   DORY_PROTOCOL_SCHEME: ${{ steps.build_config.outputs.protocol_scheme }}
@@ -235,24 +232,24 @@ jobs:
             - name: Upload workflow artifact
               uses: actions/upload-artifact@v4
               with:
-                  name: ${{ steps.build_config.outputs.distribution == 'beta' && 'electron-windows-beta-dist' || 'electron-windows-dist' }}
+                  name: ${{ needs.resolve_context.outputs.distribution == 'beta' && 'electron-windows-beta-dist' || 'electron-windows-dist' }}
                   path: apps/electron/dist/*
                   if-no-files-found: error
 
             - name: Upload Windows install assets to Release
-              if: steps.tag.outputs.tag != ''
+              if: needs.resolve_context.outputs.tag != ''
               shell: bash
               run: |
-                  TAG="${{ steps.tag.outputs.tag }}"
+                  TAG="${{ needs.resolve_context.outputs.tag }}"
                   find apps/electron/dist -maxdepth 1 -type f \
                     \( -name "*.exe" -o -name "*.msi" -o -name "*.zip" \) \
                     -print0 | xargs -0 -I {} gh release upload "$TAG" "{}" --clobber
 
             - name: Upload Windows updater metadata to Release
-              if: steps.tag.outputs.tag != ''
+              if: needs.resolve_context.outputs.tag != ''
               shell: bash
               run: |
-                  TAG="${{ steps.tag.outputs.tag }}"
+                  TAG="${{ needs.resolve_context.outputs.tag }}"
                   CHANNEL="${{ steps.build_config.outputs.update_channel }}"
                   find apps/electron/dist -maxdepth 1 -type f -name "*.blockmap" \
                     -print0 | xargs -0 -I {} gh release upload "$TAG" "{}" --clobber

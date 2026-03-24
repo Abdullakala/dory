@@ -97,13 +97,13 @@ jobs:
 
         steps:
             - name: Checkout
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
               with:
                   ref: ${{ github.event_name == 'release' && needs.resolve_context.outputs.tag || github.ref }}
                   fetch-depth: 0
 
             - name: Setup Node
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v6
               with:
                   node-version: lts/*
 
@@ -203,7 +203,7 @@ jobs:
               run: yarn electron:build:win
 
             - name: Upload workflow artifact
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v7
               with:
                   name: ${{ needs.resolve_context.outputs.distribution == 'beta' && 'electron-windows-beta-dist' || 'electron-windows-dist' }}
                   path: apps/electron/dist/*

@@ -43,6 +43,7 @@ import { currentConnectionAtom } from '@/shared/stores/app.store';
 import posthog from 'posthog-js';
 import { FolderItem, type FolderData } from './folder-item';
 import { CreateFolderDialog } from './create-folder-dialog';
+import { DeleteConfirmationDialog } from './delete-confirmation-dialog';
 import { MoveToFolderDialog } from './move-to-folder-dialog';
 
 export type SavedQueryItem = {
@@ -209,6 +210,9 @@ export function SavedQueriesSidebar({ onSelect }: SavedQueriesSidebarProps) {
     const [renameFolderTarget, setRenameFolderTarget] = useState<FolderData | null>(null);
     const [renameFolderValue, setRenameFolderValue] = useState('');
     const [renameFolderSaving, setRenameFolderSaving] = useState(false);
+    const [deleteQueryTarget, setDeleteQueryTarget] = useState<SavedQueryItem | null>(null);
+    const [deleteFolderTarget, setDeleteFolderTarget] = useState<FolderData | null>(null);
+    const [deleteSaving, setDeleteSaving] = useState(false);
     const [moveTarget, setMoveTarget] = useState<SavedQueryItem | null>(null);
     const [moveDialogOpen, setMoveDialogOpen] = useState(false);
     const [activeDropFolderId, setActiveDropFolderId] = useState<string | null>(null);
@@ -421,11 +425,11 @@ export function SavedQueriesSidebar({ onSelect }: SavedQueriesSidebarProps) {
         [t, connectionId, notifySavedQueriesUpdated],
     );
 
-    const handleDelete = async (item: SavedQueryItem) => {
+    const deleteSavedQuery = async (item: SavedQueryItem) => {
         if (!connectionId) {
             const message = t('Api.SqlConsole.Tabs.MissingConnectionContext');
             setError(message);
-            return;
+            return false;
         }
         try {
             const res = await authFetch(`/api/sql-console/saved-queries?id=${item.id}`, {
@@ -441,9 +445,32 @@ export function SavedQueriesSidebar({ onSelect }: SavedQueriesSidebarProps) {
             setItems(prev => prev.filter(entry => entry.id !== item.id));
             posthog.capture('saved_query_deleted', { query_id: item.id, connection_id: connectionId });
             notifySavedQueriesUpdated();
+            return true;
         } catch (err) {
             const message = err instanceof Error ? err.message : t('SavedQueries.LoadFailed');
             setError(message);
+            return false;
+        }
+    };
+
+    const openDeleteQuery = (item: SavedQueryItem) => {
+        setDeleteQueryTarget(item);
+        setDeleteFolderTarget(null);
+        setMenuOpenId(null);
+        setHoverOpenId(null);
+        setHoverBlockOnceId(null);
+    };
+
+    const handleDeleteQueryConfirm = async () => {
+        if (!deleteQueryTarget || deleteSaving) return;
+        setDeleteSaving(true);
+        try {
+            const deleted = await deleteSavedQuery(deleteQueryTarget);
+            if (deleted) {
+                setDeleteQueryTarget(null);
+            }
+        } finally {
+            setDeleteSaving(false);
         }
     };
 
@@ -518,8 +545,7 @@ export function SavedQueriesSidebar({ onSelect }: SavedQueriesSidebarProps) {
         }
     };
 
-    const handleDeleteFolder = async (folder: FolderData) => {
-        if (!confirm(t('SavedQueries.Folders.DeleteFolderConfirm'))) return;
+    const deleteFolder = async (folder: FolderData) => {
         try {
             const res = await authFetch(`/api/sql-console/saved-query-folders?id=${folder.id}`, {
                 method: 'DELETE',
@@ -531,9 +557,29 @@ export function SavedQueriesSidebar({ onSelect }: SavedQueriesSidebarProps) {
             await fetchFolders();
             // Refresh queries since folderId was reset to null
             await fetchList(limit);
+            return true;
         } catch (err) {
             const message = err instanceof Error ? err.message : t('SavedQueries.LoadFailed');
             setError(message);
+            return false;
+        }
+    };
+
+    const openDeleteFolder = (folder: FolderData) => {
+        setDeleteFolderTarget(folder);
+        setDeleteQueryTarget(null);
+    };
+
+    const handleDeleteFolderConfirm = async () => {
+        if (!deleteFolderTarget || deleteSaving) return;
+        setDeleteSaving(true);
+        try {
+            const deleted = await deleteFolder(deleteFolderTarget);
+            if (deleted) {
+                setDeleteFolderTarget(null);
+            }
+        } finally {
+            setDeleteSaving(false);
         }
     };
 
@@ -873,8 +919,7 @@ export function SavedQueriesSidebar({ onSelect }: SavedQueriesSidebarProps) {
                                 )}
                                 <DropdownMenuItem
                                     onClick={() => {
-                                        setMenuOpenId(null);
-                                        void handleDelete(item);
+                                        openDeleteQuery(item);
                                     }}
                                     className="text-destructive focus:text-destructive"
                                 >
@@ -969,7 +1014,7 @@ export function SavedQueriesSidebar({ onSelect }: SavedQueriesSidebarProps) {
                                                             isAbsorbing={absorbingFolderId === folder.id}
                                                             onToggle={() => toggleFolder(folder.id)}
                                                             onRename={openRenameFolder}
-                                                            onDelete={handleDeleteFolder}
+                                                            onDelete={openDeleteFolder}
                                                             t={t}
                                                             dragHandleListeners={listeners}
                                                             dragHandleAttributes={attributes}
@@ -1097,6 +1142,42 @@ export function SavedQueriesSidebar({ onSelect }: SavedQueriesSidebarProps) {
 
             {/* Create folder dialog */}
             <CreateFolderDialog open={createFolderOpen} onOpenChange={setCreateFolderOpen} onSubmit={handleCreateFolder} t={t} />
+
+            <DeleteConfirmationDialog
+                open={Boolean(deleteQueryTarget)}
+                onOpenChange={open => {
+                    if (!open) {
+                        setDeleteQueryTarget(null);
+                    }
+                }}
+                title={t('SavedQueries.DeleteTitle')}
+                description={t('SavedQueries.DeleteDescription', {
+                    name: deleteQueryTarget?.title ?? '',
+                })}
+                confirmLabel={t('SavedQueries.Delete')}
+                cancelLabel={t('SavedQueries.Cancel')}
+                loadingLabel={t('SavedQueries.Deleting')}
+                loading={deleteSaving && Boolean(deleteQueryTarget)}
+                onConfirm={handleDeleteQueryConfirm}
+            />
+
+            <DeleteConfirmationDialog
+                open={Boolean(deleteFolderTarget)}
+                onOpenChange={open => {
+                    if (!open) {
+                        setDeleteFolderTarget(null);
+                    }
+                }}
+                title={t('SavedQueries.Folders.DeleteFolderTitle')}
+                description={t('SavedQueries.Folders.DeleteFolderDescription', {
+                    name: deleteFolderTarget?.name ?? '',
+                })}
+                confirmLabel={t('SavedQueries.Folders.DeleteFolder')}
+                cancelLabel={t('SavedQueries.Cancel')}
+                loadingLabel={t('SavedQueries.Deleting')}
+                loading={deleteSaving && Boolean(deleteFolderTarget)}
+                onConfirm={handleDeleteFolderConfirm}
+            />
 
             {/* Move to folder dialog */}
             <MoveToFolderDialog

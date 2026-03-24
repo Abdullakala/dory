@@ -8,7 +8,7 @@ import { getDatabaseProvider } from '../lib/database/provider';
     console.log(`[Init] Database provider: ${provider}`);
 
     if (provider === 'postgres') {
-        console.log(`[Init] Database URL: ${process.env.DATABASE_URL ?? '<missing>'}`);
+        console.log('[Init] Postgres connection configuration detected');
     }
 
     const db = await getClient();
@@ -27,8 +27,6 @@ import { getDatabaseProvider } from '../lib/database/provider';
         console.warn(`[Init] Unrecognized database provider: ${provider}`);
     }
 
-    console.log(
-        `[Init] Database ${provider} migration completed, path: ${process.env.DATABASE_URL}`
-    );
+    console.log(`[Init] Database ${provider} migration completed.`);
     process.exit(0);
 })();

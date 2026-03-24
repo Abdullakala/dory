@@ -108,8 +108,6 @@ function createAuth() {
             }),
         ];
 
-        console.log('[auth] TRUSTED_ORIGINS =', process.env.TRUSTED_ORIGINS);
-
         async function findInitialOrganizationId(userId: string): Promise<string | null> {
             const [existingMembership] = await db
                 .select({ organizationId: schema.organizationMembers.organizationId })

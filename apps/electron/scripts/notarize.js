@@ -10,11 +10,7 @@ const APPLE_TICKET_WAIT_MS = 15_000;
 const APPLE_TICKET_MAX_ATTEMPTS = 8;
 
 dotenvConfig({ path: resolve(__dirname, '../.env.apple') });
-console.log('🔑 Apple Notarization Config Loaded:', {
-    APPLE_TEAM_ID: process.env.APPLE_TEAM_ID,
-    APPLE_ID: process.env.APPLE_ID,
-    APPLE_ID_PASSWORD: process.env.APPLE_ID_PASSWORD ? '***' : undefined,
-});
+console.log('Apple notarization configuration loaded.');
 
 function sleep(ms) {
     return new Promise((resolvePromise) => setTimeout(resolvePromise, ms));

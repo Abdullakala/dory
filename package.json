@@ -28,6 +28,7 @@
     "typecheck": "yarn workspace web run typecheck",
     "format:write": "yarn workspace web run format:write",
     "format:check": "yarn workspace web run format:check",
+    "check:sensitive-env-logging": "node ./scripts/check-sensitive-env-logging.mjs",
     "test:clean-json": "yarn workspace web run test:clean-json",
     "docker:build": "docker build --build-arg VERSION=$(git rev-parse HEAD) -t dorylab/dory .",
     "docker:run": "yarn workspace web run docker:run",

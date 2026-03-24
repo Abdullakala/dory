@@ -13,7 +13,13 @@ const productName = distribution === 'beta' ? 'Dory Beta' : 'Dory';
 const protocolScheme = readEnv('DORY_PROTOCOL_SCHEME') ?? (distribution === 'beta' ? 'dory-beta' : 'dory');
 const betaArtifactName = '${productName}-${version}-${os}-${arch}-beta.${ext}';
 const windowsInstallerArtifactName =
-    distribution === 'beta' ? betaArtifactName : '${productName}-Setup-${version}.${ext}';
+    distribution === 'beta'
+        ? '${productName}-Setup-${version}-${os}-${arch}-beta.${ext}'
+        : '${productName}-Setup-${version}.${ext}';
+const windowsPortableArtifactName =
+    distribution === 'beta'
+        ? '${productName}-Portable-${version}-${os}-${arch}-beta.${ext}'
+        : '${productName}-Portable-${version}.${ext}';
 
 /** @type {import('electron-builder').Configuration} */
 const config = {
@@ -79,6 +85,9 @@ const config = {
         createDesktopShortcut: true,
         createStartMenuShortcut: true,
         shortcutName: productName,
+    },
+    portable: {
+        artifactName: windowsPortableArtifactName,
     },
 };
 

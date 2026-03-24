@@ -1,6 +1,5 @@
 import { ConnectionListItem } from '@/types/connections';
 
-
 export const DatasourceTypesWithDBEngine = [
     {
         type: 'postgres',
@@ -13,6 +12,10 @@ export const DatasourceTypesWithDBEngine = [
     {
         type: 'mysql',
         engine: 'mysql',
+    },
+    {
+        type: 'mariadb',
+        engine: 'mariadb',
     },
     {
         type: 'doris',

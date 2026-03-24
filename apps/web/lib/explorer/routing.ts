@@ -14,6 +14,7 @@ function normalizeExplorerResourceForDriver(driver: ExplorerDriver, resource?: E
         case 'duckdb':
             return resolvePostgresExplorerResource(resource);
         case 'mysql':
+        case 'mariadb':
             return resolveMysqlExplorerResource(resource);
         case 'clickhouse':
             return resolveClickhouseExplorerResource(resource);

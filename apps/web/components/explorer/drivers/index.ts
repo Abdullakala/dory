@@ -1,6 +1,7 @@
 import { resolveExplorerDriver } from '@/lib/explorer/capabilities';
 import type { ExplorerDriver } from '@/lib/explorer/types';
 import { clickhouseExplorerDriver } from './clickhouse';
+import { mariadbExplorerDriver } from './mariadb';
 import { mysqlExplorerDriver } from './mysql';
 import { postgresExplorerDriver } from './postgres';
 import { noopSchemaDriver } from './shared';
@@ -9,6 +10,7 @@ import type { ExplorerDriverModule } from './types';
 const DRIVERS: Partial<Record<ExplorerDriver, ExplorerDriverModule>> = {
     postgres: postgresExplorerDriver,
     clickhouse: clickhouseExplorerDriver,
+    mariadb: mariadbExplorerDriver,
     mysql: mysqlExplorerDriver,
 };
 

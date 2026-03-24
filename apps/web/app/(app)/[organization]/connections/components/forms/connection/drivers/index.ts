@@ -9,14 +9,22 @@ import {
     validateClickhouseConnection,
 } from './clickhouse';
 import {
+    createMariaDbConnectionDefaults,
+    MariaDbConnectionFields,
+    normalizeMariaDbConnectionForForm,
+    normalizeMariaDbConnectionForSubmit,
+    validateMariaDbConnection,
+} from './mariadb';
+import {
     PostgresConnectionFields,
     createPostgresConnectionDefaults,
     normalizePostgresConnectionForForm,
     normalizePostgresConnectionForSubmit,
     validatePostgresConnection,
 } from './postgres';
+import { createMysqlConnectionDefaults, MysqlConnectionFields, normalizeMysqlConnectionForForm, normalizeMysqlConnectionForSubmit, validateMysqlConnection } from './mysql';
 
-export type SupportedConnectionDriver = 'clickhouse' | 'postgres';
+export type SupportedConnectionDriver = 'clickhouse' | 'mariadb' | 'mysql' | 'postgres';
 
 type DriverDefinition = {
     label: string;
@@ -44,16 +52,36 @@ const DRIVERS: Record<SupportedConnectionDriver, DriverDefinition> = {
         normalizeForSubmit: normalizePostgresConnectionForSubmit,
         validate: validatePostgresConnection,
     },
+    mariadb: {
+        label: 'MariaDB',
+        FormComponent: MariaDbConnectionFields,
+        createDefaults: createMariaDbConnectionDefaults,
+        normalizeForForm: normalizeMariaDbConnectionForForm,
+        normalizeForSubmit: normalizeMariaDbConnectionForSubmit,
+        validate: validateMariaDbConnection,
+    },
+    mysql: {
+        label: 'MySQL',
+        FormComponent: MysqlConnectionFields,
+        createDefaults: createMysqlConnectionDefaults,
+        normalizeForForm: normalizeMysqlConnectionForForm,
+        normalizeForSubmit: normalizeMysqlConnectionForSubmit,
+        validate: validateMysqlConnection,
+    },
 };
 
-export const CONNECTION_TYPE_OPTIONS = (Object.entries(DRIVERS) as Array<[SupportedConnectionDriver, DriverDefinition]>).map(
-    ([value, driver]) => ({
-        value,
-        label: driver.label,
-    }),
-);
+export const CONNECTION_TYPE_OPTIONS = (Object.entries(DRIVERS) as Array<[SupportedConnectionDriver, DriverDefinition]>).map(([value, driver]) => ({
+    value,
+    label: driver.label,
+}));
 
 export function getConnectionDriver(type?: string): DriverDefinition {
+    if (type === 'mariadb') {
+        return DRIVERS.mariadb;
+    }
+    if (type === 'mysql') {
+        return DRIVERS.mysql;
+    }
     if (type === 'postgres') {
         return DRIVERS.postgres;
     }

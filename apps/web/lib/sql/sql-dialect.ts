@@ -51,6 +51,7 @@ const SQL_DIALECT_CONFIGS: Record<ConnectionDialect, SqlDialectConfig> = {
 
 const SQL_DIALECT_BY_CONNECTION_TYPE: Partial<Record<ConnectionType, ConnectionDialect>> = {
     clickhouse: 'clickhouse',
+    mariadb: 'mysql',
     mysql: 'mysql',
     postgres: 'postgres',
 };
@@ -74,6 +75,7 @@ export const normalizeSqlDialect = (value?: string | null): ConnectionDialect =>
         case 'duckdb':
             return 'duckdb';
         case 'mysql':
+        case 'mariadb':
             return 'mysql';
         case 'postgres':
         case 'postgresql':

@@ -1099,17 +1099,24 @@
                 "EmptyFolder": "此文件夹暂无查询"
             }
         },
-        "SaveQuery": {
+        "SaveSql": {
             "Title": "保存 SQL",
             "NameLabel": "名称",
             "NamePlaceholder": "查询名称",
             "DescriptionLabel": "描述",
             "DescriptionPlaceholder": "添加描述（可选）",
+            "FolderLabel": "文件夹",
+            "FolderPlaceholder": "选择文件夹",
+            "FolderGroupLabel": "文件夹",
+            "RootFolderLabel": "无文件夹（根级别）",
+            "FolderEmpty": "暂无可选文件夹",
+            "LoadingFolders": "正在加载文件夹...",
             "Saving": "保存中...",
             "Success": "已保存",
             "Errors": {
                 "SqlRequired": "SQL 不能为空",
                 "TitleRequired": "名称不能为空",
+                "LoadFoldersFailed": "加载文件夹失败",
                 "SaveFailed": "保存 SQL 失败"
             }
         },

@@ -21,6 +21,7 @@ export type SavedQueryCreateInput = {
     userId: string;
     title: string;
     description?: string | null;
+    folderId?: string | null;
     sqlText: string;
     context?: Record<string, unknown> | null;
     tags?: string[] | null;
@@ -60,12 +61,7 @@ export class PostgresSavedQueriesRepository {
         return or(eq(savedQueries.connectionId, normalized), isNull(savedQueries.connectionId));
     }
 
-    private async assertFolderAccess(params: {
-        organizationId: string;
-        userId: string;
-        folderId: string;
-        connectionId: string;
-    }): Promise<void> {
+    private async assertFolderAccess(params: { organizationId: string; userId: string; folderId: string; connectionId: string }): Promise<void> {
         const [folder] = await this.db
             .select({ id: savedQueryFolders.id })
             .from(savedQueryFolders)
@@ -105,8 +101,18 @@ export class PostgresSavedQueriesRepository {
 
         const now = new Date();
         const id = input.id ?? newEntityId();
+        const normalizedConnectionId = this.normalizeConnectionId(input.connectionId);
 
-        // Get max position for root-level queries of this user
+        if (input.folderId) {
+            await this.assertFolderAccess({
+                organizationId: input.organizationId,
+                userId: input.userId,
+                folderId: input.folderId,
+                connectionId: normalizedConnectionId,
+            });
+        }
+
+        // Get max position for this connection's current scope (root or folder).
         const [maxRow] = await this.db
             .select({ maxPos: max(savedQueries.position) })
             .from(savedQueries)
@@ -114,8 +120,9 @@ export class PostgresSavedQueriesRepository {
                 and(
                     eq(savedQueries.organizationId, input.organizationId),
                     eq(savedQueries.userId, input.userId),
-                    isNull(savedQueries.folderId),
                     isNull(savedQueries.archivedAt),
+                    this.buildConnectionScopeCondition(normalizedConnectionId),
+                    input.folderId ? eq(savedQueries.folderId, input.folderId) : isNull(savedQueries.folderId),
                 ),
             );
 
@@ -133,8 +140,8 @@ export class PostgresSavedQueriesRepository {
                 context: (input.context ?? {}) as any,
                 tags: (input.tags ?? []) as any,
                 workId: input.workId ?? null,
-                connectionId: this.normalizeConnectionId(input.connectionId),
-                folderId: null,
+                connectionId: normalizedConnectionId,
+                folderId: input.folderId ?? null,
                 position,
                 createdAt: now,
                 updatedAt: now,
@@ -146,20 +153,10 @@ export class PostgresSavedQueriesRepository {
         return row as SavedQueryRecord;
     }
 
-    async getById(params: {
-        organizationId: string;
-        userId: string;
-        id: string;
-        includeArchived?: boolean;
-        connectionId: string;
-    }): Promise<SavedQueryRecord | null> {
+    async getById(params: { organizationId: string; userId: string; id: string; includeArchived?: boolean; connectionId: string }): Promise<SavedQueryRecord | null> {
         this.assertInited();
 
-        const conds = [
-            eq(savedQueries.id, params.id),
-            eq(savedQueries.organizationId, params.organizationId),
-            eq(savedQueries.userId, params.userId),
-        ];
+        const conds = [eq(savedQueries.id, params.id), eq(savedQueries.organizationId, params.organizationId), eq(savedQueries.userId, params.userId)];
         if (!params.includeArchived) conds.push(isNull(savedQueries.archivedAt));
         const connectionCond = this.buildConnectionScopeCondition(params.connectionId);
         if (connectionCond) {
@@ -181,13 +178,7 @@ export class PostgresSavedQueriesRepository {
         const rows = await this.db
             .select()
             .from(savedQueries)
-            .where(
-                and(
-                    eq(savedQueries.organizationId, params.organizationId),
-                    eq(savedQueries.userId, params.userId),
-                    isNull(savedQueries.archivedAt),
-                ),
-            )
+            .where(and(eq(savedQueries.organizationId, params.organizationId), eq(savedQueries.userId, params.userId), isNull(savedQueries.archivedAt)))
             .orderBy(asc(savedQueries.position), desc(savedQueries.updatedAt));
 
         return rows as SavedQueryRecord[];
@@ -196,10 +187,7 @@ export class PostgresSavedQueriesRepository {
     async list(params: SavedQueryListParams): Promise<SavedQueryRecord[]> {
         this.assertInited();
 
-        const conds = [
-            eq(savedQueries.organizationId, params.organizationId),
-            eq(savedQueries.userId, params.userId),
-        ];
+        const conds = [eq(savedQueries.organizationId, params.organizationId), eq(savedQueries.userId, params.userId)];
         if (!params.includeArchived) conds.push(isNull(savedQueries.archivedAt));
         const connectionCond = this.buildConnectionScopeCondition(params.connectionId);
         if (connectionCond) {
@@ -220,13 +208,7 @@ export class PostgresSavedQueriesRepository {
         return rows as SavedQueryRecord[];
     }
 
-    async update(params: {
-        organizationId: string;
-        userId: string;
-        id: string;
-        patch: SavedQueryUpdateInput;
-        connectionId: string;
-    }): Promise<SavedQueryRecord> {
+    async update(params: { organizationId: string; userId: string; id: string; patch: SavedQueryUpdateInput; connectionId: string }): Promise<SavedQueryRecord> {
         this.assertInited();
 
         const data = params.patch;
@@ -307,13 +289,7 @@ export class PostgresSavedQueriesRepository {
             );
     }
 
-    async reorder(params: {
-        organizationId: string;
-        userId: string;
-        folderId: string | null;
-        orderedIds: string[];
-        connectionId: string;
-    }): Promise<void> {
+    async reorder(params: { organizationId: string; userId: string; folderId: string | null; orderedIds: string[]; connectionId: string }): Promise<void> {
         this.assertInited();
 
         if (params.folderId) {

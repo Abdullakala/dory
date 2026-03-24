@@ -7,8 +7,8 @@ import { SearchableSelect, type SelectOption } from '../searchable-select';
 import { useTranslations } from 'next-intl';
 
 type Props = {
-    value: string; // 当前选中的用户名（'' 表示所有用户）
-    users: string[]; // 用户名列表
+    value: string;
+    users: string[];
     onChange: (user: string) => void;
     className?: string;
     triggerSize?: 'sm' | 'control';

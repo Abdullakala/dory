@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { Folder } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/registry/new-york-v4/ui/dialog';
 import { Button } from '@/registry/new-york-v4/ui/button';
 import { Input } from '@/registry/new-york-v4/ui/input';
 import { Textarea } from '@/registry/new-york-v4/ui/textarea';
+import { SearchableSelect, type SelectOption } from '@/components/@dory/ui/searchable-select';
 import { useAtomValue } from 'jotai';
 import { authFetch } from '@/lib/client/auth-fetch';
 import { currentConnectionAtom } from '@/shared/stores/app.store';
@@ -26,6 +28,9 @@ export function SaveSqlDialog({ open, onOpenChange, defaultTitle, getSqlText, on
     const connectionId = currentConnection?.connection.id ?? null;
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
+    const [folderId, setFolderId] = useState('');
+    const [folderOptions, setFolderOptions] = useState<SelectOption[]>([]);
+    const [loadingFolders, setLoadingFolders] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -34,12 +39,69 @@ export function SaveSqlDialog({ open, onOpenChange, defaultTitle, getSqlText, on
         return raw && raw.length > 0 ? raw : t('Tabs.NewQuery');
     }, [defaultTitle, t]);
 
+    const folderEmptyText = useMemo(() => {
+        return loadingFolders ? t('SaveSql.LoadingFolders') : t('SaveSql.FolderEmpty');
+    }, [loadingFolders, t]);
+
     useEffect(() => {
         if (!open) return;
         setTitle(resolvedDefaultTitle);
         setDescription('');
+        setFolderId('');
         setError(null);
     }, [open, resolvedDefaultTitle]);
+
+    useEffect(() => {
+        if (!open || !connectionId) {
+            setFolderOptions([]);
+            setLoadingFolders(false);
+            return;
+        }
+
+        let cancelled = false;
+
+        const loadFolders = async () => {
+            setLoadingFolders(true);
+            try {
+                const res = await authFetch('/api/sql-console/saved-query-folders', {
+                    headers: {
+                        'X-Connection-ID': connectionId,
+                    },
+                });
+                const data = await res.json().catch(() => null);
+
+                if (!res.ok || (data && data.code !== 0)) {
+                    throw new Error(data?.message ?? t('SaveSql.Errors.LoadFoldersFailed'));
+                }
+
+                if (cancelled) return;
+
+                const nextOptions = Array.isArray(data?.data)
+                    ? data.data.map((folder: { id: string; name: string }) => ({
+                          value: folder.id,
+                          label: folder.name,
+                      }))
+                    : [];
+
+                setFolderOptions(nextOptions);
+            } catch (err) {
+                if (cancelled) return;
+
+                setFolderOptions([]);
+                toast.error(err instanceof Error ? err.message : t('SaveSql.Errors.LoadFoldersFailed'));
+            } finally {
+                if (!cancelled) {
+                    setLoadingFolders(false);
+                }
+            }
+        };
+
+        void loadFolders();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [connectionId, open, t]);
 
     const handleSave = async () => {
         if (saving) return;
@@ -72,6 +134,7 @@ export function SaveSqlDialog({ open, onOpenChange, defaultTitle, getSqlText, on
                 body: JSON.stringify({
                     title: title.trim(),
                     description: description.trim() ? description.trim() : null,
+                    folderId: folderId || null,
                     sqlText,
                 }),
             });
@@ -108,25 +171,35 @@ export function SaveSqlDialog({ open, onOpenChange, defaultTitle, getSqlText, on
                 <div className="grid gap-3">
                     <div className="grid gap-2">
                         <label className="text-sm font-medium">{t('SaveSql.NameLabel')}</label>
-                        <Input
-                            value={title}
-                            onChange={event => setTitle(event.target.value)}
-                            placeholder={t('SaveSql.NamePlaceholder')}
-                        />
+                        <Input value={title} onChange={event => setTitle(event.target.value)} placeholder={t('SaveSql.NamePlaceholder')} />
                     </div>
                     <div className="grid gap-2">
                         <label className="text-sm font-medium">{t('SaveSql.DescriptionLabel')}</label>
-                        <Textarea
-                            value={description}
-                            onChange={event => setDescription(event.target.value)}
-                            placeholder={t('SaveSql.DescriptionPlaceholder')}
-                            rows={3}
-                        />
+                        <Textarea value={description} onChange={event => setDescription(event.target.value)} placeholder={t('SaveSql.DescriptionPlaceholder')} rows={3} />
+                    </div>
+                    <div className="grid gap-2">
+                        <label className="text-sm font-medium">{t('SaveSql.FolderLabel')}</label>
+                        <div className={saving ? 'pointer-events-none opacity-70' : undefined}>
+                            <SearchableSelect
+                                value={folderId}
+                                options={folderOptions}
+                                onChange={setFolderId}
+                                icon={Folder}
+                                enableAll
+                                allLabel={t('SaveSql.RootFolderLabel')}
+                                allValue=""
+                                placeholder={t('SaveSql.FolderPlaceholder')}
+                                emptyText={folderEmptyText}
+                                groupLabel={t('SaveSql.FolderGroupLabel')}
+                                popoverClassName="w-[var(--radix-popover-trigger-width)]"
+                                triggerSize="default"
+                            />
+                        </div>
                     </div>
                     {error ? <p className="text-sm text-destructive">{error}</p> : null}
                 </div>
                 <DialogFooter className="gap-2 sm:gap-0">
-                    <Button className='mr-2' variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+                    <Button className="mr-2" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
                         {t('Actions.Cancel')}
                     </Button>
                     <Button onClick={handleSave} disabled={saving}>

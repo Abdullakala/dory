@@ -13,6 +13,7 @@ const createSchema = z.object({
     id: z.string().optional(),
     title: z.string().min(1),
     description: z.string().optional().nullable(),
+    folderId: z.string().optional().nullable(),
     sqlText: z.string().min(1),
     context: z.record(z.string(), z.unknown()).optional().nullable(),
     tags: z.array(z.string()).optional().nullable(),
@@ -33,7 +34,7 @@ const updateSchema = z
         position: z.number().int().optional().nullable(),
     })
     .refine(
-        (data) =>
+        data =>
             data.title !== undefined ||
             data.description !== undefined ||
             data.sqlText !== undefined ||

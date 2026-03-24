@@ -1103,11 +1103,18 @@
             "NamePlaceholder": "Query name",
             "DescriptionLabel": "Description",
             "DescriptionPlaceholder": "Add a description (optional)",
+            "FolderLabel": "Folder",
+            "FolderPlaceholder": "Select a folder",
+            "FolderGroupLabel": "Folders",
+            "RootFolderLabel": "No Folder (Root)",
+            "FolderEmpty": "No folders found",
+            "LoadingFolders": "Loading folders...",
             "Saving": "Saving...",
             "Success": "Saved",
             "Errors": {
                 "SqlRequired": "SQL cannot be empty",
                 "TitleRequired": "Name cannot be empty",
+                "LoadFoldersFailed": "Failed to load folders",
                 "SaveFailed": "Failed to save SQL"
             }
         },

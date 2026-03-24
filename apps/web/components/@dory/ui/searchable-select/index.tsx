@@ -16,35 +16,22 @@ export type SelectOption = {
 };
 
 type SearchableSelectProps = {
-    value: string; // 当前选中值
-    options: SelectOption[]; // 选项列表
-    onChange: (value: string) => void; // 选中回调
+    value: string;
+    options: SelectOption[];
+    onChange: (value: string) => void;
 
-    placeholder?: string; // 没有选中时按钮上显示
-    emptyText?: string; // 搜索无结果文案
-    groupLabel?: string; // CommandGroup heading
+    placeholder?: string;
+    emptyText?: string;
+    groupLabel?: string;
 
-    /**
-     * 「全部」选项配置：
-     * - enableAll: 是否开启一个虚拟的「全部」选项
-     * - allLabel: 显示文案，比如「所有数据库」「所有用户」
-     * - allValue: 传给 onChange 的真实值，默认 ''
-     */
     enableAll?: boolean;
     allLabel?: string;
     allValue?: string;
 
-    /**
-     * 左侧图标，可选
-     */
     icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-
-    /**
-     * 样式
-     */
-    className?: string; // 整个按钮的 className
-    popoverClassName?: string; // PopoverContent 的 className
-    triggerSize?: 'sm' | 'control';
+    className?: string;
+    popoverClassName?: string;
+    triggerSize?: 'sm' | 'default' | 'control';
 };
 
 export function SearchableSelect({
@@ -113,7 +100,7 @@ export function SearchableSelect({
 
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <span className="max-w-[220px] truncate">{displayLabel}</span>
+                                    <span className="max-w-55 truncate">{displayLabel}</span>
                                 </TooltipTrigger>
                                 <TooltipContent side="right">{displayLabel}</TooltipContent>
                             </Tooltip>
@@ -131,7 +118,7 @@ export function SearchableSelect({
                             <CommandGroup heading={groupLabel}>
                                 {enableAll && (
                                     <CommandItem key="__ALL__" value="__ALL__" onSelect={handleSelect} className="flex items-center gap-2">
-                                        <span className="truncate text-xs">{resolvedAllLabel}</span>
+                                        <span className="truncate text-sm">{resolvedAllLabel}</span>
                                         <Check className={cn('ml-auto h-4 w-4', isAllSelected ? 'opacity-100' : 'opacity-0')} />
                                     </CommandItem>
                                 )}
@@ -141,7 +128,7 @@ export function SearchableSelect({
                                         {Icon ? <Icon className="h-4 w-4 shrink-0" /> : null}
                                         <Tooltip>
                                             <TooltipTrigger asChild>
-                                                <span className="max-w-[200px] truncate text-sm">{opt.label}</span>
+                                                <span className="max-w-50 truncate text-sm">{opt.label}</span>
                                             </TooltipTrigger>
                                             <TooltipContent side="right">{opt.label}</TooltipContent>
                                         </Tooltip>

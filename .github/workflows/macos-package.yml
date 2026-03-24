@@ -195,8 +195,8 @@ jobs:
                   DORY_PROTOCOL_SCHEME: ${{ steps.build_config.outputs.protocol_scheme }}
               run: |
                   yarn run electron:standalone
-                  cd apps/electron
-                  npx electron-builder --config electron-builder.mjs --mac --${{ matrix.arch }} --publish never
+                  yarn workspace dory run compile
+                  yarn workspace dory exec electron-builder --config electron-builder.mjs --mac --${{ matrix.arch }} --publish never
 
             - name: Upload workflow artifact
               uses: actions/upload-artifact@v4

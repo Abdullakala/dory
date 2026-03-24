@@ -8,7 +8,7 @@ async function main() {
         throw new Error('DATABASE_URL is missing');
     }
 
-    console.log(`[DB Check] Connecting with DATABASE_URL: ${connectionString}`);
+    console.log('[DB Check] Connecting to Postgres...');
 
     const client = new Client({
         connectionString,

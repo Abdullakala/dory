@@ -117,7 +117,7 @@ jobs:
 
             patch += 1;
             process.stdout.write(`${major}.${minor}.${patch}-beta.0`);
-            NODE
+          NODE
           )"
           RELEASE_TAG="v${RELEASE_VERSION}"
 

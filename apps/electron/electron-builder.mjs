@@ -11,6 +11,9 @@ const updateChannel = process.env.DORY_UPDATE_CHANNEL === 'beta' ? 'beta' : 'lat
 const appId = readEnv('DORY_ELECTRON_APP_ID') ?? (distribution === 'beta' ? 'com.dory.app.beta' : 'com.dory.app');
 const productName = distribution === 'beta' ? 'Dory Beta' : 'Dory';
 const protocolScheme = readEnv('DORY_PROTOCOL_SCHEME') ?? (distribution === 'beta' ? 'dory-beta' : 'dory');
+const betaArtifactName = '${productName}-${version}-${os}-${arch}-beta.${ext}';
+const windowsInstallerArtifactName =
+    distribution === 'beta' ? betaArtifactName : '${productName}-Setup-${version}.${ext}';
 
 /** @type {import('electron-builder').Configuration} */
 const config = {
@@ -21,7 +24,7 @@ const config = {
     },
     ...(distribution === 'beta'
         ? {
-              artifactName: '${productName}-${version}-${os}-${arch}-beta.${ext}',
+              artifactName: betaArtifactName,
           }
         : {}),
     publish: [
@@ -67,6 +70,7 @@ const config = {
         target: ['nsis', 'zip', 'portable'],
     },
     nsis: {
+        artifactName: windowsInstallerArtifactName,
         oneClick: false,
         allowElevation: true,
         allowToChangeInstallationDirectory: true,

@@ -12,7 +12,24 @@ import { buildEqualsFilterFromCell } from './filter';
 import { useTranslations } from 'next-intl';
 import { useVTableFilterUi, useVTableFilters, VTableFilters } from './VTableFilters';
 
-const HEADER_PAD = 24; 
+const HEADER_PAD = 24;
+const AUTO_FIT_SAMPLE_LIMIT = 80;
+const HEADER_TEXT_PAD = 44;
+const CELL_TEXT_PAD = 18;
+const FALLBACK_CHAR_WIDTH = 8;
+
+function getSampleRowIndices(total: number, limit: number) {
+    if (total <= 0) return [];
+    if (total <= limit) return Array.from({ length: total }, (_, index) => index);
+
+    const lastIndex = total - 1;
+    const sampled = new Set<number>();
+    for (let step = 0; step < limit; step++) {
+        sampled.add(Math.floor((step * lastIndex) / Math.max(limit - 1, 1)));
+    }
+
+    return [...sampled].sort((left, right) => left - right);
+}
 
 export default function VTable({
     results,
@@ -38,30 +55,150 @@ export default function VTable({
     const columnsRaw: any = metas?.columns;
     const columns = useMemo(() => (columnsRaw ?? []).map((c: any) => c?.name), [columnsRaw]);
 
-    const [colWidths, setColWidths] = useState<ColWidths>(() => {
+    const clampColumnWidth = useCallback(
+        (col: string, width: number) => {
+            const minW = Math.max(colMinWidthMap?.[col] ?? defaultColMinWidth, 60);
+            const maxW = Math.max(colMaxWidthMap?.[col] ?? 1200, minW);
+            return Math.min(Math.max(width, minW), maxW);
+        },
+        [colMaxWidthMap, colMinWidthMap, defaultColMinWidth],
+    );
+
+    const [manualColWidths, setManualColWidths] = useState<ColWidths>(() => {
         if (typeof window !== 'undefined' && storageKey) {
             try {
                 const raw = localStorage.getItem(`${storageKey}:colWidths`);
                 if (raw) return JSON.parse(raw) as ColWidths;
             } catch {}
         }
+
+        return {};
+    });
+
+    const [autoColWidths, setAutoColWidths] = useState<ColWidths>(() => {
         const init: ColWidths = {};
-        for (const c of columns) init[c] = Math.max(defaultColMinWidth, 60);
+        for (const c of columns) init[c] = clampColumnWidth(c, defaultColMinWidth);
         return init;
     });
+    const measureCanvasRef = useRef<CanvasRenderingContext2D | null>(null);
+
     useEffect(() => {
-        setColWidths(prev => {
+        setManualColWidths(prev => {
             const next: ColWidths = {};
-            for (const c of columns) next[c] = prev[c] ?? Math.max(defaultColMinWidth, 60);
+            for (const c of columns) {
+                if (prev[c] != null) next[c] = prev[c];
+            }
+
+            const prevKeys = Object.keys(prev);
+            const nextKeys = Object.keys(next);
+            if (prevKeys.length === nextKeys.length && nextKeys.every(key => prev[key] === next[key])) {
+                return prev;
+            }
+
             return next;
         });
-    }, [columns, defaultColMinWidth]);
+        setAutoColWidths(prev => {
+            const next: ColWidths = {};
+            for (const c of columns) {
+                next[c] = clampColumnWidth(c, prev[c] ?? defaultColMinWidth);
+            }
+
+            const prevKeys = Object.keys(prev);
+            const nextKeys = Object.keys(next);
+            if (prevKeys.length === nextKeys.length && nextKeys.every(key => prev[key] === next[key])) {
+                return prev;
+            }
+
+            return next;
+        });
+    }, [clampColumnWidth, columns, defaultColMinWidth]);
+
     useEffect(() => {
         if (!storageKey) return;
         try {
-            localStorage.setItem(`${storageKey}:colWidths`, JSON.stringify(colWidths));
+            localStorage.setItem(`${storageKey}:colWidths`, JSON.stringify(manualColWidths));
         } catch {}
-    }, [colWidths, storageKey]);
+    }, [manualColWidths, storageKey]);
+
+    const measureTextWidth = useCallback((text: string, font: string) => {
+        if (typeof document === 'undefined') {
+            return text.length * FALLBACK_CHAR_WIDTH;
+        }
+
+        if (!measureCanvasRef.current) {
+            const canvas = document.createElement('canvas');
+            measureCanvasRef.current = canvas.getContext('2d');
+        }
+
+        const context = measureCanvasRef.current;
+        if (!context) {
+            return text.length * FALLBACK_CHAR_WIDTH;
+        }
+
+        context.font = font;
+        return Math.ceil(context.measureText(text).width);
+    }, []);
+
+    const measureColumnWidth = useCallback(
+        (col: string, rows: VTableProps['results']) => {
+            const fontFamily = typeof document === 'undefined' ? 'system-ui, sans-serif' : getComputedStyle(document.body).fontFamily || 'system-ui, sans-serif';
+            const headerWidth = measureTextWidth(col, `700 14px ${fontFamily}`) + HEADER_TEXT_PAD;
+
+            let maxCellWidth = 0;
+            for (const rowIndex of getSampleRowIndices(rows.length, AUTO_FIT_SAMPLE_LIMIT)) {
+                const cellValue = rows[rowIndex]?.rowData?.[col];
+                const text = formatTooltip(cellValue);
+                maxCellWidth = Math.max(maxCellWidth, measureTextWidth(text, `400 14px ${fontFamily}`) + CELL_TEXT_PAD);
+            }
+
+            return clampColumnWidth(col, Math.max(headerWidth, maxCellWidth, defaultColMinWidth));
+        },
+        [clampColumnWidth, defaultColMinWidth, measureTextWidth],
+    );
+
+    useEffect(() => {
+        let disposed = false;
+
+        const updateAutoWidths = () => {
+            if (disposed) return;
+
+            setAutoColWidths(prev => {
+                const next: ColWidths = {};
+                for (const col of columns) {
+                    next[col] = measureColumnWidth(col, results);
+                }
+
+                const prevKeys = Object.keys(prev);
+                const nextKeys = Object.keys(next);
+                if (prevKeys.length === nextKeys.length && nextKeys.every(key => prev[key] === next[key])) {
+                    return prev;
+                }
+
+                return next;
+            });
+        };
+
+        updateAutoWidths();
+
+        if (typeof document !== 'undefined' && 'fonts' in document) {
+            document.fonts.ready.then(() => {
+                updateAutoWidths();
+            });
+        }
+
+        return () => {
+            disposed = true;
+        };
+    }, [columns, measureColumnWidth, results]);
+
+    const colWidths = useMemo(() => {
+        const next: ColWidths = {};
+        for (const col of columns) {
+            next[col] = clampColumnWidth(col, manualColWidths[col] ?? autoColWidths[col] ?? defaultColMinWidth);
+        }
+        return next;
+    }, [autoColWidths, clampColumnWidth, columns, defaultColMinWidth, manualColWidths]);
+
     const internalFilters = useVTableFilters({ results, storageKey });
     const usesExternalFilters = !!(externalActiveFilters && onUpsertExternalFilter && onRemoveExternalFilter && onClearAllExternalFilters);
     const activeFilters = usesExternalFilters ? externalActiveFilters : internalFilters.activeFilters;
@@ -191,10 +328,8 @@ export default function VTable({
             const ds = dragState.current;
             if (!ds) return;
             const delta = ev.clientX - ds.startX;
-            const minW = colMinWidthMap?.[col] ?? defaultColMinWidth;
-            const maxW = colMaxWidthMap?.[col] ?? 1200;
-            const nextW = Math.max(Math.min(ds.startW + delta, maxW), Math.max(minW, 60));
-            setColWidths(prev => ({ ...prev, [col]: nextW }));
+            const nextW = clampColumnWidth(col, ds.startW + delta);
+            setManualColWidths(prev => ({ ...prev, [col]: nextW }));
             recomputeAll();
         };
         const onUp = () => {
@@ -208,19 +343,8 @@ export default function VTable({
         document.addEventListener('mouseup', onUp);
     };
     const autoFitVisible = (col: string) => {
-        const header = String(col).length;
-        const probeCount = 50;
-        let maxChars = header;
-        for (let i = 0; i < Math.min(sortedResults.length, probeCount); i++) {
-            const v = sortedResults[i]?.rowData?.[col];
-            const s = typeof v === 'object' ? JSON.stringify(v) : v == null ? '' : String(v);
-            maxChars = Math.max(maxChars, s.length);
-        }
-        const estimated = Math.round(maxChars * 7.5) + 24;
-        const minW = colMinWidthMap?.[col] ?? defaultColMinWidth;
-        const maxW = colMaxWidthMap?.[col] ?? 1200;
-        const finalW = Math.max(Math.min(estimated, maxW), Math.max(minW, 60));
-        setColWidths(prev => ({ ...prev, [col]: finalW }));
+        const finalW = measureColumnWidth(col, sortedResults);
+        setManualColWidths(prev => ({ ...prev, [col]: finalW }));
         recomputeAll();
     };
 

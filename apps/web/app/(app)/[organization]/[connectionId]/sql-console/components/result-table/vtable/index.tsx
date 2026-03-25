@@ -13,19 +13,23 @@ import { useTranslations } from 'next-intl';
 import { useVTableFilterUi, useVTableFilters, VTableFilters } from './VTableFilters';
 
 const HEADER_PAD = 24;
-const AUTO_FIT_SAMPLE_LIMIT = 80;
+const VISIBLE_AUTO_FIT_SAMPLE_LIMIT = 48;
+const VISIBLE_AUTO_FIT_ROW_BUFFER = 20;
+const INITIAL_VISIBLE_ROW_COUNT = 24;
 const HEADER_TEXT_PAD = 44;
 const CELL_TEXT_PAD = 18;
 const FALLBACK_CHAR_WIDTH = 8;
 
-function getSampleRowIndices(total: number, limit: number) {
-    if (total <= 0) return [];
-    if (total <= limit) return Array.from({ length: total }, (_, index) => index);
+function getSampleRowIndices(start: number, stop: number, limit: number) {
+    if (stop < start) return [];
+
+    const total = stop - start + 1;
+    if (total <= limit) return Array.from({ length: total }, (_, index) => start + index);
 
     const lastIndex = total - 1;
     const sampled = new Set<number>();
     for (let step = 0; step < limit; step++) {
-        sampled.add(Math.floor((step * lastIndex) / Math.max(limit - 1, 1)));
+        sampled.add(start + Math.floor((step * lastIndex) / Math.max(limit - 1, 1)));
     }
 
     return [...sampled].sort((left, right) => left - right);
@@ -81,6 +85,10 @@ export default function VTable({
         return init;
     });
     const measureCanvasRef = useRef<CanvasRenderingContext2D | null>(null);
+    const visibleRowRangeRef = useRef<{ start: number; stop: number }>({
+        start: 0,
+        stop: Math.max(0, INITIAL_VISIBLE_ROW_COUNT - 1),
+    });
 
     useEffect(() => {
         setManualColWidths(prev => {
@@ -140,12 +148,12 @@ export default function VTable({
     }, []);
 
     const measureColumnWidth = useCallback(
-        (col: string, rows: VTableProps['results']) => {
+        (col: string, rows: VTableProps['results'], rowIndices: number[]) => {
             const fontFamily = typeof document === 'undefined' ? 'system-ui, sans-serif' : getComputedStyle(document.body).fontFamily || 'system-ui, sans-serif';
             const headerWidth = measureTextWidth(col, `700 14px ${fontFamily}`) + HEADER_TEXT_PAD;
 
             let maxCellWidth = 0;
-            for (const rowIndex of getSampleRowIndices(rows.length, AUTO_FIT_SAMPLE_LIMIT)) {
+            for (const rowIndex of rowIndices) {
                 const cellValue = rows[rowIndex]?.rowData?.[col];
                 const text = formatTooltip(cellValue);
                 maxCellWidth = Math.max(maxCellWidth, measureTextWidth(text, `400 14px ${fontFamily}`) + CELL_TEXT_PAD);
@@ -155,49 +163,6 @@ export default function VTable({
         },
         [clampColumnWidth, defaultColMinWidth, measureTextWidth],
     );
-
-    useEffect(() => {
-        let disposed = false;
-
-        const updateAutoWidths = () => {
-            if (disposed) return;
-
-            setAutoColWidths(prev => {
-                const next: ColWidths = {};
-                for (const col of columns) {
-                    next[col] = measureColumnWidth(col, results);
-                }
-
-                const prevKeys = Object.keys(prev);
-                const nextKeys = Object.keys(next);
-                if (prevKeys.length === nextKeys.length && nextKeys.every(key => prev[key] === next[key])) {
-                    return prev;
-                }
-
-                return next;
-            });
-        };
-
-        updateAutoWidths();
-
-        if (typeof document !== 'undefined' && 'fonts' in document) {
-            document.fonts.ready.then(() => {
-                updateAutoWidths();
-            });
-        }
-
-        return () => {
-            disposed = true;
-        };
-    }, [columns, measureColumnWidth, results]);
-
-    const colWidths = useMemo(() => {
-        const next: ColWidths = {};
-        for (const col of columns) {
-            next[col] = clampColumnWidth(col, manualColWidths[col] ?? autoColWidths[col] ?? defaultColMinWidth);
-        }
-        return next;
-    }, [autoColWidths, clampColumnWidth, columns, defaultColMinWidth, manualColWidths]);
 
     const internalFilters = useVTableFilters({ results, storageKey });
     const usesExternalFilters = !!(externalActiveFilters && onUpsertExternalFilter && onRemoveExternalFilter && onClearAllExternalFilters);
@@ -233,6 +198,74 @@ export default function VTable({
         });
         return sorted;
     }, [filteredResults, sortBy, sortDirection]);
+
+    const getVisibleSampleRowIndices = useCallback(
+        (range?: { start: number; stop: number }) => {
+            if (sortedResults.length === 0) return [];
+
+            const sourceRange = range ?? {
+                start: 0,
+                stop: Math.max(0, Math.min(sortedResults.length - 1, INITIAL_VISIBLE_ROW_COUNT - 1)),
+            };
+
+            const start = Math.max(0, sourceRange.start - VISIBLE_AUTO_FIT_ROW_BUFFER);
+            const stop = Math.min(sortedResults.length - 1, sourceRange.stop + VISIBLE_AUTO_FIT_ROW_BUFFER);
+            return getSampleRowIndices(start, stop, VISIBLE_AUTO_FIT_SAMPLE_LIMIT);
+        },
+        [sortedResults.length],
+    );
+
+    const initialVisibleSampleRowIndices = useMemo(() => getVisibleSampleRowIndices(), [getVisibleSampleRowIndices]);
+
+    useEffect(() => {
+        let disposed = false;
+
+        const updateAutoWidths = () => {
+            if (disposed) return;
+
+            setAutoColWidths(prev => {
+                const next: ColWidths = {};
+                for (const col of columns) {
+                    next[col] = measureColumnWidth(col, sortedResults, initialVisibleSampleRowIndices);
+                }
+
+                const prevKeys = Object.keys(prev);
+                const nextKeys = Object.keys(next);
+                if (prevKeys.length === nextKeys.length && nextKeys.every(key => prev[key] === next[key])) {
+                    return prev;
+                }
+
+                return next;
+            });
+        };
+
+        updateAutoWidths();
+
+        if (typeof document !== 'undefined' && 'fonts' in document) {
+            document.fonts.ready.then(() => {
+                updateAutoWidths();
+            });
+        }
+
+        return () => {
+            disposed = true;
+        };
+    }, [columns, initialVisibleSampleRowIndices, measureColumnWidth, sortedResults]);
+
+    useEffect(() => {
+        visibleRowRangeRef.current = {
+            start: 0,
+            stop: Math.min(Math.max(0, sortedResults.length - 1), Math.max(0, INITIAL_VISIBLE_ROW_COUNT - 1)),
+        };
+    }, [sortedResults]);
+
+    const colWidths = useMemo(() => {
+        const next: ColWidths = {};
+        for (const col of columns) {
+            next[col] = clampColumnWidth(col, manualColWidths[col] ?? autoColWidths[col] ?? defaultColMinWidth);
+        }
+        return next;
+    }, [autoColWidths, clampColumnWidth, columns, defaultColMinWidth, manualColWidths]);
 
     useEffect(() => {
         onStatsChange?.({
@@ -343,7 +376,8 @@ export default function VTable({
         document.addEventListener('mouseup', onUp);
     };
     const autoFitVisible = (col: string) => {
-        const finalW = measureColumnWidth(col, sortedResults);
+        const rowIndices = getVisibleSampleRowIndices(visibleRowRangeRef.current);
+        const finalW = measureColumnWidth(col, sortedResults, rowIndices);
         setManualColWidths(prev => ({ ...prev, [col]: finalW }));
         recomputeAll();
     };
@@ -823,6 +857,11 @@ export default function VTable({
                                 <MultiGrid
                                     ref={ref => {
                                         gridRef.current = (ref as any) || null;
+                                    }}
+                                    onSectionRendered={({ rowStartIndex, rowStopIndex }) => {
+                                        const nextStart = Math.max(0, rowStartIndex - 1);
+                                        const nextStop = Math.max(nextStart, rowStopIndex - 1);
+                                        visibleRowRangeRef.current = { start: nextStart, stop: nextStop };
                                     }}
                                     width={width}
                                     height={height}

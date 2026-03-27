@@ -132,5 +132,15 @@
     "bps": true,
     "folderMillis": 1774367010423,
     "hash": "9a2a9241dd708fa08461678f152ff3f1f62efc0331b467ff8eafb45bc3712a92"
+  },
+  {
+    "sql": [
+      "ALTER TABLE \"connections\" ALTER COLUMN \"host\" DROP NOT NULL;",
+      "\nALTER TABLE \"connections\" ALTER COLUMN \"port\" DROP NOT NULL;",
+      "\nALTER TABLE \"connections\" ADD COLUMN \"path\" text;"
+    ],
+    "bps": true,
+    "folderMillis": 1774596423872,
+    "hash": "0f8ec7eeaecfacbe82ec3e05e43a0b2da8b8cba8f122e9bb401d794c10a5191e"
   }
 ]

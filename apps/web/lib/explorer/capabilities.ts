@@ -61,10 +61,10 @@ export const EXPLORER_CAPABILITIES: Record<ExplorerDriver, DriverCapabilities> =
     sqlite: {
         driver: 'sqlite',
         supportsSchema: false,
-        supportsDatabase: false,
+        supportsDatabase: true,
         supportsCatalog: false,
         listKinds: ['tables', 'views'],
-        objectKinds: ['table', 'view'],
+        objectKinds: ['database', 'table', 'view'],
     },
     trino: {
         driver: 'trino',

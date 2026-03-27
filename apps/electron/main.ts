@@ -310,6 +310,28 @@ ipcMain.handle('auth:openExternal', async (_event, url: string) => {
   await shell.openExternal(url);
 });
 
+ipcMain.handle('filesystem:select-sqlite-file', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openFile'],
+    filters: [
+      {
+        name: 'SQLite Database',
+        extensions: ['sqlite', 'db', 'sqlite3'],
+      },
+      {
+        name: 'All Files',
+        extensions: ['*'],
+      },
+    ],
+  });
+
+  if (result.canceled) {
+    return null;
+  }
+
+  return result.filePaths[0] ?? null;
+});
+
 ipcMain.on('log:renderer', (_event, level: string, ...args: unknown[]) => {
   const safeArgs = args.map(arg => {
     if (typeof arg === 'string') return arg;

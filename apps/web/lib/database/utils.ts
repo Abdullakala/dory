@@ -21,6 +21,10 @@ export const DatasourceTypesWithDBEngine = [
         type: 'doris',
         engine: 'doris',
     },
+    {
+        type: 'sqlite',
+        engine: 'sqlite',
+    },
 ];
 
 export function getDBEngineViaType(type: string): string {

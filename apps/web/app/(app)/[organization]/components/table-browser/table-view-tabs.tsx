@@ -19,10 +19,12 @@ type TableViewTabsProps = {
     onSubTabChange?: (tab: TableSubTab) => void;
 };
 
-const SUB_TABS: TableSubTab[] = ['overview', 'data', 'structure', 'stats'];
-
 export function TableViewTabs({ connectionId, databaseName, tableName, driver, activeSubTab, initialSubTab = 'overview', onSubTabChange }: TableViewTabsProps) {
     const t = useTranslations('TableBrowser');
+    const subTabs = useMemo<TableSubTab[]>(
+        () => (driver === 'sqlite' ? ['overview', 'data', 'structure'] : ['overview', 'data', 'structure', 'stats']),
+        [driver],
+    );
     const [currentTab, setCurrentTab] = useState<TableSubTab>(activeSubTab ?? initialSubTab);
 
     useEffect(() => {
@@ -32,7 +34,7 @@ export function TableViewTabs({ connectionId, databaseName, tableName, driver, a
     }, [activeSubTab]);
 
     const handleTabChange = (value: string) => {
-        const next = (SUB_TABS.find(tab => tab === value) ?? 'data') as TableSubTab;
+        const next = (subTabs.find(tab => tab === value) ?? 'data') as TableSubTab;
         setCurrentTab(next);
         onSubTabChange?.(next);
     };
@@ -42,7 +44,7 @@ export function TableViewTabs({ connectionId, databaseName, tableName, driver, a
     return (
         <Tabs value={currentTab} onValueChange={handleTabChange} className="flex flex-col h-full" key={contentKey}>
             <TabsList className="justify-start">
-                {SUB_TABS.map(tab => (
+                {subTabs.map(tab => (
                     <TabsTrigger key={tab} value={tab} className="cursor-pointer">
                         {t(`Tabs.${tab}`)}
                     </TabsTrigger>
@@ -59,9 +61,11 @@ export function TableViewTabs({ connectionId, databaseName, tableName, driver, a
                 <TabsContent value="structure" className="h-full">
                     <TableStructure databaseName={databaseName} tableName={tableName} />
                 </TabsContent>
-                <TabsContent value="stats" className="h-full">
-                    <TableStats databaseName={databaseName} tableName={tableName} driver={driver} />
-                </TabsContent>
+                {driver !== 'sqlite' ? (
+                    <TabsContent value="stats" className="h-full">
+                        <TableStats databaseName={databaseName} tableName={tableName} driver={driver} />
+                    </TabsContent>
+                ) : null}
             </div>
         </Tabs>
     );

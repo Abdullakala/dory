@@ -5,6 +5,7 @@ ipcRenderer.send('log:renderer', 'info', '[preload] loaded');
 contextBridge.exposeInMainWorld('electron', {
     platform: process.platform,
     isPackaged: process.env.NODE_ENV === 'production' || process.env.ELECTRON_IS_PACKAGED === 'true',
+    selectSqliteFile: () => ipcRenderer.invoke('filesystem:select-sqlite-file') as Promise<string | null>,
 });
 
 contextBridge.exposeInMainWorld('authBridge', {

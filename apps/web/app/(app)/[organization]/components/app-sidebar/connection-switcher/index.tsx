@@ -35,6 +35,7 @@ import { ConnectionCheckStatus, ConnectionIdentity, ConnectionListIdentity, Conn
 import { currentConnectionAtom } from '@/shared/stores/app.store';
 import { useConnectConnection } from '../../../connections/hooks/use-connect-connection';
 import { useConnections } from '../../../connections/hooks/use-connections';
+import { getConnectionLocationLabel } from '@/lib/connection/display';
 
 function getInitial(text?: string | null) {
     if (!text) return 'C';
@@ -42,23 +43,12 @@ function getInitial(text?: string | null) {
     return letter ? letter.toUpperCase() : 'C';
 }
 
-function formatHostWithPort(connection?: ConnectionListItem['connection'] | null) {
-    if (!connection) return null;
-    const rawHost = connection.host?.trim();
-    const port = connection.port;
-    if (!rawHost && !port) return null;
-    if (rawHost && port) return `${rawHost}:${port}`;
-    if (rawHost) return rawHost;
-    if (typeof port === 'number') return `:${port}`;
-    return null;
-}
-
 function getHostLabel(
     connection: ConnectionListItem['connection'] | null,
     isLoading: boolean,
     t: ReturnType<typeof useTranslations>,
 ) {
-    const hostWithPort = formatHostWithPort(connection);
+    const hostWithPort = getConnectionLocationLabel(connection);
     if (hostWithPort) return hostWithPort;
     return isLoading ? t('Loading connections') : t('No connections yet');
 }
@@ -340,7 +330,7 @@ export function ConnectionSwitcher() {
                                 const connectionLoadingKey = makeLoadingKey(connection.connection.id, currentIdentity?.id);
                                 const connectionLoading = Boolean(connectLoadings?.[connectionLoadingKey]);
 
-                                const host = formatHostWithPort(connection.connection) ?? t('Unknown host');
+                                const host = getConnectionLocationLabel(connection.connection) ?? t('Unknown host');
 
                                 return connection.identities?.length > 1 ? (
                                     <DropdownMenuSub key={connection.connection.id}>

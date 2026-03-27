@@ -1,4 +1,4 @@
-export type ConnectionType = 'clickhouse' | 'doris' | 'mariadb' | 'mysql' | 'postgres';
+export type ConnectionType = 'clickhouse' | 'doris' | 'mariadb' | 'mysql' | 'postgres' | 'sqlite';
 export type ConnectionStatus = 'Connected' | 'Error' | 'Disconnected';
 export type ConnectionCheckStatus = 'unknown' | 'ok' | 'error';
 export type ConnectionIdentityStatus = 'active' | 'disabled';
@@ -15,10 +15,11 @@ export interface Connection {
     name: string;
     description: string | null;
 
-    host: string;
-    port: number;
+    host: string | null;
+    port: number | null;
     httpPort: number | null;
     database: string | null;
+    path: string | null;
 
     options: string;
 
@@ -112,10 +113,11 @@ export interface ConnectionCreateInput {
     name: string;
     description?: string;
 
-    host: string;
-    port: number;
+    host: string | null;
+    port: number | null;
     httpPort?: number;
     database?: string;
+    path?: string | null;
 
     options?: string;
     status?: ConnectionStatus;
@@ -131,10 +133,11 @@ export interface ConnectionUpdateInput {
     name?: string;
     description?: string | null;
 
-    host?: string;
-    port?: number;
+    host?: string | null;
+    port?: number | null;
     httpPort?: number | null;
     database?: string | null;
+    path?: string | null;
 
     options?: string;
     status?: ConnectionStatus;

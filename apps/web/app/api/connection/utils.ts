@@ -13,6 +13,7 @@ type SshWithSecrets = ConnectionSsh & { password?: string | null; privateKey?: s
 export const CONNECTION_ERROR_CODES = {
     notFound: 'connection_not_found',
     missingHost: 'missing_host',
+    missingPath: 'missing_path',
     missingUsername: 'missing_username',
     missingIdentity: 'missing_identity',
     missingPassword: 'missing_password',
@@ -117,7 +118,7 @@ export async function ensureConnectionPoolForUser(userId: string, organizationId
 
 export function mapConnectionErrorToResponse(
     error: unknown,
-    messages: { notFound: string; missingHost: string; fallback: string },
+    messages: { notFound: string; missingHost: string; missingPath?: string; fallback: string },
 ) {
     const code = getConnectionErrorCode(error);
 
@@ -127,6 +128,13 @@ export function mapConnectionErrorToResponse(
 
     if (code === CONNECTION_ERROR_CODES.missingHost) {
         return NextResponse.json(ResponseUtil.error({ code: ErrorCodes.INVALID_PARAMS, message: messages.missingHost }), { status: 400 });
+    }
+
+    if (code === CONNECTION_ERROR_CODES.missingPath) {
+        return NextResponse.json(
+            ResponseUtil.error({ code: ErrorCodes.INVALID_PARAMS, message: messages.missingPath ?? messages.fallback }),
+            { status: 400 },
+        );
     }
 
     return NextResponse.json(ResponseUtil.error({ code: ErrorCodes.ERROR, message: messages.fallback }), { status: 500 });

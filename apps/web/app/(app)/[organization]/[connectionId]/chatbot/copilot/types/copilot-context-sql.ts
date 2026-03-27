@@ -1,7 +1,7 @@
 export type CopilotContextSQL = {
     baseline: {
         database?: string | null;
-        dialect?: 'clickhouse' | 'duckdb' | 'mysql' | 'postgres' | 'unknown';
+        dialect?: 'clickhouse' | 'duckdb' | 'mysql' | 'postgres' | 'sqlite' | 'unknown';
     };
 
     draft: {

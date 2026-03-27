@@ -1640,6 +1640,7 @@
                 "FetchCatalogFailed": "Failed to fetch catalog context",
                 "NotFound": "Connection not found or insufficient permissions",
                 "MissingHost": "Connection is missing host information",
+                "MissingPath": "Connection is missing SQLite file path information",
                 "MissingConnectionId": "Missing connection ID",
                 "MissingUsername": "Missing username",
                 "MissingIdentity": "No available identity found",

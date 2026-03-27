@@ -23,8 +23,15 @@ import {
     validatePostgresConnection,
 } from './postgres';
 import { createMysqlConnectionDefaults, MysqlConnectionFields, normalizeMysqlConnectionForForm, normalizeMysqlConnectionForSubmit, validateMysqlConnection } from './mysql';
+import {
+    createSqliteConnectionDefaults,
+    normalizeSqliteConnectionForForm,
+    normalizeSqliteConnectionForSubmit,
+    SqliteConnectionFields,
+    validateSqliteConnection,
+} from './sqlite';
 
-export type SupportedConnectionDriver = 'clickhouse' | 'mariadb' | 'mysql' | 'postgres';
+export type SupportedConnectionDriver = 'clickhouse' | 'mariadb' | 'mysql' | 'postgres' | 'sqlite';
 
 type DriverDefinition = {
     label: string;
@@ -68,6 +75,14 @@ const DRIVERS: Record<SupportedConnectionDriver, DriverDefinition> = {
         normalizeForSubmit: normalizeMysqlConnectionForSubmit,
         validate: validateMysqlConnection,
     },
+    sqlite: {
+        label: 'SQLite',
+        FormComponent: SqliteConnectionFields,
+        createDefaults: createSqliteConnectionDefaults,
+        normalizeForForm: normalizeSqliteConnectionForForm,
+        normalizeForSubmit: normalizeSqliteConnectionForSubmit,
+        validate: validateSqliteConnection,
+    },
 };
 
 export const CONNECTION_TYPE_OPTIONS = (Object.entries(DRIVERS) as Array<[SupportedConnectionDriver, DriverDefinition]>).map(([value, driver]) => ({
@@ -84,6 +99,9 @@ export function getConnectionDriver(type?: string): DriverDefinition {
     }
     if (type === 'postgres') {
         return DRIVERS.postgres;
+    }
+    if (type === 'sqlite') {
+        return DRIVERS.sqlite;
     }
     return DRIVERS.clickhouse;
 }

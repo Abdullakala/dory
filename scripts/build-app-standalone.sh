@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 WEB_DIR="${ROOT_DIR}/apps/web"
+ELECTRON_DIR="${ROOT_DIR}/apps/electron"
 
 cd "${ROOT_DIR}"
 
@@ -68,6 +69,19 @@ fi
 # 5) apps/web/dist-scripts (if exists)
 if [[ -d "${WEB_DIR}/dist-scripts" ]]; then
   cp -a "${WEB_DIR}/dist-scripts" "${OUT_WEB_DIR}/dist-scripts"
+fi
+
+BETTER_SQLITE3_DIR="${OUT_DIR}/node_modules/better-sqlite3"
+if [[ -d "${BETTER_SQLITE3_DIR}" ]]; then
+  ELECTRON_VERSION="$(node -e "const fs=require('node:fs'); const pkg=JSON.parse(fs.readFileSync(process.argv[1], 'utf8')); const version=pkg.devDependencies?.electron || pkg.dependencies?.electron || ''; process.stdout.write(String(version).replace(/^[^0-9]*/, ''));" "${ELECTRON_DIR}/package.json")"
+
+  if [[ -n "${ELECTRON_VERSION}" ]]; then
+    echo "Rebuilding better-sqlite3 for Electron ${ELECTRON_VERSION}..."
+    (
+      cd "${OUT_DIR}"
+      npm rebuild better-sqlite3 --build-from-source --runtime=electron --target="${ELECTRON_VERSION}" --dist-url=https://electronjs.org/headers
+    )
+  fi
 fi
 
 echo "Output ready: ${OUT_DIR}"

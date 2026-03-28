@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { ChevronDown, ChevronUp, Loader2, Server, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
@@ -60,6 +60,8 @@ export function ConnectionDialog({
     });
 
     const { control, handleSubmit, reset } = form;
+    const connectionType = useWatch({ control, name: 'connection.type' });
+    const isSqlite = connectionType === 'sqlite';
 
     const isEditMode = mode === 'Edit' && Boolean(connectionItem?.connection?.id);
 
@@ -79,6 +81,22 @@ export function ConnectionDialog({
         return normalized;
     };
 
+    const normalizeIdentityValues = (identityValues: any) => {
+        if (!isSqlite) {
+            return identityValues;
+        }
+
+        return {
+            id: identityValues?.id,
+            name: identityValues?.name ?? 'SQLite',
+            username: identityValues?.username?.trim?.() || 'sqlite',
+            role: identityValues?.role ?? null,
+            password: null,
+            isDefault: true,
+            database: 'main',
+        };
+    };
+
     useEffect(() => {
         if (!open) return;
 
@@ -89,7 +107,10 @@ export function ConnectionDialog({
             const nextValues = {
                 connection: driver.normalizeForForm(connectionItem.connection),
                 ssh: connectionItem.ssh ? { ...connectionItem.ssh } : { ...(NEW_CONNECTION_DEFAULT_VALUES as any).ssh },
-                identity: formIdentity,
+                identity: {
+                    ...(NEW_CONNECTION_DEFAULT_VALUES as any).identity,
+                    ...formIdentity,
+                },
             } as any;
             reset(nextValues);
             setSshOpen(Boolean((connectionItem as any).ssh?.enabled));
@@ -105,9 +126,10 @@ export function ConnectionDialog({
         try {
             const connectionId = connectionItem?.connection?.id;
             const defaultIdentity = connectionItem?.identities?.find((iden: any) => iden.isDefault);
-            const sshPayload = normalizeSshValues(values.ssh, isEditMode ? connectionId : null);
+            const sshPayload = isSqlite ? null : normalizeSshValues(values.ssh, isEditMode ? connectionId : null);
             const driver = getConnectionDriver(values.connection?.type);
             const normalizedConnection = driver.normalizeForSubmit(values.connection);
+            const normalizedIdentity = normalizeIdentityValues(values.identity);
 
             const savedValues = {
                 connection: isEditMode ? { ...normalizedConnection, id: connectionId } : normalizedConnection,
@@ -115,10 +137,10 @@ export function ConnectionDialog({
                 identities: [
                     isEditMode
                         ? {
-                            ...values.identity,
-                            id: values.identity?.id ?? defaultIdentity?.id,
+                            ...normalizedIdentity,
+                            id: normalizedIdentity?.id ?? defaultIdentity?.id,
                         }
-                        : values.identity,
+                        : normalizedIdentity,
                 ],
             };
             console.log('onSaveSubmit values:', values, 'savedValues:', savedValues);
@@ -145,19 +167,20 @@ export function ConnectionDialog({
 
     
     const onValidTest = async (values: any) => {
-        const sshPayload = normalizeSshValues(values.ssh);
+        const sshPayload = isSqlite ? null : normalizeSshValues(values.ssh);
         const driver = getConnectionDriver(values.connection?.type);
         const normalizedConnection = driver.normalizeForSubmit(values.connection);
+        const normalizedIdentity = normalizeIdentityValues(values.identity);
         let testPayload = { ...values, ssh: sshPayload };
         if (mode === 'Edit') {
             const mergedSsh = sshPayload ? { ...currentConnection?.ssh, ...sshPayload } : currentConnection?.ssh ?? null;
             testPayload = {
                 connection: { ...currentConnection?.connection, ...normalizedConnection },
-                identity: { ...currentConnection?.identities?.find((iden: any) => iden.isDefault), ...values.identity },
+                identity: { ...currentConnection?.identities?.find((iden: any) => iden.isDefault), ...normalizedIdentity },
                 ssh: mergedSsh,
             };
         } else {
-            testPayload = { ...values, connection: normalizedConnection, ssh: sshPayload };
+            testPayload = { ...values, connection: normalizedConnection, identity: normalizedIdentity, ssh: sshPayload };
         }
         setTesting(true);
         try {
@@ -219,58 +242,58 @@ export function ConnectionDialog({
                                     <div className="space-y-4">
                                         <ConnectionForm form={form} />
 
-                                        <p className="text-xs text-muted-foreground mt-3">{t('Authentication Info')}</p>
-
-                                        <IdentityForm form={form} />
+                                        {!isSqlite ? <p className="text-xs text-muted-foreground mt-3">{t('Authentication Info')}</p> : null}
+                                        {!isSqlite ? <IdentityForm form={form} /> : null}
                                     </div>
                                 </section>
 
-                                
-                                <section className="mt-2 rounded-xl border border-border/70 bg-background/80">
-                                    <Collapsible open={sshOpen} onOpenChange={setSshOpen}>
-                                        <div className="flex items-center justify-between px-4 py-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted">
-                                                    <Shield className="h-3 w-3 text-muted-foreground" />
+                                {!isSqlite ? (
+                                    <section className="mt-2 rounded-xl border border-border/70 bg-background/80">
+                                        <Collapsible open={sshOpen} onOpenChange={setSshOpen}>
+                                            <div className="flex items-center justify-between px-4 py-3">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted">
+                                                        <Shield className="h-3 w-3 text-muted-foreground" />
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{tc('SSH')}</span>
+                                                    </div>
                                                 </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{tc('SSH')}</span>
+
+                                                <div className="flex items-center gap-2">
+                                                    <FormField
+                                                        control={control}
+                                                        name="ssh.enabled"
+                                                        render={({ field }) => (
+                                                            <FormItem className="flex items-center gap-2">
+                                                                <FormLabel className="text-xs text-muted-foreground">{t('Enable')}</FormLabel>
+                                                                <FormControl>
+                                                                    <Switch
+                                                                        checked={field.value}
+                                                                        onCheckedChange={checked => {
+                                                                            field.onChange(checked);
+                                                                            setSshOpen(checked);
+                                                                        }}
+                                                                    />
+                                                                </FormControl>
+                                                            </FormItem>
+                                                        )}
+                                                    />
+
+                                                    <CollapsibleTrigger asChild>
+                                                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-muted/60">
+                                                            {sshOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                                        </Button>
+                                                    </CollapsibleTrigger>
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center gap-2">
-                                                <FormField
-                                                    control={control}
-                                                    name="ssh.enabled"
-                                                    render={({ field }) => (
-                                                        <FormItem className="flex items-center gap-2">
-                                                            <FormLabel className="text-xs text-muted-foreground">{t('Enable')}</FormLabel>
-                                                            <FormControl>
-                                                                <Switch
-                                                                    checked={field.value}
-                                                                    onCheckedChange={checked => {
-                                                                        field.onChange(checked);
-                                                                        setSshOpen(checked);
-                                                                    }}
-                                                                />
-                                                            </FormControl>
-                                                        </FormItem>
-                                                    )}
-                                                />
-
-                                                <CollapsibleTrigger asChild>
-                                                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-muted/60">
-                                                        {sshOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                                                    </Button>
-                                                </CollapsibleTrigger>
-                                            </div>
-                                        </div>
-
-                                        <CollapsibleContent className="border-t border-border/60 bg-muted/20 px-4 py-4">
-                                            <SSHConnectionForm form={form} />
-                                        </CollapsibleContent>
-                                    </Collapsible>
-                                </section>
+                                            <CollapsibleContent className="border-t border-border/60 bg-muted/20 px-4 py-4">
+                                                <SSHConnectionForm form={form} />
+                                            </CollapsibleContent>
+                                        </Collapsible>
+                                    </section>
+                                ) : null}
                             </div>
                         </ScrollArea>
 

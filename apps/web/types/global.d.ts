@@ -38,5 +38,6 @@ interface Window {
   electron?: {
     platform: string;
     isPackaged: boolean;
+    selectSqliteFile?: () => Promise<string | null>;
   };
 }

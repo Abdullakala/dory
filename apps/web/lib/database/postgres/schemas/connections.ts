@@ -2,7 +2,7 @@ import { boolean, integer, text, timestamp, pgTable, check, index, uniqueIndex }
 import { sql } from 'drizzle-orm';
 import { newEntityId } from '@/lib/id';
 
-export type ConnectionType = 'clickhouse' | 'doris' | 'mariadb' | 'mysql' | 'postgres';
+export type ConnectionType = 'clickhouse' | 'doris' | 'mariadb' | 'mysql' | 'postgres' | 'sqlite';
 export type ConnectionStatus = 'draft' | 'ready' | 'error' | 'disabled';
 export type SyncSource = 'local' | 'cloud';
 export type SyncStatus =
@@ -44,10 +44,11 @@ export const connections = pgTable(
         name: text('name').notNull().default('Untitled connection'),
         description: text('description'),
 
-        host: text('host').notNull(),
-        port: integer('port').notNull(),
+        host: text('host'),
+        port: integer('port'),
         httpPort: integer('http_port'),
         database: text('database'),
+        path: text('path'),
 
         // Extended config:
         // App layer handles JSON.parse / JSON.stringify

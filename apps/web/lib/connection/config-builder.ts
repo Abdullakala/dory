@@ -96,6 +96,26 @@ export function buildStoredConnectionConfig(
     ssh?: SshWithSecrets | null,
     createError: ErrorFactory = defaultErrorFactory,
 ): BaseConfig {
+    const type = resolveConnectionType(connection.type ?? connection.engine ?? 'clickhouse');
+
+    if (type === 'sqlite') {
+        const normalizedPath = connection.path?.trim();
+        if (!normalizedPath) {
+            throw createError('missing_path');
+        }
+
+        return {
+            id: connection.id,
+            type,
+            host: '',
+            path: normalizedPath,
+            database: identity.database ?? connection.database ?? 'main',
+            options: parseConnectionOptions(connection.options) ?? undefined,
+            configVersion: connection.configVersion ?? undefined,
+            updatedAt: connection.updatedAt instanceof Date ? connection.updatedAt.getTime() : (connection.updatedAt ?? undefined),
+        };
+    }
+
     if (!connection?.host) {
         throw createError('missing_host');
     }
@@ -104,7 +124,6 @@ export function buildStoredConnectionConfig(
     }
 
     const options = buildOptions(connection.options, { httpPort: connection.httpPort, port: connection.port }, ssh);
-    const type = resolveConnectionType(connection.type ?? connection.engine ?? 'clickhouse');
     const database = identity.database ?? (connection as any).database ?? undefined;
     const port = typeof connection.httpPort === 'number' ? connection.httpPort : connection.port;
     const updatedAt = connection.updatedAt instanceof Date ? connection.updatedAt.getTime() : connection.updatedAt;
@@ -128,6 +147,23 @@ export function buildTestConnectionConfig(
     createError: ErrorFactory = defaultErrorFactory,
 ): BaseConfig {
     const { connection, ssh, identity } = payload;
+    const type = resolveConnectionType(connection.type ?? connection.engine ?? 'clickhouse');
+
+    if (type === 'sqlite') {
+        const normalizedPath = connection.path?.trim();
+        if (!normalizedPath) {
+            throw createError('missing_path');
+        }
+
+        return {
+            id: connection.id || connection.name ? `test-${connection.id ?? connection.name}` : 'test-sqlite',
+            type,
+            host: '',
+            path: normalizedPath,
+            database: connection.database ?? 'main',
+            options: parseConnectionOptions(connection.options) ?? undefined,
+        };
+    }
 
     if (!connection?.host) {
         throw createError('missing_host');
@@ -140,7 +176,6 @@ export function buildTestConnectionConfig(
     }
 
     const options = buildOptions(connection.options, { httpPort: connection.httpPort, port: connection.port }, ssh);
-    const type = resolveConnectionType(connection.type ?? connection.engine ?? 'clickhouse');
     const database = identity.database ?? connection.database ?? undefined;
     const id = connection.name ? `test-${connection.name}` : `test-${connection.host}`;
 
@@ -148,7 +183,7 @@ export function buildTestConnectionConfig(
         id,
         type,
         host: connection.host,
-        port: connection.port,
+        port: connection.port ?? undefined,
         username: identity.username,
         password: identity.password ?? undefined,
         database,

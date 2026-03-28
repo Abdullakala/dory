@@ -28,6 +28,7 @@ export default function ConnectionForm(props: { form: UseFormReturn<any> }) {
         form.setValue('connection.port', nextDefaults.port, { shouldDirty: true, shouldValidate: false });
         form.setValue('connection.httpPort', nextDefaults.httpPort, { shouldDirty: true, shouldValidate: false });
         form.setValue('connection.database', nextDefaults.database, { shouldDirty: true, shouldValidate: false });
+        form.setValue('connection.path', currentConnection.path ?? nextDefaults.path ?? null, { shouldDirty: true, shouldValidate: false });
         form.setValue('connection.ssl', nextDefaults.ssl, { shouldDirty: true, shouldValidate: false });
         form.setValue('connection.description', currentConnection.description ?? nextDefaults.description, {
             shouldDirty: true,
@@ -48,6 +49,7 @@ export default function ConnectionForm(props: { form: UseFormReturn<any> }) {
             'connection.port',
             'connection.httpPort',
             'connection.database',
+            'connection.path',
             'connection.ssl',
         ]);
     };

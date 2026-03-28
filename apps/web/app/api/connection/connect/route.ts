@@ -128,6 +128,8 @@ export const POST = withUserAndOrganizationHandler(async ({ req, db, organizatio
         const message =
             code === CONNECTION_ERROR_CODES.missingHost
                 ? t('Api.Connection.Errors.MissingHost')
+                : code === CONNECTION_ERROR_CODES.missingPath
+                  ? t('Api.Connection.Errors.MissingPath')
                 : code === CONNECTION_ERROR_CODES.missingUsername
                   ? t('Api.Connection.Errors.MissingUsername')
                   : messageFromError ?? fallbackMessage;

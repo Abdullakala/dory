@@ -36,6 +36,13 @@
       "when": 1774367010423,
       "tag": "0004_short_quasimodo",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1774596423872,
+      "tag": "0005_wet_jack_power",
+      "breakpoints": true
     }
   ]
 }

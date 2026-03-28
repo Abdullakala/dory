@@ -7,6 +7,7 @@ import { ConnectionCheckStatus, ConnectionListItem } from '@/types/connections';
 import { Edit2, Trash2, Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useHasMounted } from '@/hooks/use-has-mounted';
+import { getConnectionLocationLabel } from '@/lib/connection/display';
 
 type Props = {
     connectionItem: ConnectionListItem;
@@ -23,6 +24,7 @@ export default function ConnectionCard({ connectionItem, id, connectLoading, err
     const hasMounted = useHasMounted();
 
     const connection = connectionItem.connection;
+    const locationLabel = getConnectionLocationLabel(connection);
     const lastCheckStatus = (connection?.lastCheckStatus ?? 'unknown') as ConnectionCheckStatus;
     const lastCheckError = connection?.lastCheckError;
     const lastCheckAt = connection?.lastCheckAt ? new Date(connection.lastCheckAt) : null;
@@ -102,10 +104,10 @@ export default function ConnectionCard({ connectionItem, id, connectLoading, err
 
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <p className="min-h-6 max-w-full truncate text-sm text-muted-foreground">{connectionItem?.connection.host}</p>
+                        <p className="min-h-6 max-w-full truncate text-sm text-muted-foreground">{locationLabel}</p>
                     </TooltipTrigger>
                     <TooltipContent>
-                        <p className="max-w-xs break-all text-center">{connectionItem?.connection.host}</p>
+                        <p className="max-w-xs break-all text-center">{locationLabel}</p>
                     </TooltipContent>
                 </Tooltip>
 

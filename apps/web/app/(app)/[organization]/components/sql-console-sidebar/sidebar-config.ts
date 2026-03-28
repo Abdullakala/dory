@@ -34,6 +34,11 @@ const SIDEBAR_CONFIG_BY_DIALECT: Record<ConnectionType, SidebarConfig> = {
         defaultSchemaName: 'public',
         hiddenDatabases: ['system', 'information_schema'],
     },
+    sqlite: {
+        dialect: 'sqlite',
+        supportsSchemas: false,
+        hiddenDatabases: [],
+    },
 };
 
 export function getSidebarConfig(connectionType?: ConnectionType | null): SidebarConfig {

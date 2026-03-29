@@ -1,6 +1,7 @@
 import type { ConnectionDialect } from '@/types';
 import type { ConnectionType } from '@/types/connections';
 import type { SqlLanguage } from 'sql-formatter';
+import { isPostgresFamilyConnectionType } from '@/lib/connection/postgres-family';
 
 export type SqlDialectParser = {
     getSuggestionAtCaretPosition?: (sql: string, caretPos: { lineNumber: number; column: number }) => unknown;
@@ -59,6 +60,7 @@ const SQL_DIALECT_BY_CONNECTION_TYPE: Partial<Record<ConnectionType, ConnectionD
     clickhouse: 'clickhouse',
     mariadb: 'mysql',
     mysql: 'mysql',
+    neon: 'postgres',
     postgres: 'postgres',
     sqlite: 'sqlite',
 };
@@ -85,6 +87,7 @@ export const normalizeSqlDialect = (value?: string | null): ConnectionDialect =>
         case 'mariadb':
             return 'mysql';
         case 'postgres':
+        case 'neon':
         case 'postgresql':
             return 'postgres';
         case 'sqlite':
@@ -99,7 +102,7 @@ export const getSqlDialectConfig = (dialect?: ConnectionDialect): SqlDialectConf
 };
 
 export const getSqlDialectConfigForConnectionType = (connectionType?: ConnectionType): SqlDialectConfig => {
-    const dialect = connectionType ? SQL_DIALECT_BY_CONNECTION_TYPE[connectionType] : undefined;
+    const dialect = connectionType ? (isPostgresFamilyConnectionType(connectionType) ? 'postgres' : SQL_DIALECT_BY_CONNECTION_TYPE[connectionType]) : undefined;
     return getSqlDialectConfig(dialect ?? 'unknown');
 };
 

@@ -1,7 +1,7 @@
 import { QueryInsightsFilters, QueryInsightsSummary, QueryTimelinePoint, QueryInsightsRow } from '@/types/monitoring';
 import { TableIndexInfo, TablePropertiesRow, TableStats } from '@/types/table-info';
 
-export type ConnectionType = 'clickhouse' | 'mariadb' | 'mysql' | 'postgres' | 'sqlite';
+export type ConnectionType = 'clickhouse' | 'mariadb' | 'mysql' | 'neon' | 'postgres' | 'sqlite';
 
 export interface BaseConfig {
     id: string; // datasource_id

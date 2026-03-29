@@ -1,4 +1,5 @@
 import type { ExplorerDriver, ExplorerListKind, ExplorerObjectKind } from './types';
+import { isPostgresFamilyConnectionType } from '@/lib/connection/postgres-family';
 
 export type DriverCapabilities = {
     driver: ExplorerDriver;
@@ -87,6 +88,10 @@ export const EXPLORER_CAPABILITIES: Record<ExplorerDriver, DriverCapabilities> =
 export function resolveExplorerDriver(driver?: string | null): ExplorerDriver {
     if (!driver) {
         return 'unknown';
+    }
+
+    if (isPostgresFamilyConnectionType(driver)) {
+        return 'postgres';
     }
 
     const normalized = driver.toLowerCase() as ExplorerDriver;

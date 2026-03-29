@@ -15,6 +15,7 @@ import {
     normalizeMariaDbConnectionForSubmit,
     validateMariaDbConnection,
 } from './mariadb';
+import { createNeonConnectionDefaults, NeonConnectionFields, normalizeNeonConnectionForForm, normalizeNeonConnectionForSubmit, validateNeonConnection } from './neon';
 import {
     PostgresConnectionFields,
     createPostgresConnectionDefaults,
@@ -23,15 +24,9 @@ import {
     validatePostgresConnection,
 } from './postgres';
 import { createMysqlConnectionDefaults, MysqlConnectionFields, normalizeMysqlConnectionForForm, normalizeMysqlConnectionForSubmit, validateMysqlConnection } from './mysql';
-import {
-    createSqliteConnectionDefaults,
-    normalizeSqliteConnectionForForm,
-    normalizeSqliteConnectionForSubmit,
-    SqliteConnectionFields,
-    validateSqliteConnection,
-} from './sqlite';
+import { createSqliteConnectionDefaults, normalizeSqliteConnectionForForm, normalizeSqliteConnectionForSubmit, SqliteConnectionFields, validateSqliteConnection } from './sqlite';
 
-export type SupportedConnectionDriver = 'clickhouse' | 'mariadb' | 'mysql' | 'postgres' | 'sqlite';
+export type SupportedConnectionDriver = 'clickhouse' | 'mariadb' | 'mysql' | 'neon' | 'postgres' | 'sqlite';
 
 type DriverDefinition = {
     label: string;
@@ -58,6 +53,14 @@ const DRIVERS: Record<SupportedConnectionDriver, DriverDefinition> = {
         normalizeForForm: normalizePostgresConnectionForForm,
         normalizeForSubmit: normalizePostgresConnectionForSubmit,
         validate: validatePostgresConnection,
+    },
+    neon: {
+        label: 'Neon',
+        FormComponent: NeonConnectionFields,
+        createDefaults: createNeonConnectionDefaults,
+        normalizeForForm: normalizeNeonConnectionForForm,
+        normalizeForSubmit: normalizeNeonConnectionForSubmit,
+        validate: validateNeonConnection,
     },
     mariadb: {
         label: 'MariaDB',
@@ -99,6 +102,9 @@ export function getConnectionDriver(type?: string): DriverDefinition {
     }
     if (type === 'postgres') {
         return DRIVERS.postgres;
+    }
+    if (type === 'neon') {
+        return DRIVERS.neon;
     }
     if (type === 'sqlite') {
         return DRIVERS.sqlite;

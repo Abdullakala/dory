@@ -18,6 +18,7 @@ import { editorSelectionByTabAtom } from '../../sql-console.store';
 import { useTranslations } from 'next-intl';
 import type { ConnectionType } from '@/types/connections';
 import { getSqlDialectConfigForConnectionType, getSqlDialectParser, type SqlDialectParser } from '@/lib/sql/sql-dialect';
+import { isPostgresFamilyConnectionType } from '@/lib/connection/postgres-family';
 
 const MAX_SQL_LEN_FOR_PARSE = 20000;
 
@@ -140,7 +141,7 @@ const registerDtSqlCompletion = (
     getSchemas: () => any[],
     getActiveDatabase?: () => string,
 ) => {
-    const isPostgres = currentConnectionType === 'postgres';
+    const isPostgres = isPostgresFamilyConnectionType(currentConnectionType);
 
     return monaco.languages.registerCompletionItemProvider(languageId, {
         triggerCharacters: [' ', '.', ',', '(', '=', '\n'],
@@ -166,7 +167,6 @@ const registerDtSqlCompletion = (
             const offset = model.getOffsetAt(position);
             const prefixText = sql.slice(0, offset);
 
-            
             let suggestion: any = {};
             try {
                 suggestion = parser.getSuggestionAtCaretPosition?.(sql, caretPos) || {};
@@ -186,7 +186,6 @@ const registerDtSqlCompletion = (
             const syntaxList = Array.isArray(syntax) ? syntax : [];
             const columnPrefix = buildColumnPrefix(syntaxList, currentWord);
 
-            
             if (Array.isArray(keywords)) {
                 for (const kw of keywords) {
                     items.push({
@@ -205,7 +204,6 @@ const registerDtSqlCompletion = (
                 const hasTableContext = syntaxList.some(s => s.syntaxContextType === 'table');
                 const hasDatabaseContext = syntaxList.some(s => s.syntaxContextType === 'database' || s.syntaxContextType === 'databaseCreate');
 
-                
                 if (hasTableContext) {
                     const tableSyntax = syntaxList.find(s => s.syntaxContextType === 'table');
                     const typedTablePrefix =
@@ -258,7 +256,6 @@ const registerDtSqlCompletion = (
                         }
                     }
 
-                    
                     if (isPostgres) {
                         const normalizedSchemaPrefix = (qualifierPrefixRaw || typedTablePrefix || currentWord).toLowerCase();
 
@@ -338,34 +335,29 @@ const registerDtSqlCompletion = (
                     }
                 }
 
-                
                 if (hasColumnContext) {
-                    const rawPrefix = columnPrefix.trim(); 
+                    const rawPrefix = columnPrefix.trim();
                     let targetTables: string[] = [];
                     let filterPrefix = rawPrefix.toLowerCase();
 
-                    
                     const aliasMatch = rawPrefix.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\.(.*)$/);
                     if (aliasMatch) {
                         const aliasPart = aliasMatch[1]; // c
-                        const afterDotPart = aliasMatch[2]; 
+                        const afterDotPart = aliasMatch[2];
 
                         const tableFromAlias = resolveTableFromAliasInSql(sql, aliasPart);
                         if (tableFromAlias) {
                             targetTables = [tableFromAlias];
 
-                            
                             filterPrefix = (afterDotPart || '').toLowerCase();
                         }
                     }
 
-                    
                     if (!targetTables.length) {
                         const caretOffset = model.getOffsetAt(position);
                         targetTables = resolveTablesForColumnContext(parser, sql, caretPos, tables, caretOffset);
 
                         if (!targetTables.length) {
-                            
                             targetTables = tables.map(t => normalizeTableName(resolveTableName(t))).filter(Boolean);
                         }
                     }
@@ -428,7 +420,7 @@ export function useSqlMonacoEditor({
     const setSelectionByTab = useSetAtom(editorSelectionByTabAtom);
     const { databases } = useDatabases();
     const { tables } = useTables(activeDatabase);
-    const { schemas } = useSchemas(activeDatabase, currentConnectionType === 'postgres');
+    const { schemas } = useSchemas(activeDatabase, isPostgresFamilyConnectionType(currentConnectionType));
     const { refresh: refreshColumns } = useColumns();
     const refreshColumnsRef = useRef(refreshColumns);
     const t = useTranslations('SqlConsole');
@@ -497,7 +489,6 @@ export function useSqlMonacoEditor({
             const dialectConfig = getSqlDialectConfigForConnectionType(currentConnectionType);
             const languageId = dialectConfig.monacoLanguageId;
 
-            
             const parser = await getSqlDialectParser(dialectConfig.dialect);
             console.log(`[useSqlMonacoEditor] Loaded parser for dialect=${dialectConfig.dialect}`);
 

@@ -5,7 +5,7 @@ import { Input } from '@/registry/new-york-v4/ui/input';
 import { Switch } from '@/registry/new-york-v4/ui/switch';
 import { FieldHelp, PortField } from './shared';
 
-function parsePostgresHostDraft(rawHost: unknown): { host?: string; port?: number; database?: string } {
+export function parsePostgresHostDraft(rawHost: unknown): { host?: string; port?: number; database?: string } {
     if (typeof rawHost !== 'string') return {};
     const trimmed = rawHost.trim();
     if (!trimmed) return {};
@@ -26,7 +26,7 @@ function parsePostgresHostDraft(rawHost: unknown): { host?: string; port?: numbe
     }
 }
 
-function parseConnectionOptions(raw: unknown): Record<string, unknown> {
+export function parsePostgresConnectionOptions(raw: unknown): Record<string, unknown> {
     if (!raw) return {};
     if (typeof raw === 'object' && !Array.isArray(raw)) return { ...(raw as Record<string, unknown>) };
     if (typeof raw === 'string') {
@@ -58,20 +58,15 @@ export function createPostgresConnectionDefaults() {
 }
 
 export function normalizePostgresConnectionForForm(connection: any) {
-    const options = parseConnectionOptions(connection?.options);
+    const options = parsePostgresConnectionOptions(connection?.options);
     const parsedHost = parsePostgresHostDraft(connection?.host);
-    const ssl =
-        typeof options.ssl === 'boolean'
-            ? options.ssl
-            : typeof options.sslmode === 'string'
-              ? options.sslmode !== 'disable'
-              : false;
+    const ssl = typeof options.ssl === 'boolean' ? options.ssl : typeof options.sslmode === 'string' ? options.sslmode !== 'disable' : false;
 
     return {
         ...createPostgresConnectionDefaults(),
         ...connection,
         host: parsedHost.host ?? connection?.host ?? '',
-        port: typeof connection?.port === 'number' ? connection.port : parsedHost.port ?? 5432,
+        port: typeof connection?.port === 'number' ? connection.port : (parsedHost.port ?? 5432),
         httpPort: null,
         ssl,
         database: connection?.database ?? parsedHost.database ?? 'postgres',
@@ -79,7 +74,7 @@ export function normalizePostgresConnectionForForm(connection: any) {
 }
 
 export function normalizePostgresConnectionForSubmit(connection: any) {
-    const options = parseConnectionOptions(connection?.options);
+    const options = parsePostgresConnectionOptions(connection?.options);
     const { ssl: _ssl, ...restConnection } = connection ?? {};
     const parsedHost = parsePostgresHostDraft(connection?.host);
     const ssl = Boolean(connection?.ssl);
@@ -97,10 +92,7 @@ export function normalizePostgresConnectionForSubmit(connection: any) {
     return {
         ...restConnection,
         host: parsedHost.host ?? connection?.host?.trim?.() ?? '',
-        port:
-            typeof connection?.port === 'number' && Number.isFinite(connection.port)
-                ? connection.port
-                : parsedHost.port ?? 5432,
+        port: typeof connection?.port === 'number' && Number.isFinite(connection.port) ? connection.port : (parsedHost.port ?? 5432),
         httpPort: null,
         database: connection?.database?.trim?.() || parsedHost.database || 'postgres',
         options: JSON.stringify(options),
@@ -119,7 +111,9 @@ export function PostgresConnectionFields({ form }: { form: UseFormReturn<any> })
                     render={({ field }) => (
                         <FormItem className="space-y-2">
                             <FormLabel className="flex items-center gap-1.5">
-                                <span>Host<span className="text-destructive"> *</span></span>
+                                <span>
+                                    Host<span className="text-destructive"> *</span>
+                                </span>
                                 <FieldHelp text="Use your PostgreSQL server hostname or IP address." />
                             </FormLabel>
                             <FormControl>

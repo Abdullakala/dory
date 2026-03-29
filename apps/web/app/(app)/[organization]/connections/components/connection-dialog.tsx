@@ -27,6 +27,7 @@ import { ConnectionDialogFormSchema } from '../form-schema';
 import { useAtomValue } from 'jotai';
 import { currentConnectionAtom } from '@/shared/stores/app.store';
 import { getConnectionDriver } from './forms/connection/drivers';
+import { buildNeonConnectionStringForForm, normalizeNeonIdentityFromConnectionString } from './forms/connection/drivers/neon';
 
 type Mode = 'Create' | 'Edit';
 
@@ -62,6 +63,9 @@ export function ConnectionDialog({
     const { control, handleSubmit, reset } = form;
     const connectionType = useWatch({ control, name: 'connection.type' });
     const isSqlite = connectionType === 'sqlite';
+    const isNeon = connectionType === 'neon';
+    const hidesIdentityForm = isSqlite || isNeon;
+    const hidesSshForm = isSqlite || isNeon;
 
     const isEditMode = mode === 'Edit' && Boolean(connectionItem?.connection?.id);
 
@@ -82,6 +86,16 @@ export function ConnectionDialog({
     };
 
     const normalizeIdentityValues = (identityValues: any) => {
+        if (isNeon) {
+            const fallbackIdentity = connectionItem?.identities?.find((iden: any) => iden.isDefault);
+
+            return normalizeNeonIdentityFromConnectionString(form.getValues('connection.host'), {
+                id: fallbackIdentity?.id,
+                username: fallbackIdentity?.username,
+                database: fallbackIdentity?.database,
+            });
+        }
+
         if (!isSqlite) {
             return identityValues;
         }
@@ -112,21 +126,25 @@ export function ConnectionDialog({
                     ...formIdentity,
                 },
             } as any;
+            if (connectionItem.connection?.type === 'neon') {
+                nextValues.connection.host = buildNeonConnectionStringForForm(connectionItem.connection, formIdentity);
+            }
             reset(nextValues);
-            setSshOpen(Boolean((connectionItem as any).ssh?.enabled));
+            setSshOpen(connectionItem.connection?.type === 'neon' ? false : Boolean((connectionItem as any).ssh?.enabled));
         } else {
             reset(NEW_CONNECTION_DEFAULT_VALUES as any);
             setSshOpen(Boolean((NEW_CONNECTION_DEFAULT_VALUES as any).ssh?.enabled));
         }
     }, [open, isEditMode, connectionItem, reset]);
 
-    
     const onSaveSubmit = async (values: any) => {
         setSubmitting(true);
         try {
             const connectionId = connectionItem?.connection?.id;
             const defaultIdentity = connectionItem?.identities?.find((iden: any) => iden.isDefault);
-            const sshPayload = isSqlite ? null : normalizeSshValues(values.ssh, isEditMode ? connectionId : null);
+            const sshPayload = hidesSshForm
+                ? { enabled: false, host: null, port: null, username: null, authMethod: null }
+                : normalizeSshValues(values.ssh, isEditMode ? connectionId : null);
             const driver = getConnectionDriver(values.connection?.type);
             const normalizedConnection = driver.normalizeForSubmit(values.connection);
             const normalizedIdentity = normalizeIdentityValues(values.identity);
@@ -137,16 +155,16 @@ export function ConnectionDialog({
                 identities: [
                     isEditMode
                         ? {
-                            ...normalizedIdentity,
-                            id: normalizedIdentity?.id ?? defaultIdentity?.id,
-                        }
+                              ...normalizedIdentity,
+                              id: normalizedIdentity?.id ?? defaultIdentity?.id,
+                          }
                         : normalizedIdentity,
                 ],
             };
             console.log('onSaveSubmit values:', values, 'savedValues:', savedValues);
             if (isEditMode && connectionItem?.connection?.id) {
                 console.log('isEditMode true, updating connection');
-                
+
                 const updateValues: any = {
                     ...savedValues,
                     id: connectionItem.connection.id,
@@ -165,15 +183,14 @@ export function ConnectionDialog({
         }
     };
 
-    
     const onValidTest = async (values: any) => {
-        const sshPayload = isSqlite ? null : normalizeSshValues(values.ssh);
+        const sshPayload = hidesSshForm ? { enabled: false, host: null, port: null, username: null, authMethod: null } : normalizeSshValues(values.ssh);
         const driver = getConnectionDriver(values.connection?.type);
         const normalizedConnection = driver.normalizeForSubmit(values.connection);
         const normalizedIdentity = normalizeIdentityValues(values.identity);
         let testPayload = { ...values, ssh: sshPayload };
         if (mode === 'Edit') {
-            const mergedSsh = sshPayload ? { ...currentConnection?.ssh, ...sshPayload } : currentConnection?.ssh ?? null;
+            const mergedSsh = sshPayload ? { ...currentConnection?.ssh, ...sshPayload } : (currentConnection?.ssh ?? null);
             testPayload = {
                 connection: { ...currentConnection?.connection, ...normalizedConnection },
                 identity: { ...currentConnection?.identities?.find((iden: any) => iden.isDefault), ...normalizedIdentity },
@@ -192,13 +209,11 @@ export function ConnectionDialog({
         }
     };
 
-    
     const onInvalidTest = (errors: any) => {
         console.log('test connection validation errors:', errors);
         toast.error(t('Fix Form Errors Before Testing'));
     };
 
-    
     const handleTestConnection = () => {
         handleSubmit(onValidTest, onInvalidTest)();
     };
@@ -228,7 +243,6 @@ export function ConnectionDialog({
                     <form className="flex flex-col flex-1" onSubmit={handleSubmit(onSaveSubmit)}>
                         <ScrollArea className="overflow-hidden pr-2 h-[70vh]">
                             <div className="space-y-4 pb-4">
-                                
                                 <section className="rounded-xl border border-border/70 bg-background/80 p-4 space-y-4">
                                     <div className="flex items-center gap-2">
                                         <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted">
@@ -242,12 +256,12 @@ export function ConnectionDialog({
                                     <div className="space-y-4">
                                         <ConnectionForm form={form} />
 
-                                        {!isSqlite ? <p className="text-xs text-muted-foreground mt-3">{t('Authentication Info')}</p> : null}
-                                        {!isSqlite ? <IdentityForm form={form} /> : null}
+                                        {!hidesIdentityForm ? <p className="text-xs text-muted-foreground mt-3">{t('Authentication Info')}</p> : null}
+                                        {!hidesIdentityForm ? <IdentityForm form={form} /> : null}
                                     </div>
                                 </section>
 
-                                {!isSqlite ? (
+                                {!hidesSshForm ? (
                                     <section className="mt-2 rounded-xl border border-border/70 bg-background/80">
                                         <Collapsible open={sshOpen} onOpenChange={setSshOpen}>
                                             <div className="flex items-center justify-between px-4 py-3">
@@ -297,7 +311,6 @@ export function ConnectionDialog({
                             </div>
                         </ScrollArea>
 
-                        
                         <DialogFooter className="shrink-0 pt-4 mt-2 bg-background flex lg:justify-between">
                             <div>
                                 <Button type="button" onClick={handleTestConnection} disabled={submitting || testing} data-testid="test-connection">

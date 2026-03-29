@@ -11,6 +11,7 @@ const registry = new Map<ConnectionType, ConnectionDriverCtor>();
 registry.set('clickhouse', ClickhouseDatasource);
 registry.set('mariadb', MariaDbDatasource);
 registry.set('mysql', MySqlDatasource);
+registry.set('neon', PostgresDatasource);
 registry.set('postgres', PostgresDatasource);
 registry.set('sqlite', SqliteDatasource);
 

@@ -90,10 +90,7 @@ export class PostgresDatasource extends BaseConnection {
         });
     }
 
-    async queryWithContext<Row = any>(
-        sql: string,
-        context?: ConnectionQueryContext & { params?: DriverQueryParams },
-    ): Promise<QueryResult<Row>> {
+    async queryWithContext<Row = any>(sql: string, context?: ConnectionQueryContext & { params?: DriverQueryParams }): Promise<QueryResult<Row>> {
         this.assertReady();
         const targetDatabase = context?.database ?? this.config.database;
         const pool = this.resolvePool(targetDatabase);

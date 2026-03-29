@@ -32,7 +32,6 @@ function translateConnectionsApi(key: string) {
 
 
 export async function addConnection(params: CreateConnectionPayload): Promise<ResponseObject<ConnectionListItem>> {
-    console.log('addConnection params:', params);
     const res = await fetchJsonResponse<ConnectionListItem>(
         '/api/connection',
         {

@@ -7,6 +7,7 @@ import { hasMetadataCapability } from '@/lib/connection/base/types';
 import { ensureConnectionPoolForUser, mapConnectionErrorToResponse } from '@/app/api/connection/utils';
 import { withUserAndOrganizationHandler } from '@/app/api/utils/with-organization-handler';
 import { getApiLocale, translateApi } from '@/app/api/utils/i18n';
+import { isPostgresFamilyConnectionType } from '@/lib/connection/postgres-family';
 
 const paramsSchema = z.object({
     database: z.string().min(1),
@@ -159,7 +160,9 @@ export async function GET(req: NextRequest, context: { params: Promise<{ databas
 
         try {
             const { entry, config } = await ensureConnectionPoolForUser(userId, organizationId, connectionId, null);
-            const engine = (config.type ?? 'unknown') as 'clickhouse' | 'doris' | 'mariadb' | 'mysql' | 'postgres' | 'sqlite' | 'unknown';
+            const engine = isPostgresFamilyConnectionType(config.type)
+                ? 'postgres'
+                : ((config.type ?? 'unknown') as 'clickhouse' | 'doris' | 'mariadb' | 'mysql' | 'postgres' | 'sqlite' | 'unknown');
             const cluster = config.port ? `${config.host}:${config.port}` : (config.host ?? null);
             const metadata = entry.instance.capabilities.metadata;
             if (!hasMetadataCapability(metadata, 'getDatabaseSummary')) {

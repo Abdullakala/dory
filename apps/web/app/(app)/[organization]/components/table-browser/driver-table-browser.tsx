@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/registry/new-york-v4/ui/tabs';
-import type { ExplorerDriver } from '@/lib/explorer/types';
 import type { SQLTab } from '@/types/tabs';
 import { TableOverview } from './components/overview';
 import TableStats from './components/stats';
@@ -12,9 +11,10 @@ import TableDataPreview from './components/data-preview';
 import { TableIndexesTab } from './components/indexes';
 import { TableViewTabs } from './table-view-tabs';
 import type { TableSubTab } from './types';
+import { isPostgresFamilyConnectionType } from '@/lib/connection/postgres-family';
 
 type DriverTableBrowserProps = {
-    driver?: ExplorerDriver;
+    driver?: string;
     activeTab?: SQLTab;
     connectionId?: string;
     databaseName?: string;
@@ -27,8 +27,8 @@ type DriverTableBrowserProps = {
 const DEFAULT_TAB: TableSubTab = 'data';
 const POSTGRES_SUB_TABS: TableSubTab[] = ['overview', 'data', 'structure', 'stats', 'indexes'];
 
-function normalizeTab(driver: ExplorerDriver | undefined, tab?: TableSubTab): TableSubTab {
-    if (driver !== 'postgres' && tab === 'indexes') {
+function normalizeTab(driver: string | undefined, tab?: TableSubTab): TableSubTab {
+    if (!isPostgresFamilyConnectionType(driver) && tab === 'indexes') {
         return DEFAULT_TAB;
     }
 
@@ -60,7 +60,7 @@ export function DriverTableBrowser({
         onSubTabChange?.(next);
     };
 
-    if (driver !== 'postgres') {
+    if (!isPostgresFamilyConnectionType(driver)) {
         return (
             <div className="p-6 h-full flex flex-col">
                 <TableViewTabs

@@ -1,5 +1,6 @@
 import type { ConnectionType } from '@/types/connections';
 import type { SidebarConfig } from './types';
+import { isPostgresFamilyConnectionType } from '@/lib/connection/postgres-family';
 
 const DEFAULT_CONFIG: SidebarConfig = {
     dialect: 'default',
@@ -28,6 +29,12 @@ const SIDEBAR_CONFIG_BY_DIALECT: Record<ConnectionType, SidebarConfig> = {
         supportsSchemas: false,
         hiddenDatabases: ['information_schema', 'mysql', 'performance_schema', 'sys'],
     },
+    neon: {
+        dialect: 'postgres',
+        supportsSchemas: true,
+        defaultSchemaName: 'public',
+        hiddenDatabases: ['system', 'information_schema'],
+    },
     postgres: {
         dialect: 'postgres',
         supportsSchemas: true,
@@ -44,6 +51,10 @@ const SIDEBAR_CONFIG_BY_DIALECT: Record<ConnectionType, SidebarConfig> = {
 export function getSidebarConfig(connectionType?: ConnectionType | null): SidebarConfig {
     if (!connectionType) {
         return DEFAULT_CONFIG;
+    }
+
+    if (isPostgresFamilyConnectionType(connectionType)) {
+        return SIDEBAR_CONFIG_BY_DIALECT.postgres;
     }
 
     return SIDEBAR_CONFIG_BY_DIALECT[connectionType] ?? DEFAULT_CONFIG;

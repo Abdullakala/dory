@@ -21,7 +21,6 @@ function hasSshSecret(ssh?: SSHConfigWithSecrets | null): boolean {
     return values.length > 0;
 }
 
-
 export async function testConnectService(organizationId: string, payload: TestConnectionPayload): Promise<HealthInfo> {
     const db = await getDBService();
     const connectionId = payload.connection?.id;
@@ -44,9 +43,8 @@ export async function testConnectService(organizationId: string, payload: TestCo
 
     const testPassword = payload?.identity?.password ?? plainPassword;
     const resolvedSsh = await resolveSshSecrets(organizationId, payload, db);
-    const config = buildTestConnectionConfig(
-        { ...payload, identity: { ...payload.identity, password: testPassword }, ssh: resolvedSsh },
-        code => createConnectionError(code as ConnectionErrorCode),
+    const config = buildTestConnectionConfig({ ...payload, identity: { ...payload.identity, password: testPassword }, ssh: resolvedSsh }, code =>
+        createConnectionError(code as ConnectionErrorCode),
     );
     let provider = null as Awaited<ReturnType<typeof createProvider>> | null;
 

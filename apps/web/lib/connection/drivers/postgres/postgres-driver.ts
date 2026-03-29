@@ -15,6 +15,8 @@ type PostgresRuntimeOptions = {
     statementTimeoutMs?: number;
     connectionTimeoutMs?: number;
     applicationName?: string;
+    connectionOptions?: string;
+    enableChannelBinding?: boolean;
 };
 
 type PostgresConnectionOverride = {
@@ -84,6 +86,41 @@ function parsePositiveInt(value: unknown): number | undefined {
     return undefined;
 }
 
+function mergeConnectionStringWithConfig(connectionString: string, config: BaseConfig, databaseOverride?: string, connectionOverride?: PostgresConnectionOverride) {
+    try {
+        const url = new URL(connectionString);
+        if (!/^postgres(ql)?:$/i.test(url.protocol)) {
+            return connectionString;
+        }
+
+        const resolvedHost = connectionOverride?.host ?? config.host;
+        const resolvedPort = connectionOverride?.port ?? normalizePort(config.port);
+        const resolvedDatabase = databaseOverride ?? config.database;
+        const resolvedUsername = config.username;
+        const resolvedPassword = config.password;
+
+        if (resolvedHost) {
+            url.hostname = resolvedHost.replace(/^\[(.*)\]$/, '$1');
+        }
+        if (resolvedPort) {
+            url.port = String(resolvedPort);
+        }
+        if (resolvedDatabase) {
+            url.pathname = `/${encodeURIComponent(resolvedDatabase)}`;
+        }
+        if (resolvedUsername && !url.username) {
+            url.username = encodeURIComponent(resolvedUsername);
+        }
+        if (resolvedPassword && !url.password) {
+            url.password = encodeURIComponent(resolvedPassword);
+        }
+
+        return url.toString();
+    } catch {
+        return connectionString;
+    }
+}
+
 function extractRuntimeOptions(config: BaseConfig): PostgresRuntimeOptions {
     const options = (config.options ?? {}) as Record<string, unknown>;
     const sslMode = typeof options.sslmode === 'string' ? options.sslmode.toLowerCase() : undefined;
@@ -104,10 +141,12 @@ function extractRuntimeOptions(config: BaseConfig): PostgresRuntimeOptions {
         queryTimeoutMs: parsePositiveInt(options.request_timeout),
         statementTimeoutMs: parsePositiveInt(options.statement_timeout),
         connectionTimeoutMs: parsePositiveInt(options.connection_timeout),
-        applicationName:
-            typeof options.application_name === 'string' && options.application_name.trim()
-                ? options.application_name.trim()
-                : 'dory',
+        applicationName: typeof options.application_name === 'string' && options.application_name.trim() ? options.application_name.trim() : 'dory',
+        connectionOptions: typeof options.options === 'string' && options.options.trim() ? options.options.trim() : undefined,
+        enableChannelBinding:
+            typeof options.channel_binding === 'string'
+                ? options.channel_binding.toLowerCase() === 'require'
+                : Boolean((options as { enableChannelBinding?: unknown }).enableChannelBinding),
     };
 }
 
@@ -116,15 +155,14 @@ export function resolvePostgresPort(config: BaseConfig): number {
     return hostConfig.port ?? 5432;
 }
 
-function buildPoolConfig(
-    config: BaseConfig,
-    databaseOverride?: string,
-    connectionOverride?: PostgresConnectionOverride,
-): PoolConfig {
+export function buildPostgresPoolConfig(config: BaseConfig, databaseOverride?: string, connectionOverride?: PostgresConnectionOverride): PoolConfig {
     const hostConfig = parseHostInput(config.host, config.port);
     const runtime = extractRuntimeOptions(config);
+    const rawOptions = (config.options ?? {}) as Record<string, unknown>;
+    const connectionString =
+        config.type === 'neon' && typeof rawOptions.connectionString === 'string' && rawOptions.connectionString.trim() ? rawOptions.connectionString.trim() : undefined;
 
-    return {
+    const poolConfig = {
         host: connectionOverride?.host ?? hostConfig.host,
         port: connectionOverride?.port ?? hostConfig.port ?? 5432,
         user: config.username ?? hostConfig.user,
@@ -137,7 +175,15 @@ function buildPoolConfig(
         query_timeout: runtime.queryTimeoutMs,
         statement_timeout: runtime.statementTimeoutMs,
         application_name: runtime.applicationName,
-    };
+        options: runtime.connectionOptions,
+        ...(runtime.enableChannelBinding ? ({ enableChannelBinding: true } as any) : {}),
+    } as PoolConfig;
+
+    if (connectionString) {
+        poolConfig.connectionString = mergeConnectionStringWithConfig(connectionString, config, databaseOverride, connectionOverride);
+    }
+
+    return poolConfig;
 }
 
 function normalizeColumns(result: PgResult<any>) {
@@ -188,12 +234,8 @@ function quoteQualifiedPath(input: string): string {
         .join(', ');
 }
 
-export function createPostgresPool(
-    config: BaseConfig,
-    databaseOverride?: string,
-    connectionOverride?: PostgresConnectionOverride,
-): Pool {
-    return new Pool(buildPoolConfig(config, databaseOverride, connectionOverride));
+export function createPostgresPool(config: BaseConfig, databaseOverride?: string, connectionOverride?: PostgresConnectionOverride): Pool {
+    return new Pool(buildPostgresPoolConfig(config, databaseOverride, connectionOverride));
 }
 
 export async function pingPostgres(pool: Pool): Promise<HealthInfo & { version?: string }> {
@@ -207,13 +249,7 @@ export async function pingPostgres(pool: Pool): Promise<HealthInfo & { version?:
     };
 }
 
-export async function executePostgresQuery<Row>(
-    pool: Pool,
-    config: BaseConfig,
-    sql: string,
-    params?: DriverQueryParams,
-    options?: QuerySessionOptions,
-): Promise<QueryResult<Row>> {
+export async function executePostgresQuery<Row>(pool: Pool, config: BaseConfig, sql: string, params?: DriverQueryParams, options?: QuerySessionOptions): Promise<QueryResult<Row>> {
     const { sql: compiledSql, values } = normalizeParams(sql, params);
     const client = (await pool.connect()) as PgClientLike;
     const started = Date.now();
@@ -233,10 +269,7 @@ export async function executePostgresQuery<Row>(
             rows: (Array.isArray(result.rows) ? result.rows : []) as Row[],
             rowCount: typeof result.rowCount === 'number' ? result.rowCount : undefined,
             columns: normalizeColumns(result),
-            limited:
-                typeof result.rowCount === 'number' &&
-                /^\s*(select|with)\b/i.test(compiledSql) &&
-                result.rowCount >= MAX_RESULT_ROWS,
+            limited: typeof result.rowCount === 'number' && /^\s*(select|with)\b/i.test(compiledSql) && result.rowCount >= MAX_RESULT_ROWS,
             limit: /^\s*(select|with)\b/i.test(compiledSql) ? MAX_RESULT_ROWS : undefined,
             tookMs: Date.now() - started,
         };
@@ -246,13 +279,7 @@ export async function executePostgresQuery<Row>(
     }
 }
 
-export async function executePostgresCommand(
-    pool: Pool,
-    config: BaseConfig,
-    sql: string,
-    params?: DriverQueryParams,
-    context?: ConnectionQueryContext,
-): Promise<void> {
+export async function executePostgresCommand(pool: Pool, config: BaseConfig, sql: string, params?: DriverQueryParams, context?: ConnectionQueryContext): Promise<void> {
     await executePostgresQuery(pool, config, sql, params, { context });
 }
 

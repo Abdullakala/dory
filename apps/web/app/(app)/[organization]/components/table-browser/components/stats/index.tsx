@@ -11,6 +11,7 @@ import { TableHealthReportCard } from './components/ai-insight';
 import PostgresTableStatsView from './postgres-stats';
 import { useTableStatsQuery } from '../table-queries';
 import { useTranslations } from 'next-intl';
+import { isPostgresFamilyConnectionType } from '@/lib/connection/postgres-family';
 // import TTLCard from './components/ttl-card';
 
 type TableStatsProps = {
@@ -28,9 +29,7 @@ function ClickhouseTableStatsView({ databaseName, tableName }: Omit<TableStatsPr
 
     const stats = statsQuery.data ?? null;
     const loading = statsQuery.isLoading;
-    const error =
-        (!connectionId && databaseName && tableName ? t('No available connection') : null) ||
-        (statsQuery.error ? (statsQuery.error as Error).message : null);
+    const error = (!connectionId && databaseName && tableName ? t('No available connection') : null) || (statsQuery.error ? (statsQuery.error as Error).message : null);
 
     if (!databaseName || !tableName) {
         return <div className="h-full flex items-center justify-center text-sm text-muted-foreground">{t('Select table to view stats')}</div>;
@@ -45,12 +44,7 @@ function ClickhouseTableStatsView({ databaseName, tableName }: Omit<TableStatsPr
                         <AlertDescription>{error}</AlertDescription>
                     </Alert>
                 ) : null}
-                <TableHealthReportCard
-                    tableStats={stats}
-                    databaseName={databaseName}
-                    tableName={tableName}
-                    connectionId={connectionId}
-                />
+                <TableHealthReportCard tableStats={stats} databaseName={databaseName} tableName={tableName} connectionId={connectionId} />
                 <SizeAndRowsCard stats={stats} loading={loading} />
                 <PartitionsCard stats={stats} loading={loading} />
                 <StorageHealthCard stats={stats} loading={loading} />
@@ -61,9 +55,8 @@ function ClickhouseTableStatsView({ databaseName, tableName }: Omit<TableStatsPr
 }
 
 export default function TableStatsView({ databaseName, tableName, driver }: TableStatsProps) {
-    if (driver === 'postgres') {
+    if (isPostgresFamilyConnectionType(driver)) {
         return <PostgresTableStatsView databaseName={databaseName} tableName={tableName} />;
     }
     return <ClickhouseTableStatsView databaseName={databaseName} tableName={tableName} />;
 }
-

@@ -58,9 +58,7 @@ export class PostgresConnectionsRepository {
 
             if (isDesktopRuntime()) {
                 try {
-                    await this.db.execute(
-                        sql`ALTER TABLE "connections" DROP CONSTRAINT IF EXISTS "connections_created_by_user_id_user_id_fk"`,
-                    );
+                    await this.db.execute(sql`ALTER TABLE "connections" DROP CONSTRAINT IF EXISTS "connections_created_by_user_id_user_id_fk"`);
                 } catch (error) {
                     console.warn('[db:init] skipped legacy desktop constraint cleanup:', error);
                 }
@@ -247,7 +245,7 @@ export class PostgresConnectionsRepository {
                             secret: {
                                 passwordEncrypted,
                             },
-                        }
+                        };
                         await this.createIdentityWithSecret(tx, userId, created.organizationId, created.id, savedIdentityWithSecret as any);
                     }
                 }
@@ -270,6 +268,10 @@ export class PostgresConnectionsRepository {
             delete connectionPayload.id;
         }
 
+        if (connectionPayload.type) {
+            connectionPayload.engine = getDBEngineViaType(connectionPayload.type);
+        }
+
         const [updatedConnection] = await this.db
             .update(connections)
             .set(connectionPayload)
@@ -288,14 +290,11 @@ export class PostgresConnectionsRepository {
         if (payload.identities && payload.identities.length > 0) {
             for (const identity of payload.identities as any) {
                 if (!identity.id) {
-                    throw new ConnectionIdentityValidationError(
-                        translateDatabase('Database.Errors.ConnectionIdentityUpdateRequiresId'),
-                    );
+                    throw new ConnectionIdentityValidationError(translateDatabase('Database.Errors.ConnectionIdentityUpdateRequiresId'));
                 }
 
                 const { password, ...restIdentity } = identity;
-                const secret =
-                    typeof password === 'undefined' ? undefined : { passwordEncrypted: await encrypt(password ?? '') };
+                const secret = typeof password === 'undefined' ? undefined : { passwordEncrypted: await encrypt(password ?? '') };
 
                 await this.updateIdentityWithSecret(this.db, organizationId, connectionId, {
                     ...restIdentity,
@@ -306,7 +305,6 @@ export class PostgresConnectionsRepository {
         }
         return updatedConnection;
     }
-
 
     async delete(organizationId: string, connectionId: string): Promise<any> {
         const deleted = await this.db
@@ -368,21 +366,20 @@ export class PostgresConnectionsRepository {
             .where(and(...conditions));
     }
 
-
     async toConnectionListItem(db: DbExecutor, organizationId: string, row: any): Promise<ConnectionListItem> {
         // 1) SSH config
         const [sshRow] = await db.select().from(connectionSsh).where(eq(connectionSsh.connectionId, row.id)).limit(1);
         const sshConfig: ConnectionSsh | null = sshRow
             ? {
-                connectionId: sshRow.connectionId,
-                enabled: sshRow.enabled,
-                host: sshRow.host,
-                port: sshRow.port,
-                username: sshRow.username,
-                authMethod: sshRow.authMethod,
-                createdAt: sshRow.createdAt,
-                updatedAt: sshRow.updatedAt,
-            }
+                  connectionId: sshRow.connectionId,
+                  enabled: sshRow.enabled,
+                  host: sshRow.host,
+                  port: sshRow.port,
+                  username: sshRow.username,
+                  authMethod: sshRow.authMethod,
+                  createdAt: sshRow.createdAt,
+                  updatedAt: sshRow.updatedAt,
+              }
             : null;
 
         // 2) Identities list
@@ -440,8 +437,6 @@ export class PostgresConnectionsRepository {
         };
     }
 
-
-
     /* -------------------- Private helpers: SSH / Identity creation -------------------- */
 
     /**
@@ -482,7 +477,6 @@ export class PostgresConnectionsRepository {
         });
     }
 
-
     /**
      * Create identity + secret (for create)
      * Incoming secret fields are already *Encrypted
@@ -496,7 +490,6 @@ export class PostgresConnectionsRepository {
             secret?: Omit<ConnectionIdentitySecretUpsertInput, 'identityId'>;
         },
     ) {
-        console.log('Creating identity with payload:', payload);
         if (!payload.name || !payload.username) {
             throw new ConnectionIdentityValidationError();
         }
@@ -535,14 +528,14 @@ export class PostgresConnectionsRepository {
     }
 
     /**
- * Update identity + secret
- * - payload.id is required
- * - other fields optional; only update provided fields
- * - secret rules:
- *   - secret === undefined: no change
- *   - secret === null: delete existing secret
- *   - secret object: insert/update
- */
+     * Update identity + secret
+     * - payload.id is required
+     * - other fields optional; only update provided fields
+     * - secret rules:
+     *   - secret === undefined: no change
+     *   - secret === null: delete existing secret
+     *   - secret object: insert/update
+     */
     private async updateIdentityWithSecret(
         db: DbExecutor,
         organizationId: string,
@@ -552,8 +545,6 @@ export class PostgresConnectionsRepository {
             secret?: Omit<ConnectionIdentitySecretUpsertInput, 'identityId'> | null;
         },
     ) {
-        console.log('Updating identity with payload:', payload);
-
         if (!payload.id) {
             throw new ConnectionIdentityValidationError(translateDatabase('Database.Errors.ConnectionIdentityMissingId'));
         }
@@ -607,11 +598,7 @@ export class PostgresConnectionsRepository {
         }
 
         // Check existing secret
-        const [existing] = await db
-            .select()
-            .from(connectionIdentitySecrets)
-            .where(eq(connectionIdentitySecrets.identityId, identity.id));
-
+        const [existing] = await db.select().from(connectionIdentitySecrets).where(eq(connectionIdentitySecrets.identityId, identity.id));
 
         if (payload.secret === null) {
             return null;
@@ -624,13 +611,8 @@ export class PostgresConnectionsRepository {
             secretRef: payload.secret.secretRef ?? null,
         } as any;
 
-        return await db
-            .update(connectionIdentitySecrets)
-            .set(secret)
-            .where(eq(connectionIdentitySecrets.identityId, identity.id));
-
+        return await db.update(connectionIdentitySecrets).set(secret).where(eq(connectionIdentitySecrets.identityId, identity.id));
     }
-
 
     /**
      * Decrypt plaintext password by identityId (for testConnection)

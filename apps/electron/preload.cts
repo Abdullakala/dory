@@ -33,10 +33,10 @@ contextBridge.exposeInMainWorld('themeBridge', {
 });
 
 contextBridge.exposeInMainWorld('localeBridge', {
-    getLocale: () => ipcRenderer.invoke('locale:get') as Promise<'en-US' | 'zh-CN'>,
-    setLocale: (locale: 'en-US' | 'zh-CN') => ipcRenderer.invoke('locale:set', locale) as Promise<'en-US' | 'zh-CN'>,
-    onLocaleChanged: (callback: (locale: 'en-US' | 'zh-CN') => void) => {
-        const listener = (_event: unknown, locale: 'en-US' | 'zh-CN') => {
+    getLocale: () => ipcRenderer.invoke('locale:get') as Promise<'en-US' | 'zh-CN' | 'ja-JP' | 'es-ES'>,
+    setLocale: (locale: 'en-US' | 'zh-CN' | 'ja-JP' | 'es-ES') => ipcRenderer.invoke('locale:set', locale) as Promise<'en-US' | 'zh-CN' | 'ja-JP' | 'es-ES'>,
+    onLocaleChanged: (callback: (locale: 'en-US' | 'zh-CN' | 'ja-JP' | 'es-ES') => void) => {
+        const listener = (_event: unknown, locale: 'en-US' | 'zh-CN' | 'ja-JP' | 'es-ES') => {
             callback(locale);
         };
         ipcRenderer.on('locale:changed', listener);

@@ -23,9 +23,9 @@ type UpdateBridgeState = {
 interface Window {
   authBridge?: AuthBridge;
   localeBridge?: {
-    getLocale: () => Promise<'en-US' | 'zh-CN'>;
-    setLocale: (locale: 'en-US' | 'zh-CN') => Promise<'en-US' | 'zh-CN'>;
-    onLocaleChanged: (callback: (locale: 'en-US' | 'zh-CN') => void) => () => void;
+    getLocale: () => Promise<'en-US' | 'zh-CN' | 'ja-JP' | 'es-ES'>;
+    setLocale: (locale: 'en-US' | 'zh-CN' | 'ja-JP' | 'es-ES') => Promise<'en-US' | 'zh-CN' | 'ja-JP' | 'es-ES'>;
+    onLocaleChanged: (callback: (locale: 'en-US' | 'zh-CN' | 'ja-JP' | 'es-ES') => void) => () => void;
   };
   themeBridge?: {
     getTheme: () => Promise<'light' | 'dark' | 'system'>;

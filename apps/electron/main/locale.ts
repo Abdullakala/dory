@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import Store from 'electron-store';
 
-export type MainLocale = 'zh-CN' | 'en-US';
+export type MainLocale = 'zh-CN' | 'en-US' | 'ja-JP' | 'es-ES';
 
 const localeStore = new Store<{ locale: MainLocale }>({
     name: 'preferences',
@@ -11,6 +11,8 @@ function normalizeMainLocale(rawLocale: string | undefined): MainLocale {
     if (!rawLocale) return 'en-US';
     const lower = rawLocale.toLowerCase();
     if (lower.startsWith('zh')) return 'zh-CN';
+    if (lower.startsWith('ja')) return 'ja-JP';
+    if (lower.startsWith('es')) return 'es-ES';
     return 'en-US';
 }
 
@@ -19,7 +21,7 @@ export function getSystemLocale(): MainLocale {
 }
 
 export function isMainLocale(value: unknown): value is MainLocale {
-    return value === 'zh-CN' || value === 'en-US';
+    return value === 'zh-CN' || value === 'en-US' || value === 'ja-JP' || value === 'es-ES';
 }
 
 export function getStoredLocale(): MainLocale {

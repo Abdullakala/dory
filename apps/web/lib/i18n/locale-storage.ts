@@ -1,6 +1,6 @@
 import { routing, type Locale } from './routing';
 
-export type ElectronLocale = 'en-US' | 'zh-CN';
+export type ElectronLocale = 'en-US' | 'zh-CN' | 'ja-JP' | 'es-ES';
 
 const LOCALE_COOKIE_NAME = 'locale';
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
@@ -26,9 +26,15 @@ export function writeLocaleCookie(locale: Locale) {
 }
 
 export function electronLocaleToWebLocale(locale: ElectronLocale): Locale {
-    return locale === 'zh-CN' ? 'zh' : 'en';
+    if (locale === 'zh-CN') return 'zh';
+    if (locale === 'ja-JP') return 'ja';
+    if (locale === 'es-ES') return 'es';
+    return 'en';
 }
 
 export function webLocaleToElectronLocale(locale: Locale): ElectronLocale {
-    return locale === 'zh' ? 'zh-CN' : 'en-US';
+    if (locale === 'zh') return 'zh-CN';
+    if (locale === 'ja') return 'ja-JP';
+    if (locale === 'es') return 'es-ES';
+    return 'en-US';
 }

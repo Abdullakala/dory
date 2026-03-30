@@ -1,6 +1,4 @@
-import { app } from 'electron';
-
-type SupportedLocale = 'zh-CN' | 'en-US';
+import { getStoredLocale, type MainLocale } from './locale.js';
 
 type MessageKey =
     | 'menu.checkForUpdates'
@@ -44,7 +42,7 @@ type MessageKey =
     | 'updater.channelBusy'
     | 'updater.updateInProgress';
 
-const MESSAGES: Record<SupportedLocale, Record<MessageKey, string>> = {
+const MESSAGES: Record<MainLocale, Record<MessageKey, string>> = {
     'zh-CN': {
         'menu.checkForUpdates': '检查更新',
         'menu.updateChannel': '更新通道',
@@ -131,26 +129,27 @@ const MESSAGES: Record<SupportedLocale, Record<MessageKey, string>> = {
     },
 };
 
-function normalizeLocale(rawLocale: string | undefined): SupportedLocale {
-    if (!rawLocale) return 'en-US';
-    const lower = rawLocale.toLowerCase();
-    if (lower.startsWith('zh')) return 'zh-CN';
-    return 'en-US';
-}
-
 function format(template: string, vars?: Record<string, string>) {
     if (!vars) return template;
     return template.replace(/\{(\w+)\}/g, (_, token: string) => vars[token] ?? `{${token}}`);
 }
 
 export function getMainLocale() {
-    return normalizeLocale(app.getLocale());
+    return getStoredLocale();
 }
 
 export function createMainI18n() {
-    const locale = getMainLocale();
-    const t = (key: MessageKey, vars?: Record<string, string>) => format(MESSAGES[locale][key], vars);
-    return { locale, t };
+    const t = (key: MessageKey, vars?: Record<string, string>) => {
+        const locale = getMainLocale();
+        return format(MESSAGES[locale][key], vars);
+    };
+
+    return {
+        get locale() {
+            return getMainLocale();
+        },
+        t,
+    };
 }
 
 export type MainTranslator = ReturnType<typeof createMainI18n>['t'];

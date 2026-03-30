@@ -22,6 +22,11 @@ type UpdateBridgeState = {
 
 interface Window {
   authBridge?: AuthBridge;
+  localeBridge?: {
+    getLocale: () => Promise<'en-US' | 'zh-CN'>;
+    setLocale: (locale: 'en-US' | 'zh-CN') => Promise<'en-US' | 'zh-CN'>;
+    onLocaleChanged: (callback: (locale: 'en-US' | 'zh-CN') => void) => () => void;
+  };
   themeBridge?: {
     getTheme: () => Promise<'light' | 'dark' | 'system'>;
     setTheme: (theme: 'light' | 'dark' | 'system') => Promise<'light' | 'dark' | 'system'>;

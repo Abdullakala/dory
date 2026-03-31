@@ -60,52 +60,57 @@ function createAuth() {
             ...(betterAuthApiUrl ? { apiUrl: betterAuthApiUrl } : {}),
             ...(betterAuthKvUrl ? { kvUrl: betterAuthKvUrl } : {}),
         };
+        const infraEnabled = Boolean(betterAuthApiKey);
         const authPlugins = [
             jwt(),
-            dash({
-                ...betterAuthInfraOptions,
-                activityTracking: {
-                    enabled: true,
-                    updateInterval: 300000,
-                },
-            }),
-            sentinel({
-                ...betterAuthInfraOptions,
-                security: {
-                    credentialStuffing: {
-                        enabled: true,
-                        thresholds: {
-                            challenge: 3,
-                            block: 5,
-                        },
-                        windowSeconds: 3600,
-                        cooldownSeconds: 900,
-                    },
-                    impossibleTravel: {
-                        enabled: true,
-                        action: 'log',
-                    },
-                    botBlocking: {
-                        action: 'challenge',
-                    },
-                    suspiciousIpBlocking: {
-                        action: 'challenge',
-                    },
-                    velocity: {
-                        enabled: true,
-                        thresholds: {
-                            challenge: 10,
-                            block: 20,
-                        },
-                        maxSignupsPerVisitor: 5,
-                        maxPasswordResetsPerIp: 10,
-                        maxSignInsPerIp: 50,
-                        windowSeconds: 3600,
-                        action: 'challenge',
-                    },
-                    challengeDifficulty: 18,
-                },
-            }),
+            ...(infraEnabled
+                ? [
+                      dash({
+                          ...betterAuthInfraOptions,
+                          activityTracking: {
+                              enabled: true,
+                              updateInterval: 300000,
+                          },
+                      }),
+                      sentinel({
+                          ...betterAuthInfraOptions,
+                          security: {
+                              credentialStuffing: {
+                                  enabled: true,
+                                  thresholds: {
+                                      challenge: 3,
+                                      block: 5,
+                                  },
+                                  windowSeconds: 3600,
+                                  cooldownSeconds: 900,
+                              },
+                              impossibleTravel: {
+                                  enabled: true,
+                                  action: 'log',
+                              },
+                              botBlocking: {
+                                  action: 'challenge',
+                              },
+                              suspiciousIpBlocking: {
+                                  action: 'challenge',
+                              },
+                              velocity: {
+                                  enabled: true,
+                                  thresholds: {
+                                      challenge: 10,
+                                      block: 20,
+                                  },
+                                  maxSignupsPerVisitor: 5,
+                                  maxPasswordResetsPerIp: 10,
+                                  maxSignInsPerIp: 50,
+                                  windowSeconds: 3600,
+                                  action: 'challenge',
+                              },
+                              challengeDifficulty: 18,
+                          },
+                      }),
+                  ]
+                : []),
         ];
 
         async function findInitialOrganizationId(userId: string): Promise<string | null> {

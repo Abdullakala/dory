@@ -4,7 +4,10 @@ import { getServerLocale } from '@/lib/i18n/server-locale';
 import { translate } from '@/lib/i18n/i18n';
 import { getClient } from '@/lib/database/postgres/client';
 import { schema } from '@/lib/database/schema';
-import { mergeAnonymousOrganizationIntoExistingOrganization } from '@/lib/database/postgres/impl/organization/anonymous-resource-merge';
+import {
+    mergeAnonymousOrganizationIntoExistingOrganization,
+    migrateAnonymousOrganizationOwnership,
+} from '@/lib/database/postgres/impl/organization/anonymous-resource-merge';
 
 type AuthSessionLike = {
     session?: {
@@ -17,6 +20,26 @@ type AuthSessionLike = {
         isAnonymous?: boolean | null;
     } | null;
 };
+
+export const anonymousDeleteCleanupTableCoverage = {
+    connectionIdentityScoped: ['connectionIdentitySecrets'],
+    connectionScoped: ['connectionSsh', 'tabs', 'aiSchemaCache', 'syncOperations'],
+    organizationScoped: [
+        'chatMessages',
+        'chatSessionState',
+        'chatSessions',
+        'savedQueries',
+        'savedQueryFolders',
+        'queryAudit',
+        'aiUsageEvents',
+        'aiUsageTraces',
+        'invitation',
+        'organizationMembers',
+        'connectionIdentities',
+        'connections',
+        'organizations',
+    ],
+} as const;
 
 function slugifyOrganizationName(name: string) {
     const normalized = name
@@ -51,6 +74,97 @@ async function findFirstActiveOrganizationIdForUser(db: PostgresDBClient, userId
         .limit(1);
 
     return membership?.organizationId ?? null;
+}
+
+async function findOwnedOrganizationIdsForUser(db: Pick<PostgresDBClient, 'select'>, userId: string) {
+    const organizations = await db
+        .select({ id: schema.organizations.id })
+        .from(schema.organizations)
+        .where(eq(schema.organizations.ownerUserId, userId));
+
+    return organizations.map(organization => organization.id);
+}
+
+async function findAnonymousOrganizationIdsForLink(
+    db: PostgresDBClient,
+    params: {
+        anonymousUserId: string;
+        anonymousActiveOrganizationId?: string | null;
+    },
+) {
+    const organizationIds = [
+        params.anonymousActiveOrganizationId ?? null,
+        await findFirstActiveOrganizationIdForUser(db, params.anonymousUserId),
+        ...(await findOwnedOrganizationIdsForUser(db, params.anonymousUserId)),
+    ].filter((organizationId): organizationId is string => Boolean(organizationId));
+
+    return [...new Set(organizationIds)];
+}
+
+export async function cleanupAnonymousUserOrganizations(userId: string) {
+    const db = await getDb();
+    const organizationIds = await findOwnedOrganizationIdsForUser(db, userId);
+
+    if (organizationIds.length === 0) {
+        return { organizationIds: [], deletedOrganizations: 0 };
+    }
+
+    await db.transaction(async tx => {
+        const connections = await tx
+            .select({ id: schema.connections.id })
+            .from(schema.connections)
+            .where(inArray(schema.connections.organizationId, organizationIds));
+
+        const connectionIds = connections.map(connection => connection.id);
+
+        const connectionIdentities = connectionIds.length
+            ? await tx
+                  .select({ id: schema.connectionIdentities.id })
+                  .from(schema.connectionIdentities)
+                  .where(inArray(schema.connectionIdentities.connectionId, connectionIds))
+            : [];
+        const connectionIdentityIds = connectionIdentities.map(identity => identity.id);
+
+        if (connectionIdentityIds.length > 0) {
+            await tx.delete(schema.connectionIdentitySecrets).where(inArray(schema.connectionIdentitySecrets.identityId, connectionIdentityIds));
+        }
+
+        if (connectionIds.length > 0) {
+            await tx.delete(schema.connectionSsh).where(inArray(schema.connectionSsh.connectionId, connectionIds));
+            await tx.delete(schema.tabs).where(inArray(schema.tabs.connectionId, connectionIds));
+            await tx.delete(schema.aiSchemaCache).where(inArray(schema.aiSchemaCache.connectionId, connectionIds));
+            await tx
+                .delete(schema.syncOperations)
+                .where(and(eq(schema.syncOperations.entityType, 'connection'), inArray(schema.syncOperations.entityId, connectionIds)));
+        }
+
+        if (connectionIdentityIds.length > 0) {
+            await tx
+                .delete(schema.syncOperations)
+                .where(and(eq(schema.syncOperations.entityType, 'connection_identity'), inArray(schema.syncOperations.entityId, connectionIdentityIds)));
+        }
+
+        if (organizationIds.length > 0) {
+            await tx.delete(schema.chatMessages).where(inArray(schema.chatMessages.organizationId, organizationIds));
+            await tx.delete(schema.chatSessionState).where(inArray(schema.chatSessionState.organizationId, organizationIds));
+            await tx.delete(schema.chatSessions).where(inArray(schema.chatSessions.organizationId, organizationIds));
+            await tx.delete(schema.savedQueries).where(inArray(schema.savedQueries.organizationId, organizationIds));
+            await tx.delete(schema.savedQueryFolders).where(inArray(schema.savedQueryFolders.organizationId, organizationIds));
+            await tx.delete(schema.queryAudit).where(inArray(schema.queryAudit.organizationId, organizationIds));
+            await tx.delete(schema.aiUsageEvents).where(inArray(schema.aiUsageEvents.organizationId, organizationIds));
+            await tx.delete(schema.aiUsageTraces).where(inArray(schema.aiUsageTraces.organizationId, organizationIds));
+            await tx.delete(schema.invitation).where(inArray(schema.invitation.organizationId, organizationIds));
+            await tx.delete(schema.organizationMembers).where(inArray(schema.organizationMembers.organizationId, organizationIds));
+            await tx.delete(schema.connectionIdentities).where(inArray(schema.connectionIdentities.organizationId, organizationIds));
+            await tx.delete(schema.connections).where(inArray(schema.connections.organizationId, organizationIds));
+            await tx.delete(schema.organizations).where(inArray(schema.organizations.id, organizationIds));
+        }
+    });
+
+    return {
+        organizationIds,
+        deletedOrganizations: organizationIds.length,
+    };
 }
 
 async function looksLikeDisposableAutoCreatedOrganization(
@@ -163,11 +277,16 @@ export async function linkAnonymousOrganizationToUser(params: {
     newActiveOrganizationId?: string | null;
 }) {
     const db = await getDb();
-    const sourceOrganizationId = params.anonymousActiveOrganizationId ?? (await findFirstActiveOrganizationIdForUser(db, params.anonymousUserId));
+    const sourceOrganizationIds = await findAnonymousOrganizationIdsForLink(db, {
+        anonymousUserId: params.anonymousUserId,
+        anonymousActiveOrganizationId: params.anonymousActiveOrganizationId,
+    });
 
-    if (!sourceOrganizationId) {
+    if (sourceOrganizationIds.length === 0) {
         return null;
     }
+
+    const primarySourceOrganizationId = sourceOrganizationIds[0];
 
     const resultOrganization = await db.transaction(async tx => {
         const preexistingMemberships = await tx
@@ -176,9 +295,9 @@ export async function linkAnonymousOrganizationToUser(params: {
             .where(and(eq(schema.organizationMembers.userId, params.newUserId), or(eq(schema.organizationMembers.status, 'active'), isNull(schema.organizationMembers.status))));
 
         const candidateTargetOrganizationId =
-            (params.newActiveOrganizationId && params.newActiveOrganizationId !== sourceOrganizationId
+            (params.newActiveOrganizationId && !sourceOrganizationIds.includes(params.newActiveOrganizationId)
                 ? params.newActiveOrganizationId
-                : preexistingMemberships.find(membership => membership.organizationId !== sourceOrganizationId)?.organizationId) ?? null;
+                : preexistingMemberships.find(membership => !sourceOrganizationIds.includes(membership.organizationId))?.organizationId) ?? null;
 
         const [organization] = await tx
             .select({
@@ -187,7 +306,7 @@ export async function linkAnonymousOrganizationToUser(params: {
                 name: schema.organizations.name,
             })
             .from(schema.organizations)
-            .where(eq(schema.organizations.id, sourceOrganizationId))
+            .where(eq(schema.organizations.id, primarySourceOrganizationId))
             .limit(1);
 
         if (!organization) {
@@ -208,16 +327,32 @@ export async function linkAnonymousOrganizationToUser(params: {
             (!isFreshlyCreatedUser || !(await looksLikeDisposableAutoCreatedOrganization(tx, candidateTargetOrganizationId, params.newUserId)));
 
         if (canMergeIntoExistingOrganization) {
-            const mergeResult = await mergeAnonymousOrganizationIntoExistingOrganization(tx, {
-                sourceOrganizationId: organization.id,
-                targetOrganizationId: candidateTargetOrganizationId,
-                anonymousUserId: params.anonymousUserId,
-                newUserId: params.newUserId,
-            });
+            const mergeResults = [];
 
-            await tx.delete(schema.organizationMembers).where(eq(schema.organizationMembers.organizationId, organization.id));
+            for (const sourceOrganizationId of sourceOrganizationIds) {
+                const [sourceOrganization] = await tx
+                    .select({ id: schema.organizations.id })
+                    .from(schema.organizations)
+                    .where(eq(schema.organizations.id, sourceOrganizationId))
+                    .limit(1);
 
-            await tx.delete(schema.organizations).where(eq(schema.organizations.id, organization.id));
+                if (!sourceOrganization) {
+                    continue;
+                }
+
+                const mergeResult = await mergeAnonymousOrganizationIntoExistingOrganization(tx, {
+                    sourceOrganizationId: sourceOrganization.id,
+                    targetOrganizationId: candidateTargetOrganizationId,
+                    anonymousUserId: params.anonymousUserId,
+                    newUserId: params.newUserId,
+                });
+
+                await tx.delete(schema.organizationMembers).where(eq(schema.organizationMembers.organizationId, sourceOrganization.id));
+
+                await tx.delete(schema.organizations).where(eq(schema.organizations.id, sourceOrganization.id));
+
+                mergeResults.push(mergeResult);
+            }
 
             if (params.newSessionToken) {
                 await tx
@@ -229,7 +364,7 @@ export async function linkAnonymousOrganizationToUser(params: {
                     .where(eq(schema.session.token, params.newSessionToken));
             }
 
-            console.log('[auth] merged guest organization into existing organization', mergeResult);
+            console.log('[auth] merged guest organizations into existing organization', mergeResults);
 
             const [targetOrganization] = await tx
                 .select({
@@ -244,111 +379,73 @@ export async function linkAnonymousOrganizationToUser(params: {
             return targetOrganization ?? null;
         }
 
-        await tx
-            .update(schema.organizations)
-            .set({
-                ownerUserId: params.newUserId,
-                updatedAt: new Date(),
+        const sourceOrganizations = await tx
+            .select({
+                id: schema.organizations.id,
+                slug: schema.organizations.slug,
+                name: schema.organizations.name,
+                createdAt: schema.organizations.createdAt,
             })
-            .where(eq(schema.organizations.id, organization.id));
+            .from(schema.organizations)
+            .where(inArray(schema.organizations.id, sourceOrganizationIds));
 
-        const [existingMembership] = await tx
-            .select({ id: schema.organizationMembers.id })
-            .from(schema.organizationMembers)
-            .where(and(eq(schema.organizationMembers.organizationId, organization.id), eq(schema.organizationMembers.userId, params.newUserId)))
-            .limit(1);
+        const migrationResults = [];
 
-        if (existingMembership) {
+        for (const sourceOrganization of sourceOrganizations) {
             await tx
-                .update(schema.organizationMembers)
+                .update(schema.organizations)
                 .set({
+                    ownerUserId: params.newUserId,
+                    updatedAt: new Date(),
+                })
+                .where(eq(schema.organizations.id, sourceOrganization.id));
+
+            const [existingMembership] = await tx
+                .select({ id: schema.organizationMembers.id })
+                .from(schema.organizationMembers)
+                .where(and(eq(schema.organizationMembers.organizationId, sourceOrganization.id), eq(schema.organizationMembers.userId, params.newUserId)))
+                .limit(1);
+
+            if (existingMembership) {
+                await tx
+                    .update(schema.organizationMembers)
+                    .set({
+                        role: 'owner',
+                        status: 'active',
+                        joinedAt: new Date(),
+                    })
+                    .where(eq(schema.organizationMembers.id, existingMembership.id));
+            } else {
+                await tx.insert(schema.organizationMembers).values({
+                    userId: params.newUserId,
+                    organizationId: sourceOrganization.id,
                     role: 'owner',
                     status: 'active',
                     joinedAt: new Date(),
-                })
-                .where(eq(schema.organizationMembers.id, existingMembership.id));
-        } else {
-            await tx.insert(schema.organizationMembers).values({
-                userId: params.newUserId,
-                organizationId: organization.id,
-                role: 'owner',
-                status: 'active',
-                joinedAt: new Date(),
+                });
+            }
+
+            const migrationResult = await migrateAnonymousOrganizationOwnership(tx, {
+                sourceOrganizationId: sourceOrganization.id,
+                targetOrganizationId: sourceOrganization.id,
+                anonymousUserId: params.anonymousUserId,
+                newUserId: params.newUserId,
             });
-        }
 
-        await tx
-            .update(schema.savedQueryFolders)
-            .set({
-                userId: params.newUserId,
-                updatedAt: new Date(),
-            })
-            .where(and(eq(schema.savedQueryFolders.organizationId, organization.id), eq(schema.savedQueryFolders.userId, params.anonymousUserId)));
-
-        await tx
-            .update(schema.savedQueries)
-            .set({
-                userId: params.newUserId,
-                updatedAt: new Date(),
-            })
-            .where(and(eq(schema.savedQueries.organizationId, organization.id), eq(schema.savedQueries.userId, params.anonymousUserId)));
-
-        await tx
-            .update(schema.chatSessions)
-            .set({
-                userId: params.newUserId,
-                updatedAt: new Date(),
-            })
-            .where(and(eq(schema.chatSessions.organizationId, organization.id), eq(schema.chatSessions.userId, params.anonymousUserId)));
-
-        await tx
-            .update(schema.chatMessages)
-            .set({
-                userId: params.newUserId,
-            })
-            .where(and(eq(schema.chatMessages.organizationId, organization.id), eq(schema.chatMessages.userId, params.anonymousUserId)));
-
-        await tx
-            .update(schema.connections)
-            .set({
-                createdByUserId: params.newUserId,
-                updatedAt: new Date(),
-            })
-            .where(eq(schema.connections.organizationId, organization.id));
-
-        await tx
-            .update(schema.connectionIdentities)
-            .set({
-                createdByUserId: params.newUserId,
-                updatedAt: new Date(),
-            })
-            .where(eq(schema.connectionIdentities.organizationId, organization.id));
-
-        const organizationConnections = await tx
-            .select({ id: schema.connections.id })
-            .from(schema.connections)
-            .where(and(eq(schema.connections.organizationId, organization.id), isNull(schema.connections.deletedAt)));
-
-        const connectionIds = organizationConnections.map(connection => connection.id);
-        if (connectionIds.length > 0) {
-            await tx
-                .update(schema.tabs)
-                .set({
-                    userId: params.newUserId,
-                    updatedAt: new Date(),
-                })
-                .where(and(eq(schema.tabs.userId, params.anonymousUserId), inArray(schema.tabs.connectionId, connectionIds)));
+            migrationResults.push(migrationResult);
         }
 
         if (params.newSessionToken) {
             await tx
                 .update(schema.session)
                 .set({
-                    activeOrganizationId: organization.id,
+                    activeOrganizationId: primarySourceOrganizationId,
                     updatedAt: new Date(),
                 })
                 .where(eq(schema.session.token, params.newSessionToken));
         }
+
+        console.log('[auth] reassigned guest organization ownership to linked user', migrationResults);
 
         if (isFreshlyCreatedUser) {
             const ownedOrganizations = await tx
@@ -361,7 +458,7 @@ export async function linkAnonymousOrganizationToUser(params: {
                 .where(eq(schema.organizations.ownerUserId, params.newUserId));
 
             for (const ownedOrganization of ownedOrganizations) {
-                if (ownedOrganization.id === organization.id) {
+                if (sourceOrganizationIds.includes(ownedOrganization.id)) {
                     continue;
                 }
 
@@ -385,7 +482,7 @@ export async function linkAnonymousOrganizationToUser(params: {
             }
         }
 
-        return organization;
+        return sourceOrganizations.find(sourceOrganization => sourceOrganization.id === primarySourceOrganizationId) ?? organization;
     });
 
     return resultOrganization;

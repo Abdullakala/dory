@@ -4,6 +4,8 @@ export const dynamic = 'force-dynamic';
 
 import { getAuth } from '@/lib/auth';
 import { proxyAuthRequest, shouldProxyAuthRequest } from '@/lib/auth/auth-proxy';
+import { cleanupAnonymousUserOrganizations } from '@/lib/auth/anonymous';
+import { isAnonymousUser } from '@/lib/auth/anonymous-user';
 
 function getSetCookies(headers: Headers): string[] {
     const anyHeaders = headers as unknown as { getSetCookie?: () => string[] };
@@ -85,6 +87,17 @@ export async function POST(req: Request) {
         return proxyAuthRequest(req);
     }
     const auth = await getAuth();
+
+    if (new URL(req.url).pathname.endsWith('/delete-anonymous-user')) {
+        const session = await auth.api.getSession({
+            headers: req.headers,
+        });
+
+        if (session && isAnonymousUser(session.user)) {
+            await cleanupAnonymousUserOrganizations(session.user.id);
+        }
+    }
+
     const res = await auth.handler(req);
     return rewriteAuthResponse(req, res);
 }

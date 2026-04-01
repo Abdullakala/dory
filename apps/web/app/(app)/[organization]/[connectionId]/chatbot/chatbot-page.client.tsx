@@ -85,8 +85,6 @@ export default function ChatBotPageContent({
     const handleWelcomeSend = async (text: string) => {
         pendingPromptRef.current = text;
         await chat.handleCreateSession();
-        // pendingPromptRef is read by ChatBotComp on mount, then cleared after a tick
-        requestAnimationFrame(() => { pendingPromptRef.current = null; });
     };
 
     const onExecuteAction: CopilotActionExecutor = async (action) => {

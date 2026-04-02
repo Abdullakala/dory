@@ -14,10 +14,17 @@ type TableMentionTextareaProps = {
     onChange: (value: string) => void;
     tables: string[];
     children: any;
+    autoFocus?: boolean;
 } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange'>;
 
-export function TableMentionTextarea({ value, onChange, tables, children }: TableMentionTextareaProps) {
+export function TableMentionTextarea({ value, onChange, tables, children, autoFocus }: TableMentionTextareaProps) {
     const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
+
+    React.useEffect(() => {
+        if (autoFocus && textareaRef.current) {
+            textareaRef.current.focus();
+        }
+    }, []);
     const t = useTranslations('Chatbot');
 
     const [open, setOpen] = React.useState(false);

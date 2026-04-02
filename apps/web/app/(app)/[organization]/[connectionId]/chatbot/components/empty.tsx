@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useAtom } from 'jotai';
 import { useTranslations } from 'next-intl';
+import { useParams } from 'next/navigation';
 import { Sparkles } from 'lucide-react';
 
 import {
@@ -17,8 +18,10 @@ import { Suggestions, Suggestion } from '@/components/ai-elements/suggestion';
 import { activeDatabaseAtom } from '@/shared/stores/app.store';
 import { useDatabases } from '@/hooks/use-databases';
 import { useTables } from '@/hooks/use-tables';
+import { useSchema } from '@/hooks/use-schema';
 import { DatabaseSelect } from '../../../components/sql-console-sidebar/database-select';
 import { TableMentionTextarea } from '../thread/table-mention-textarea';
+import { generateSuggestions } from './suggestion-rules';
 
 type ChatWelcomeProps = {
     onSend: (text: string) => void;
@@ -33,6 +36,17 @@ export default function ChatWelcome({ onSend, disabled = false }: ChatWelcomePro
     const [activeDatabase, setActiveDatabase] = useAtom(activeDatabaseAtom);
     const { databases } = useDatabases();
     const { tables } = useTables(activeDatabase);
+    const params = useParams();
+    const connectionId = params.connectionId as string | undefined;
+    const { schema } = useSchema(connectionId);
+
+    const suggestions = useMemo(() => {
+        const fallbacks = SUGGESTION_KEYS.map((key) => t(`Welcome.Suggestions.${key}`));
+        if (!schema?.databases || !activeDatabase) return fallbacks;
+        const db = schema.databases.find((d) => d.name === activeDatabase);
+        if (!db?.tables?.length) return fallbacks;
+        return generateSuggestions(db.tables, fallbacks, 4);
+    }, [schema, activeDatabase, t]);
 
     const handleSubmit = (message: PromptInputMessage) => {
         const text = message.text?.trim();
@@ -64,10 +78,10 @@ export default function ChatWelcome({ onSend, disabled = false }: ChatWelcomePro
                 </div>
 
                 <Suggestions className="justify-center flex-wrap">
-                    {SUGGESTION_KEYS.map((key) => (
+                    {suggestions.map((text, i) => (
                         <Suggestion
-                            key={key}
-                            suggestion={t(`Welcome.Suggestions.${key}`)}
+                            key={i}
+                            suggestion={text}
                             onClick={handleSuggestionClick}
                             disabled={disabled}
                         />
@@ -87,11 +101,12 @@ export default function ChatWelcome({ onSend, disabled = false }: ChatWelcomePro
                                     />
                                 </div>
                                 <div className="flex items-start gap-2 w-full">
-                                    <TableMentionTextarea value={input} onChange={setInput} tables={tables.map((t: any) => t.name ?? t)}>
+                                    <TableMentionTextarea value={input} onChange={setInput} tables={tables.map((t: any) => t.name ?? t)} autoFocus>
                                         <PromptInputTextarea
-                                            placeholder={t('Input.GlobalPlaceholder')}
+                                            placeholder={t('Input.WelcomePlaceholder')}
                                             value={input}
                                             onChange={(e) => setInput(e.target.value)}
+                                            autoFocus
                                             className="min-h-18 w-full resize-none border-0 bg-transparent text-sm focus-visible:outline-none focus-visible:ring-0"
                                         />
                                     </TableMentionTextarea>

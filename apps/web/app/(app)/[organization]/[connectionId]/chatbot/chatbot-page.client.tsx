@@ -97,11 +97,13 @@ export default function ChatBotPageContent({
     };
 
 
+    const hasSessions = chat.sessionsForDisplay.length > 0;
+
     return (
         <div className="flex h-full relative">
             {compactMode ? (
                 <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
-                    {sessionSelector}
+                    {hasSessions && sessionSelector}
                     <Button
                         variant="outline"
                         size="icon"
@@ -113,7 +115,7 @@ export default function ChatBotPageContent({
                     </Button>
                 </div>
             ) : (
-                sessionSelector
+                hasSessions && sessionSelector
             )}
 
             <main className="flex-1 min-w-0 flex relative mt-10">

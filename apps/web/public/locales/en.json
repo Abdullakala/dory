@@ -763,7 +763,8 @@
         "Input": {
             "GlobalPlaceholder": "@ mention tables to ask about the database, Shift + Enter for a new line",
             "CopilotPlaceholder": "Ask about this SQL / let AI fix or rewrite it, Shift + Enter for a new line",
-            "SentWithAttachments": "Sent with attachments"
+            "SentWithAttachments": "Sent with attachments",
+            "WelcomePlaceholder": "Ask about your data… Try: \"Top 10 users by revenue last week\""
         },
         "Sessions": {
             "Title": "Sessions",

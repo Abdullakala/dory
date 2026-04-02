@@ -1311,6 +1311,11 @@
             "SaveQuery": "保存查询",
             "Stop": "停止"
         },
+        "AnonymousWorkspaceAlert": {
+            "Title": "未登录，无法保存工作区内容",
+            "Description": "当前是访客工作区。登录或注册后，才能保存查询和其它工作区内容，并保留当前访客数据。",
+            "Action": "登录后继续"
+        },
         "Refresh": "刷新",
         "Sidebar": {
             "Tables": "表",

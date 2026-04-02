@@ -1297,6 +1297,11 @@
             "SaveQuery": "Guardar consulta",
             "Stop": "Detener"
         },
+        "AnonymousWorkspaceAlert": {
+            "Title": "No has iniciado sesión, así que el contenido del espacio de trabajo no se puede guardar",
+            "Description": "Este es un espacio de trabajo de invitado. Inicia sesión o crea una cuenta para guardar consultas y otro contenido del espacio de trabajo sin perder tus datos actuales de invitado.",
+            "Action": "Inicia sesión para continuar"
+        },
         "Refresh": "Actualizar",
         "Sidebar": {
             "Tables": "Tablas",

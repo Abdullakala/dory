@@ -1310,6 +1310,11 @@
             "SaveQuery": "Save Query",
             "Stop": "Stop"
         },
+        "AnonymousWorkspaceAlert": {
+            "Title": "You're not signed in, so workspace content can't be saved",
+            "Description": "This is a guest workspace. Sign in or create an account to save queries and other workspace content while keeping your current guest data.",
+            "Action": "Sign in to continue"
+        },
         "Refresh": "Refresh",
         "Sidebar": {
             "Tables": "Tables",

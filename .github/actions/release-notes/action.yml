@@ -6,7 +6,7 @@ inputs:
     description: Release tag to generate notes for.
     required: true
   from_ref:
-    description: Optional start ref. Defaults to the latest reachable tag from the target ref.
+    description: Optional start ref. Defaults to the latest matching reachable tag before the target ref.
     required: false
     default: ""
   to_ref:
@@ -54,7 +54,22 @@ runs:
         PREVIOUS_TAG="$FROM_REF_INPUT"
 
         if [ -z "$PREVIOUS_TAG" ]; then
-          PREVIOUS_TAG="$(git describe --tags --abbrev=0 "$TO_REF" 2>/dev/null || true)"
+          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            PREVIOUS_TAG="$(
+              git tag --merged "$TO_REF" --list 'v*' --sort=-version:refname \
+                | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+                | grep -F -x -v "$TAG" \
+                | head -n 1 \
+                || true
+            )"
+          else
+            PREVIOUS_TAG="$(
+              git tag --merged "$TO_REF" --list 'v*' --sort=-version:refname \
+                | grep -F -x -v "$TAG" \
+                | head -n 1 \
+                || true
+            )"
+          fi
         fi
 
         mkdir -p "$OUTPUT_DIR"

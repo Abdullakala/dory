@@ -1,5 +1,5 @@
 import type { ConnectionListItem } from '@/types/connections';
-import { isDemoSqliteConnectionPath } from '@/lib/demo/paths';
+import { isDemoSqliteConnectionPath } from '@/lib/demo/connection-path';
 
 export function getConnectionLocationLabel(connection?: ConnectionListItem['connection'] | null) {
     if (!connection) return null;

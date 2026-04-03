@@ -99,7 +99,7 @@ export function SqliteConnectionFields({ form }: { form: UseFormReturn<any> }) {
                         </FormLabel>
                         <FormControl>
                             <div className="flex gap-2">
-                                <Input placeholder={t('Select File')} {...field} value={field.value ?? ''} />
+                                <Input placeholder={t('Select File Placeholder')} {...field} value={field.value ?? ''} />
                                 {canPickFile ? (
                                     <Button
                                         type="button"

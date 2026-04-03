@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import type { DBService } from '@/lib/database';
-import { DEMO_SQLITE_CONNECTION_PATH, getDemoSqlitePath } from './paths';
+import { DEMO_SQLITE_CONNECTION_PATH } from './connection-path';
+import { getDemoSqlitePath } from './paths';
 
 const DEMO_CONNECTION_NAME = 'Demo Database';
 type DemoConnectionService = Pick<DBService, 'connections'>;

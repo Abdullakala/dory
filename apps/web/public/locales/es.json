@@ -281,7 +281,7 @@
             "Data Directory": "Directorio de datos",
             "Database File": "Archivo de base de datos",
             "Select Directory": "Introduce la ruta absoluta a tu directorio de datos o archivo",
-            "Select File": "Introduce la ruta absoluta a tu archivo .sqlite/.db",
+            "Select File Placeholder": "Introduce la ruta absoluta a tu archivo .sqlite/.db",
             "Choose": "Elegir",
             "Clear": "Limpiar",
             "SSH": "SSH",

@@ -283,7 +283,7 @@
             "Data Directory": "数据目录",
             "Database File": "数据库文件",
             "Select Directory": "请输入数据目录或文件的绝对路径",
-            "Select File": "请输入 .sqlite/.db 文件的绝对路径",
+            "Select File Placeholder": "请输入 .sqlite/.db 文件的绝对路径",
             "Choose": "选择",
             "Clear": "清除",
             "SSH": "SSH",

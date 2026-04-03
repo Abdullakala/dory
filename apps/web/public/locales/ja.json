@@ -281,7 +281,7 @@
             "Data Directory": "データディレクトリ",
             "Database File": "データベースファイル",
             "Select Directory": "データディレクトリまたはファイルの絶対パスを入力してください",
-            "Select File": ".sqlite/.db ファイルの絶対パスを入力してください",
+            "Select File Placeholder": ".sqlite/.db ファイルの絶対パスを入力してください",
             "Choose": "選択",
             "Clear": "クリア",
             "SSH": "SSH",

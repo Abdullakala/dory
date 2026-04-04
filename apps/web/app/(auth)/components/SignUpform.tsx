@@ -13,6 +13,8 @@ import { VerifyEmailPanel } from './verify-email-panel';
 import { Card, CardContent } from '@/registry/new-york-v4/ui/card';
 import { useTranslations } from 'next-intl';
 import { IconBrandGithub } from '@tabler/icons-react';
+import { parseEnvFlag } from '@/lib/env';
+import { env } from 'next-runtime-env';
 
 type Stage = 'form' | 'verify';
 
@@ -23,6 +25,7 @@ type SignUpFormProps = React.ComponentProps<'div'> & {
 
 export function SignUpForm({ className, callbackURL: callbackURLOverride, onRequestSignIn, ...props }: SignUpFormProps) {
     const t = useTranslations('Auth');
+    const requireEmailVerification = parseEnvFlag(env('NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION'));
     const [loading, setLoading] = useState(false);
     const [err, setErr] = useState<string | null>(null);
     const [stage, setStage] = useState<Stage>('form');
@@ -55,16 +58,22 @@ export function SignUpForm({ className, callbackURL: callbackURLOverride, onRequ
             if (!error) {
                 posthog.identify(email, { email, name });
                 posthog.capture('user_signed_up', { method: 'email' });
-                setEmailForVerify(email);
-                setStage('verify');
+                if (requireEmailVerification) {
+                    setEmailForVerify(email);
+                    setStage('verify');
+                } else {
+                    window.location.href = callbackURL;
+                }
             } else {
                 // Keep user on the form for regular errors (e.g. email already exists).
                 // Only switch for "unverified account" type errors.
                 if (verifyMatchRegex.test(error.message ?? '')) {
                     posthog.identify(email, { email, name });
                     posthog.capture('user_signed_up', { method: 'email' });
-                    setEmailForVerify(email);
-                    setStage('verify');
+                    if (requireEmailVerification) {
+                        setEmailForVerify(email);
+                        setStage('verify');
+                    }
                 } else {
                     posthog.capture('user_sign_up_failed', { method: 'email', error: error.message });
                 }

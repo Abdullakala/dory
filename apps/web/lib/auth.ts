@@ -12,6 +12,7 @@ import { getClient } from './database/postgres/client';
 import { getDatabaseProvider } from './database/provider';
 import { schema } from './database/schema';
 import { sendEmail } from './email';
+import { parseEnvFlag } from './env';
 import { resolveOrganizationIdForSession, shouldCreateDefaultOrganization } from './auth/migration-state';
 import { createProvisionedOrganization } from './auth/organization-provisioning';
 import { translate } from './i18n/i18n';
@@ -21,6 +22,8 @@ import { organizationAc, organizationRoles } from './auth/organization-ac';
 import { canManageOrganizationBilling } from './billing/authz';
 import { buildDefaultOrganizationValues, linkAnonymousOrganizationToUser } from './auth/anonymous';
 import { isAnonymousUser } from './auth/anonymous-user';
+
+const REQUIRE_EMAIL_VERIFICATION = parseEnvFlag(process.env.NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION);
 
 type AuthUser = {
     id: string;
@@ -498,7 +501,7 @@ function createAuth() {
 
             emailAndPassword: {
                 enabled: true,
-                requireEmailVerification: true,
+                requireEmailVerification: REQUIRE_EMAIL_VERIFICATION,
                 autoSignInAfterVerification: true,
 
                 sendResetPassword: async ({ user, url, token }, request) => {
@@ -538,7 +541,7 @@ function createAuth() {
             },
 
             emailVerification: {
-                sendOnSignUp: true,
+                sendOnSignUp: REQUIRE_EMAIL_VERIFICATION,
 
                 sendVerificationEmail: async ({ user, url, token }, request) => {
                     const locale = await getServerLocale();

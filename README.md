@@ -50,9 +50,12 @@ docker run -d --name dory \
   -e DORY_AI_MODEL=gpt-4o-mini \
   -e DORY_AI_API_KEY=your_api_key_here \
   -e DORY_AI_URL=https://api.openai.com/v1 \
+  -e NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION=false \
   dorylab/dory:latest
 
 ```
+
+To enable email verification, set `RESEND_API_KEY` to a valid [resend](https://resend.com) key and `EMAIL_FROM` to a validated email.
 
   
 ### 🧠 Supported AI Providers
@@ -62,14 +65,14 @@ You can freely switch between different model vendors by changing environment va
 
 Currently supported providers:
 
-| Provider | Env `DORY_AI_PROVIDER` | Description |
-|----------|-------------------------|-------------|
-| OpenAI | `openai` | Default provider. Uses official OpenAI API. |
-| OpenAI-Compatible | `openai-compatible` | Any service exposing an OpenAI-compatible API. |
-| Anthropic | `anthropic` | Claude models via Anthropic official API. |
-| Google | `google` | Gemini models via Google Generative AI API. |
-| Qwen (Alibaba) | `qwen` | Qwen models via DashScope OpenAI-compatible endpoint. |
-| xAI | `xai` | Grok models via xAI API. |
+| Provider          | Env `DORY_AI_PROVIDER` | Description                                           |
+| ----------------- | ---------------------- | ----------------------------------------------------- |
+| OpenAI            | `openai`               | Default provider. Uses official OpenAI API.           |
+| OpenAI-Compatible | `openai-compatible`    | Any service exposing an OpenAI-compatible API.        |
+| Anthropic         | `anthropic`            | Claude models via Anthropic official API.             |
+| Google            | `google`               | Gemini models via Google Generative AI API.           |
+| Qwen (Alibaba)    | `qwen`                 | Qwen models via DashScope OpenAI-compatible endpoint. |
+| xAI               | `xai`                  | Grok models via xAI API.                              |
 
 
 ## ✨ Key Features
@@ -153,14 +156,14 @@ Native ClickHouse user and role management UI.
 
 ## 🔌 Database Support
 
-| Database     | Status              |
-|--------------|---------------------|
-| ClickHouse   | ✅ Deeply integrated |
-| PostgreSQL   | ✅ Supported   |
-| MySQL        | ✅ Supported   |
-| MariaDB      | ✅ Supported   |         |
-| SQLite       | ✅ Supported (Beta)  |
-| DuckDB       | 🚧 Planned  
+| Database   | Status              |
+| ---------- | ------------------- |
+| ClickHouse | ✅ Deeply integrated |
+| PostgreSQL | ✅ Supported         |
+| MySQL      | ✅ Supported         |
+| MariaDB    | ✅ Supported         |  |
+| SQLite     | ✅ Supported (Beta)  |
+| DuckDB     | 🚧 Planned           |
 
 ---
 

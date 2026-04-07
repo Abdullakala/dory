@@ -1,3 +1,0 @@
-{
-  "/(app)/[organization]/[connectionId]/privileges/user/[name]/page": "app/(app)/[organization]/[connectionId]/privileges/user/[name]/page.js"
-}

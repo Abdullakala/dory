@@ -1,3 +1,0 @@
-{
-  "/api/connection/[id]/databases/[database]/materialized-views/route": "app/api/connection/[id]/databases/[database]/materialized-views/route.js"
-}

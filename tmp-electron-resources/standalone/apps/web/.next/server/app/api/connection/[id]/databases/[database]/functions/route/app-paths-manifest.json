@@ -1,3 +1,0 @@
-{
-  "/api/connection/[id]/databases/[database]/functions/route": "app/api/connection/[id]/databases/[database]/functions/route.js"
-}

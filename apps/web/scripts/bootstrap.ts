@@ -59,6 +59,7 @@ export async function bootstrap() {
     }
 
     await verifyDemoSqlite();
+    console.log('[bootstrap] completed');
 }
 
 bootstrap().catch(err => {

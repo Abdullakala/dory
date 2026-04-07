@@ -87,6 +87,7 @@ export function createStandaloneServerManager({ isDev, userDataPath, databasePat
         log(`[electron] Starting bootstrap script on port ${port}...`);
 
         await new Promise<void>((resolve, reject) => {
+            let bootstrapCompleted = false;
             const bootstrapProc = fork(bootstrapPath, [], {
                 cwd: standaloneDir,
                 env: createDesktopServerEnv({
@@ -103,7 +104,13 @@ export function createStandaloneServerManager({ isDev, userDataPath, databasePat
             console.log('[electron] bootstrapProc PID:', bootstrapProc.pid);
             console.log('[electron] bootstrapProc databasePath:', databasePath);
 
-            bootstrapProc.stdout?.on('data', buf => log('[bootstrap stdout]', String(buf).trimEnd()));
+            bootstrapProc.stdout?.on('data', buf => {
+                const output = String(buf).trimEnd();
+                log('[bootstrap stdout]', output);
+                if (output.includes('[bootstrap] completed')) {
+                    bootstrapCompleted = true;
+                }
+            });
             bootstrapProc.stderr?.on('data', buf => logWarn('[bootstrap stderr]', String(buf).trimEnd()));
 
             bootstrapProc.on('error', error => {
@@ -111,7 +118,7 @@ export function createStandaloneServerManager({ isDev, userDataPath, databasePat
             });
 
             bootstrapProc.on('exit', (code, signal) => {
-                if (code === 0) {
+                if (bootstrapCompleted || code === 0) {
                     resolve();
                     return;
                 }

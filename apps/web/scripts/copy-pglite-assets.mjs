@@ -12,9 +12,21 @@ const pgliteDist = path.resolve(
   "../../node_modules/@electric-sql/pglite/dist"
 );
 
+const pgliteLegacyDist = path.resolve(
+  projectRoot,
+  "../../node_modules/@electric-sql/pglite-legacy/dist"
+);
+
 await mkdir(outDir, { recursive: true });
 
-for (const f of ["postgres.data", "postgres.wasm"]) {
+// New PGlite 0.4.x assets
+for (const f of ["pglite.data", "pglite.wasm", "initdb.wasm"]) {
   await copyFile(path.join(pgliteDist, f), path.join(outDir, f));
   console.log(`[copy] ${f} -> dist-scripts/${f}`);
+}
+
+// Legacy PGlite 0.2.x assets (needed for PG 16 -> 17 data migration)
+for (const f of ["postgres.data", "postgres.wasm"]) {
+  await copyFile(path.join(pgliteLegacyDist, f), path.join(outDir, f));
+  console.log(`[copy legacy] ${f} -> dist-scripts/${f}`);
 }

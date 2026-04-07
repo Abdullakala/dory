@@ -27,6 +27,8 @@ RUN yarn run build \
  && mkdir -p apps/web/dist-scripts \
  && bun build apps/web/scripts/bootstrap.ts --target=node --format=esm --outfile=apps/web/dist-scripts/bootstrap.mjs \
  && cp -rn node_modules/@electric-sql/pglite/dist/. apps/web/dist-scripts/ \
+ && cp node_modules/@electric-sql/pglite-legacy/dist/postgres.data apps/web/dist-scripts/ \
+ && cp node_modules/@electric-sql/pglite-legacy/dist/postgres.wasm apps/web/dist-scripts/ \
  && rm -f apps/web/.next/standalone/.env apps/web/.next/standalone/.env.local
 
 FROM node:24-bookworm-slim AS runner

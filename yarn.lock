@@ -12121,7 +12121,7 @@ __metadata:
   dependencies:
     "@types/node": "npm:^25.5.2"
     dotenv: "npm:^17.4.1"
-    electron: "npm:^41.1.1"
+    electron: "npm:41.1.1"
     electron-builder: "npm:^26.8.1"
     electron-log: "npm:^5.4.3"
     electron-notarize: "npm:^1.2.2"
@@ -12458,7 +12458,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"electron@npm:^41.1.1":
+"electron@npm:41.1.1":
   version: 41.1.1
   resolution: "electron@npm:41.1.1"
   dependencies:

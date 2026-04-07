@@ -49,6 +49,7 @@ const serverManager = createStandaloneServerManager({
   logWarn,
   logError,
 });
+let launchPromise: Promise<void> | null = null;
 
 registerThemeIpc();
 applyTheme(getStoredTheme());
@@ -218,6 +219,12 @@ function createLocalizedMenuLabels() {
 }
 
 async function launch() {
+  if (launchPromise) {
+    log('[electron] launch already in progress');
+    return launchPromise;
+  }
+
+  launchPromise = (async () => {
   try {
     const targetUrl = await serverManager.getAppUrl();
     log('[electron] launch targetUrl:', targetUrl);
@@ -231,7 +238,12 @@ async function launch() {
     logError('[electron] launch error:', error);
     dialog.showErrorBox('Launch Failed', message);
     app.quit();
+  } finally {
+    launchPromise = null;
   }
+  })();
+
+  return launchPromise;
 }
 
 const gotLock = app.requestSingleInstanceLock();

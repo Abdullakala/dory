@@ -34,6 +34,7 @@ const DESKTOP_SECRETS_FILE_NAME = 'desktop-secrets.json';
 
 export function createStandaloneServerManager({ isDev, userDataPath, databasePath, log, logWarn, logError }: CreateStandaloneServerManagerOptions) {
     let cachedServerUrl: string | null = null;
+    let pendingServerUrlPromise: Promise<string> | null = null;
     let nextProc: ChildProcess | null = null;
 
     function getStandaloneDir() {
@@ -42,6 +43,7 @@ export function createStandaloneServerManager({ isDev, userDataPath, databasePat
     }
 
     function stopStandaloneServer() {
+        pendingServerUrlPromise = null;
         if (!nextProc) return;
         try {
             log('[electron] stopping Next server...');
@@ -149,14 +151,24 @@ export function createStandaloneServerManager({ isDev, userDataPath, databasePat
 
     async function getAppUrl(): Promise<string> {
         if (cachedServerUrl) return cachedServerUrl;
+        if (pendingServerUrlPromise) return pendingServerUrlPromise;
 
         if (isDev) {
             cachedServerUrl = process.env.ELECTRON_START_URL ?? 'http://127.0.0.1:3000';
             return cachedServerUrl;
         }
 
-        cachedServerUrl = await startStandaloneServer();
-        return cachedServerUrl;
+        pendingServerUrlPromise = (async () => {
+            try {
+                const url = await startStandaloneServer();
+                cachedServerUrl = url;
+                return url;
+            } finally {
+                pendingServerUrlPromise = null;
+            }
+        })();
+
+        return pendingServerUrlPromise;
     }
 
     return {

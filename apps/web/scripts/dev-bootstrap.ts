@@ -7,6 +7,7 @@ import { migratePgliteDB } from '@/lib/database/pglite/migrate-pglite';
 import { getDatabaseProvider } from '@/lib/database/provider';
 import { ensureFileUrl, extractFilePath } from '@/lib/database/pglite/url';
 import { resolveDemoSqlitePath } from '@/lib/demo/paths';
+import { resetPgliteClient } from '@/lib/database/postgres/client/pglite';
 
 async function ensureDirForFile(filePath: string) {
     const dir = path.dirname(filePath);
@@ -32,6 +33,9 @@ async function bootstrapPglite() {
 
     console.log('[dev] running pglite migrate...');
     await migratePgliteDB();
+
+    // Close the PGlite client so the process can exit after bootstrap
+    await resetPgliteClient();
 }
 
 async function verifyDemoSqlite() {

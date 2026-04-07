@@ -513,8 +513,12 @@ async function insertRows(targetDb: PostgresDBClient, targetTable: unknown, rows
     }
 }
 
-export async function exportWorkspaceRecoverySnapshot(sourceDataDir: string, snapshotPath: string) {
-    const sourceDb = new PGlite({ dataDir: sourceDataDir });
+export async function exportWorkspaceRecoverySnapshot(
+    sourceDataDir: string,
+    snapshotPath: string,
+    PGliteImpl: new (options: { dataDir: string }) => PGlite = PGlite,
+) {
+    const sourceDb = new PGliteImpl({ dataDir: sourceDataDir });
 
     try {
         const tables: RecoveryTableSnapshot[] = [];

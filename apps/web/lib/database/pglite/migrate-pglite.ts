@@ -5,6 +5,7 @@ import migrations from './migrations.json';
 import { getPgliteClient, resetPgliteClient, resolvePgliteDataDir } from '../postgres/client/pglite';
 import { translateDatabase } from '../i18n';
 import { exportWorkspaceRecoverySnapshot, importWorkspaceRecoverySnapshot } from './workspace-recovery';
+import { migrateFromPg16IfNeeded } from './pg-version-migration';
 
 async function runDrizzleMigrate(db: any) {
     const dialect = db?.dialect;
@@ -48,11 +49,18 @@ async function archivePgliteDataDir(dataDir: string) {
 }
 
 export async function migratePgliteDB() {
+    const dataDir = await resolvePgliteDataDir();
+
+    // Phase 1: Check for PG major version incompatibility BEFORE opening the DB.
+    // PGlite 0.4.x (PG 17) WASM crashes on PG 16 data, so we must detect and
+    // migrate using the legacy PGlite version before attempting to open.
+    const upgradeResult = await migrateFromPg16IfNeeded(dataDir);
+
+    // Phase 2: Open DB with current PGlite (fresh DB after upgrade, or existing PG 17)
     const db = await getPgliteClient();
 
     try {
         await runDrizzleMigrate(db);
-        return;
     } catch (err) {
         console.warn(translateDatabase('Database.Errors.PgliteMigrationFailed'), {
             error: err,
@@ -64,9 +72,14 @@ export async function migratePgliteDB() {
                     : undefined,
         });
 
-        const dataDir = await resolvePgliteDataDir();
+        // The PGlite WASM instance may be in a crashed state (e.g. RuntimeError: Aborted),
+        // so closing it can also throw — catch and proceed with recovery regardless.
+        try {
+            await resetPgliteClient();
+        } catch (resetError) {
+            console.warn('[PGlite migrate] Failed to close crashed PGlite instance, proceeding with recovery', resetError);
+        }
 
-        await resetPgliteClient();
         const archivedDataDir = await archivePgliteDataDir(dataDir);
         const snapshotPath = `${archivedDataDir}.workspace-recovery.json`;
 
@@ -94,6 +107,22 @@ export async function migratePgliteDB() {
                     recoveryError,
                 });
             }
+        }
+
+        // If we already extracted a PG 16 snapshot, don't try to import it again
+        // since the schema migration on the fresh DB already ran above.
+        return;
+    }
+
+    // Phase 3: If we just did a PG version upgrade, import the extracted data
+    if (upgradeResult.migrated && upgradeResult.snapshot) {
+        try {
+            await importWorkspaceRecoverySnapshot(db, upgradeResult.snapshot);
+            console.log('[PGlite upgrade] Successfully imported data into new PG 17 database');
+        } catch (importError) {
+            console.warn('[PGlite upgrade] Failed to import some data into new database', {
+                importError,
+            });
         }
     }
 }

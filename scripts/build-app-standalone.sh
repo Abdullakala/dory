@@ -16,6 +16,7 @@ STANDALONE_WEB_SRC="${STANDALONE_SRC}/apps/web"
 OUT_DIR="${ROOT_DIR}/release/standalone"
 OUT_WEB_DIR="${OUT_DIR}/apps/web"
 OUT_WEB_NEXT_NODE_MODULES_DIR="${OUT_WEB_DIR}/.next/node_modules"
+OUT_WEB_NODE_MODULES_DIR="${OUT_WEB_DIR}/node_modules"
 
 if [[ ! -d "${STANDALONE_SRC}" ]]; then
   echo "Error: standalone output not found: ${STANDALONE_SRC}" >&2
@@ -38,6 +39,12 @@ fi
 # 2) apps/web required files
 cp -f "${STANDALONE_WEB_SRC}/server.js" "${OUT_WEB_DIR}/server.js"
 cp -f "${WEB_DIR}/package.json" "${OUT_WEB_DIR}/package.json"
+
+# Next standalone's server.js resolves packages like "next" relative to apps/web,
+# so keep a colocated node_modules copy under apps/web for packaged Electron builds.
+if [[ -d "${STANDALONE_SRC}/node_modules" ]]; then
+  cp -a "${STANDALONE_SRC}/node_modules" "${OUT_WEB_NODE_MODULES_DIR}"
+fi
 
 # Optional .env files
 if [[ -f "${STANDALONE_WEB_SRC}/.env" ]]; then

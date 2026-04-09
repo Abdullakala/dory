@@ -1,4 +1,5 @@
 import { getAuth } from '@/lib/auth';
+import { proxyAuthRequest, shouldProxyAuthRequest } from '@/lib/auth/auth-proxy';
 import { schema } from '@/lib/database/schema';
 import { getClient } from '@/lib/database/postgres/client';
 import type { PostgresDBClient } from '@/types';
@@ -241,6 +242,16 @@ async function createTicket(auth: Awaited<ReturnType<typeof getAuth>>, payload: 
 }
 
 export async function GET(req: Request) {
+    if (shouldProxyAuthRequest()) {
+        const url = new URL(req.url);
+        console.log('[electron-auth][finalize] proxying callback', {
+            hasCode: Boolean(url.searchParams.get('code')),
+            hasState: Boolean(url.searchParams.get('state')),
+            provider: url.searchParams.get('provider') ?? null,
+        });
+        return proxyAuthRequest(req);
+    }
+
     const url = new URL(req.url);
     const locale = await getApiLocale();
     const copy = getFinalizePageCopy(locale);
@@ -263,6 +274,13 @@ export async function GET(req: Request) {
     });
 
     const activeSession = await getSessionFromFinalizeRequest(auth, req, url);
+    console.log('[electron-auth][finalize] active session resolved', {
+        userId: activeSession?.user?.id ?? null,
+        email: activeSession?.user?.email ?? null,
+        isAnonymous: activeSession?.user && 'isAnonymous' in activeSession.user ? (activeSession.user as any).isAnonymous : null,
+        activeOrganizationId:
+            activeSession?.session && 'activeOrganizationId' in activeSession.session ? (activeSession.session as any).activeOrganizationId ?? null : null,
+    });
     if (!activeSession?.session?.token) {
         return NextResponse.json({ error: 'missing_session_cookie' }, { status: 401 });
     }

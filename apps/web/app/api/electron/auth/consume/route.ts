@@ -83,8 +83,13 @@ async function consumeTicketLocally(ticket: string) {
 
 export async function POST(req: Request) {
     if (shouldProxyAuthRequest()) {
+        console.log('[electron-auth][consume] proxying request');
         const response = await proxyAuthRequest(req);
         const mirroredCookie = response.ok ? await mirrorCloudSessionToDesktop(req, response.headers) : null;
+        console.log('[electron-auth][consume] proxy response', {
+            status: response.status,
+            mirroredCookie: Boolean(mirroredCookie),
+        });
         if (!mirroredCookie) {
             return response;
         }
@@ -99,5 +104,9 @@ export async function POST(req: Request) {
     }
 
     const body = bodySchema.parse(await req.json().catch(() => ({})));
+    console.log('[electron-auth][consume] local consume', {
+        hasTicket: Boolean(body.ticket),
+        ticketPrefix: body.ticket.slice(0, 16),
+    });
     return consumeTicketLocally(body.ticket);
 }

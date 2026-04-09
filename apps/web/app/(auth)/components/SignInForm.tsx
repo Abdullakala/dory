@@ -21,6 +21,7 @@ type SignInFormProps = React.ComponentProps<'div'> & {
     imageUrl?: string;
     callbackURL?: string;
     onRequestSignUp?: () => void;
+    onSignedIn?: () => void;
     showGuestOption?: boolean;
     showDemoOption?: boolean;
     resumeAnonymousSession?: boolean;
@@ -31,6 +32,7 @@ export function SignInForm({
     imageUrl,
     callbackURL: callbackURLOverride,
     onRequestSignUp,
+    onSignedIn,
     showGuestOption = true,
     showDemoOption = true,
     resumeAnonymousSession = false,
@@ -46,7 +48,30 @@ export function SignInForm({
     const [msg, setMsg] = useState<string | null>(null);
     const [guestLoading, setGuestLoading] = useState(false);
     const { isOffline: isDesktopOffline } = useCloudFeatureAvailability();
+    const { data: session, refetch: refetchSession } = authClient.useSession();
     const callbackURL = callbackURLOverride || searchParams?.get('callbackURL') || '/';
+
+    async function recoverAnonymousSessionForDesktopLink() {
+        if (!window.authBridge?.openExternal) {
+            return true;
+        }
+
+        if (!session?.user?.isAnonymous && !resumeAnonymousSession) {
+            return true;
+        }
+
+        const recoverResponse = await fetch('/api/auth/anonymous/recover', {
+            method: 'POST',
+            credentials: 'include',
+        });
+
+        if (!recoverResponse.ok) {
+            const payload = await recoverResponse.json().catch(() => null);
+            throw new Error(typeof payload?.error === 'string' ? payload.error : t('SignIn.Guest.StartFailed'));
+        }
+
+        return true;
+    }
 
     useEffect(() => {
         if (!window.authBridge?.onCallback) return;
@@ -90,6 +115,8 @@ export function SignInForm({
                 }
 
                 setMsg(t('SignIn.SuccessRefreshing'));
+                await refetchSession();
+                onSignedIn?.();
                 router.refresh();
                 router.replace(callbackURL);
             } catch (e) {
@@ -100,7 +127,7 @@ export function SignInForm({
         return () => {
             unsubscribe?.();
         };
-    }, [callbackURL, router, t]);
+    }, [callbackURL, onSignedIn, refetchSession, router, t]);
 
     async function signInViaGithubElectron() {
         if (isDesktopOffline) {
@@ -110,6 +137,7 @@ export function SignInForm({
         setErr(null);
         setMsg(null);
         try {
+            await recoverAnonymousSessionForDesktopLink();
             const res = await authFetch('/api/electron/auth/start/github', { method: 'GET' });
             console.log('GitHub OAuth start response:', res);
             const data = await res.json().catch(() => ({}));
@@ -130,6 +158,7 @@ export function SignInForm({
         setErr(null);
         setMsg(null);
         try {
+            await recoverAnonymousSessionForDesktopLink();
             const res = await authFetch('/api/electron/auth/start/google', { method: 'GET' });
             console.log('Google OAuth start response:', res);
             const data = await res.json().catch(() => ({}));
@@ -149,6 +178,7 @@ export function SignInForm({
         setLoading(true);
         try {
             if (window.authBridge?.openExternal) {
+                await recoverAnonymousSessionForDesktopLink();
                 const res = await fetch('/api/electron/auth/sign-in/email', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -162,6 +192,8 @@ export function SignInForm({
                 } else {
                     posthog.identify(email, { email });
                     posthog.capture('user_signed_in', { method: 'email' });
+                    await refetchSession();
+                    onSignedIn?.();
                     router.refresh();
                     router.push(callbackURL);
                 }

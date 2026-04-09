@@ -104,7 +104,13 @@ export function SignInForm({
                 const consumeRes = await fetch('/api/electron/auth/consume', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ticket }),
+                    body: JSON.stringify({
+                        ticket,
+                        anonymousUserId: session?.user?.isAnonymous ? session.user.id : null,
+                        anonymousActiveOrganizationId: session?.user?.isAnonymous
+                            ? ((session.session as { activeOrganizationId?: string | null } | undefined)?.activeOrganizationId ?? null)
+                            : null,
+                    }),
                 });
 
                 if (!consumeRes.ok) {
@@ -113,9 +119,7 @@ export function SignInForm({
                 }
 
                 setMsg(t('SignIn.SuccessRefreshing'));
-                await refetchSession();
-                router.refresh();
-                router.replace(callbackURL);
+                window.location.assign(callbackURL);
             } catch (e) {
                 setErr(t('SignIn.InvalidCallback'));
             }

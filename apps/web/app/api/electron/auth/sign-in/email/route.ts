@@ -49,13 +49,13 @@ function rewriteSetCookie(value: string, isSecureRequest: boolean): string {
 export async function POST(req: Request) {
     if (shouldProxyAuthRequest()) {
         const response = await proxyAuthRequest(req);
-        const mirroredCookie = response.ok ? await mirrorCloudSessionToDesktop(req, response.headers) : null;
-        if (!mirroredCookie) {
+        const mirror = response.ok ? await mirrorCloudSessionToDesktop(req, response.headers) : null;
+        if (!mirror) {
             return response;
         }
 
         const headers = new Headers(response.headers);
-        headers.append('set-cookie', mirroredCookie);
+        headers.append('set-cookie', mirror.cookie);
         return new Response(response.body, {
             status: response.status,
             statusText: response.statusText,

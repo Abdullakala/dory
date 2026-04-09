@@ -1,8 +1,12 @@
 import { getAuth } from '@/lib/auth';
 import { mirrorCloudSessionToDesktop } from '@/lib/auth/desktop-session-recovery';
 import { buildSessionOrganizationPatch } from '@/lib/auth/migration-state';
+import { linkAnonymousOrganizationToUser } from '@/lib/auth/anonymous-lifecycle/link';
 import { serializeSignedCookie } from 'better-call';
 import { proxyAuthRequest, shouldProxyAuthRequest } from '@/lib/auth/auth-proxy';
+import { getClient } from '@/lib/database/postgres/client';
+import { schema } from '@/lib/database/schema';
+import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
@@ -11,6 +15,12 @@ export const dynamic = 'force-dynamic';
 
 const bodySchema = z.object({
     ticket: z.string().min(1),
+});
+
+const bodySchemaWithAnonymous = z.object({
+    ticket: z.string().min(1),
+    anonymousUserId: z.string().optional().nullable(),
+    anonymousActiveOrganizationId: z.string().optional().nullable(),
 });
 
 type TicketUser = {
@@ -81,21 +91,89 @@ async function consumeTicketLocally(ticket: string) {
     return res;
 }
 
+async function linkAnonymousUserLocally(params: {
+    anonymousUserId: string;
+    anonymousActiveOrganizationId: string | null;
+    newUserId: string;
+    newActiveOrganizationId: string | null;
+}) {
+    try {
+        const db = await getClient();
+        const [anonUser] = await db
+            .select({ id: schema.user.id, isAnonymous: schema.user.isAnonymous })
+            .from(schema.user)
+            .where(eq(schema.user.id, params.anonymousUserId))
+            .limit(1);
+
+        if (!anonUser?.isAnonymous) {
+            console.log('[electron-auth][consume] anonymous user not found or not anonymous locally, skipping link', {
+                anonymousUserId: params.anonymousUserId,
+            });
+            return;
+        }
+
+        await linkAnonymousOrganizationToUser({
+            anonymousUserId: params.anonymousUserId,
+            anonymousActiveOrganizationId: params.anonymousActiveOrganizationId,
+            newUserId: params.newUserId,
+            newActiveOrganizationId: params.newActiveOrganizationId,
+        });
+
+        console.log('[electron-auth][consume] linked anonymous org locally', {
+            anonymousUserId: params.anonymousUserId,
+            newUserId: params.newUserId,
+        });
+    } catch (err) {
+        console.error('[electron-auth][consume] failed to link anonymous org locally', err);
+    }
+}
+
 export async function POST(req: Request) {
     if (shouldProxyAuthRequest()) {
-        console.log('[electron-auth][consume] proxying request');
-        const response = await proxyAuthRequest(req);
-        const mirroredCookie = response.ok ? await mirrorCloudSessionToDesktop(req, response.headers) : null;
+        // Parse the full body before proxying (consuming the stream)
+        const rawBody = await req.json().catch(() => ({}));
+        const parsed = bodySchemaWithAnonymous.safeParse(rawBody);
+        if (!parsed.success) {
+            return NextResponse.json({ error: 'invalid_request_body' }, { status: 400 });
+        }
+
+        const { ticket, anonymousUserId, anonymousActiveOrganizationId } = parsed.data;
+
+        console.log('[electron-auth][consume] proxying request', {
+            hasAnonymousUserId: Boolean(anonymousUserId),
+        });
+
+        // Rebuild request for proxy with only the ticket (cloud ignores extra fields anyway)
+        const proxyReq = new Request(req.url, {
+            method: req.method,
+            headers: req.headers,
+            body: JSON.stringify({ ticket }),
+        });
+
+        const response = await proxyAuthRequest(proxyReq);
+        const mirror = response.ok ? await mirrorCloudSessionToDesktop(req, response.headers) : null;
+
         console.log('[electron-auth][consume] proxy response', {
             status: response.status,
-            mirroredCookie: Boolean(mirroredCookie),
+            hasMirror: Boolean(mirror),
         });
-        if (!mirroredCookie) {
+
+        // Migrate local anonymous user's org/connections to the new user
+        if (mirror && anonymousUserId && mirror.userId !== anonymousUserId) {
+            await linkAnonymousUserLocally({
+                anonymousUserId,
+                anonymousActiveOrganizationId: anonymousActiveOrganizationId ?? null,
+                newUserId: mirror.userId,
+                newActiveOrganizationId: mirror.activeOrganizationId,
+            });
+        }
+
+        if (!mirror) {
             return response;
         }
 
         const headers = new Headers(response.headers);
-        headers.append('set-cookie', mirroredCookie);
+        headers.append('set-cookie', mirror.cookie);
         return new Response(response.body, {
             status: response.status,
             statusText: response.statusText,

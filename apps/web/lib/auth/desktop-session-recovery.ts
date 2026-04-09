@@ -402,7 +402,13 @@ async function buildLocalSessionCookie(sessionToken: string, requestUrl?: string
     return rewriteCookieSecurity(rawCookie, getSecureCookieFlag(requestUrl));
 }
 
-export async function mirrorCloudSessionToDesktop(req: Request, responseHeaders: Headers): Promise<string | null> {
+export type MirroredCloudSession = {
+    cookie: string;
+    userId: string;
+    activeOrganizationId: string | null;
+};
+
+export async function mirrorCloudSessionToDesktop(req: Request, responseHeaders: Headers): Promise<MirroredCloudSession | null> {
     const details = await fetchCloudSessionDetails(req, responseHeaders);
     if (!details?.cloudSession?.user?.id) {
         return null;
@@ -417,7 +423,11 @@ export async function mirrorCloudSessionToDesktop(req: Request, responseHeaders:
         activeOrganizationId,
     });
 
-    return buildDesktopRecoveryCookie(recoveryToken, req.url);
+    return {
+        cookie: buildDesktopRecoveryCookie(recoveryToken, req.url),
+        userId,
+        activeOrganizationId,
+    };
 }
 
 export async function resolveDesktopRecoveredSession(headers: Headers) {

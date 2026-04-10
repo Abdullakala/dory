@@ -8,7 +8,7 @@ import { formatTooltip, formatValue } from './utils';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/registry/new-york-v4/ui/context-menu';
 import { useAtomValue } from 'jotai';
 import { currentSessionMetaAtom } from '../stores/result-table.atoms';
-import { buildEqualsFilterFromCell } from './filter';
+import { buildEqualsFilterFromCell, mapDbTypeToTwoKinds } from './filter';
 import { useTranslations } from 'next-intl';
 import { useVTableFilterUi, useVTableFilters, VTableFilters } from './VTableFilters';
 
@@ -185,10 +185,19 @@ export default function VTable({
         onRemoveFilter: removeFilter,
     });
 
+    const numericColumns = useMemo(() => {
+        const set = new Set<string>();
+        for (const c of columnsRaw ?? []) {
+            if (c?.name && mapDbTypeToTwoKinds(c.type) === 'number') set.add(c.name);
+        }
+        return set;
+    }, [columnsRaw]);
+
     const [sortBy, setSortBy] = useState<string | null>(null);
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
     const sortedResults = useMemo(() => {
         if (!sortBy) return filteredResults;
+        const isNumericCol = numericColumns.has(sortBy);
         const sorted = [...filteredResults].sort((a, b) => {
             const aVal = a.rowData[sortBy];
             const bVal = b.rowData[sortBy];
@@ -198,10 +207,17 @@ export default function VTable({
             if (typeof aVal === 'number' && typeof bVal === 'number') {
                 return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
             }
+            if (isNumericCol) {
+                const aNum = Number(aVal);
+                const bNum = Number(bVal);
+                if (Number.isFinite(aNum) && Number.isFinite(bNum)) {
+                    return sortDirection === 'asc' ? aNum - bNum : bNum - aNum;
+                }
+            }
             return sortDirection === 'asc' ? String(aVal).localeCompare(String(bVal)) : String(bVal).localeCompare(String(aVal));
         });
         return sorted;
-    }, [filteredResults, sortBy, sortDirection]);
+    }, [filteredResults, sortBy, sortDirection, numericColumns]);
 
     const getVisibleSampleRowIndices = useCallback(
         (range?: { start: number; stop: number }) => {

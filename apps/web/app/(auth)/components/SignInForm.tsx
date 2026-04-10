@@ -49,11 +49,7 @@ export function SignInForm({
     const { data: session, refetch: refetchSession } = authClient.useSession();
     const callbackURL = callbackURLOverride || searchParams?.get('callbackURL') || '/';
 
-    async function recoverAnonymousSessionForDesktopLink() {
-        if (!window.authBridge?.openExternal) {
-            return true;
-        }
-
+    async function recoverAnonymousSessionIfNeeded() {
         if (!session?.user?.isAnonymous && !resumeAnonymousSession) {
             return true;
         }
@@ -138,7 +134,7 @@ export function SignInForm({
         setErr(null);
         setMsg(null);
         try {
-            await recoverAnonymousSessionForDesktopLink();
+            await recoverAnonymousSessionIfNeeded();
             const res = await authFetch('/api/electron/auth/start/github', { method: 'GET' });
             console.log('GitHub OAuth start response:', res);
             const data = await res.json().catch(() => ({}));
@@ -159,7 +155,7 @@ export function SignInForm({
         setErr(null);
         setMsg(null);
         try {
-            await recoverAnonymousSessionForDesktopLink();
+            await recoverAnonymousSessionIfNeeded();
             const res = await authFetch('/api/electron/auth/start/google', { method: 'GET' });
             console.log('Google OAuth start response:', res);
             const data = await res.json().catch(() => ({}));
@@ -179,7 +175,7 @@ export function SignInForm({
         setLoading(true);
         try {
             if (window.authBridge?.openExternal) {
-                await recoverAnonymousSessionForDesktopLink();
+                await recoverAnonymousSessionIfNeeded();
                 const res = await fetch('/api/electron/auth/sign-in/email', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -198,6 +194,7 @@ export function SignInForm({
                     router.push(callbackURL);
                 }
             } else {
+                await recoverAnonymousSessionIfNeeded();
                 const { error } = await authClient.signIn.email({
                     email,
                     password: pwd,
@@ -398,7 +395,11 @@ export function SignInForm({
                                             if (window.authBridge?.openExternal) {
                                                 void signInViaGithubElectron();
                                             } else {
-                                                signInViaGithub(callbackURL);
+                                                void recoverAnonymousSessionIfNeeded().then(() => {
+                                                    signInViaGithub(callbackURL);
+                                                }).catch((error: unknown) => {
+                                                    setErr(error instanceof Error ? error.message : t('SignIn.GithubStartFailed'));
+                                                });
                                             }
                                         }}
                                     >
@@ -415,7 +416,11 @@ export function SignInForm({
                                             if (window.authBridge?.openExternal) {
                                                 void signInViaGoogleElectron();
                                             } else {
-                                                signInViaGoogle(callbackURL);
+                                                void recoverAnonymousSessionIfNeeded().then(() => {
+                                                    signInViaGoogle(callbackURL);
+                                                }).catch((error: unknown) => {
+                                                    setErr(error instanceof Error ? error.message : t('SignIn.GoogleStartFailed'));
+                                                });
                                             }
                                         }}
                                     >

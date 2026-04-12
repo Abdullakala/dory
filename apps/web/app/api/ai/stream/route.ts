@@ -8,12 +8,16 @@ import { isMissingAiEnvError } from '@/lib/ai/errors';
 import { USE_CLOUD_AI } from '@/app/config/app';
 import { proxyAiRouteIfNeeded } from '@/app/api/utils/cloud-ai-proxy';
 import { withUserAndOrganizationHandler } from '@/app/api/utils/with-organization-handler';
+import { getCloudApiBaseUrl } from '@/lib/cloud/url';
 
 export const runtime = 'nodejs';
 
 export const POST = withUserAndOrganizationHandler(async ({ req, organizationId, userId }) => {
     try {
-        const proxied = await proxyAiRouteIfNeeded(req, '/api/ai/stream');
+        const cloudApiBaseUrl = getCloudApiBaseUrl();
+        const shouldUseCloudProxy = USE_CLOUD_AI && Boolean(cloudApiBaseUrl);
+
+        const proxied = shouldUseCloudProxy ? await proxyAiRouteIfNeeded(req, '/api/ai/stream') : null;
         if (proxied) return proxied;
 
         const body = (await req.json()) as {
@@ -29,11 +33,7 @@ export const POST = withUserAndOrganizationHandler(async ({ req, organizationId,
         const envProvider = (process.env.DORY_AI_PROVIDER ?? '').trim().toLowerCase();
         const envBaseUrl = (process.env.DORY_AI_URL ?? '').trim().toLowerCase();
         const isCloudflareGatewayUrl = envBaseUrl.includes('gateway.ai.cloudflare.com');
-        const shouldForcePresetModel =
-            USE_CLOUD_AI ||
-            envProvider === 'cloudflare' ||
-            envProvider === 'cloudflare-gateway' ||
-            isCloudflareGatewayUrl;
+        const shouldForcePresetModel = shouldUseCloudProxy || envProvider === 'cloudflare' || envProvider === 'cloudflare-gateway' || isCloudflareGatewayUrl;
         const requestedModel = shouldForcePresetModel ? null : body.model;
 
         console.info('[ai/stream] request model input', {
@@ -42,6 +42,7 @@ export const POST = withUserAndOrganizationHandler(async ({ req, organizationId,
             envBaseUrl: process.env.DORY_AI_URL ?? null,
             envModel: process.env.DORY_AI_MODEL ?? null,
             useCloud: USE_CLOUD_AI,
+            cloudProxyConfigured: shouldUseCloudProxy,
             forcePresetModel: shouldForcePresetModel,
         });
 
@@ -55,12 +56,11 @@ export const POST = withUserAndOrganizationHandler(async ({ req, organizationId,
             envBaseUrl: process.env.DORY_AI_URL ?? null,
             envModel: process.env.DORY_AI_MODEL ?? null,
             useCloud: USE_CLOUD_AI,
+            cloudProxyConfigured: shouldUseCloudProxy,
             forcePresetModel: shouldForcePresetModel,
         });
 
-        const toolSet = buildCloudToolSet(
-            body.tools as Record<string, any> | null,
-        );
+        const toolSet = buildCloudToolSet(body.tools as Record<string, any> | null);
 
         const result = streamText({
             model,

@@ -37,6 +37,7 @@ type ChatBotCompProps = {
     onConversationActivity?: () => void;
     onSessionCreated?: (sessionId: string) => void;
     initialPrompt?: string | null;
+    onInitialPromptConsumed?: () => void;
 
     mode?: 'global' | 'copilot';
     copilotEnvelope?: CopilotEnvelopeV1 | null;
@@ -49,6 +50,7 @@ const ChatBotComp = ({
     onConversationActivity,
     onSessionCreated,
     initialPrompt = null,
+    onInitialPromptConsumed,
     mode = 'global',
     copilotEnvelope = null,
     onExecuteAction,
@@ -98,18 +100,29 @@ const ChatBotComp = ({
     const showGlobalLoader = status === 'submitted' || (status === 'streaming' && !hasAssistantContent);
 
     useEffect(() => {
+        console.log('[chatbot-debug] chatbox state', {
+            chatStateId,
+            sessionId,
+            initialPrompt,
+            status,
+            messagesCount: messages.length,
+            initialMessagesCount: initialMessages.length,
+        });
+    }, [chatStateId, sessionId, initialPrompt, status, messages.length, initialMessages.length]);
+
+    useEffect(() => {
         if (sessionRef.current !== chatStateId) {
             sessionRef.current = chatStateId;
             appliedInitialRef.current = null;
         }
 
-        // Skip overwriting messages after initial prompt was submitted,
-        // to avoid a race condition where fetchSessionDetail returns the
-        // just-sent user message and causes it to appear twice.
-        if (initialPromptSubmittedRef.current) return;
-
         const key = initialMessages.map(message => message.id).join('|');
         if (appliedInitialRef.current !== key) {
+            console.log('[chatbot-debug] apply initial messages', {
+                chatStateId,
+                key,
+                count: initialMessages.length,
+            });
             setMessages(initialMessages);
             appliedInitialRef.current = key;
         }
@@ -176,11 +189,22 @@ const ChatBotComp = ({
 
     const initialPromptSubmittedRef = useRef(false);
     useEffect(() => {
+        console.log('[chatbot-debug] initial prompt effect check', {
+            chatStateId,
+            initialPrompt,
+            status,
+            submitted: initialPromptSubmittedRef.current,
+        });
         if (initialPrompt && !initialPromptSubmittedRef.current && status === 'ready') {
             initialPromptSubmittedRef.current = true;
+            console.log('[chatbot-debug] initial prompt submitting', {
+                chatStateId,
+                initialPrompt,
+            });
             handleSubmit({ text: initialPrompt, files: [] });
+            onInitialPromptConsumed?.();
         }
-    }, [initialPrompt, status]);
+    }, [initialPrompt, onInitialPromptConsumed, status]);
 
     const handleCopySql = useCallback(
         async (sql: string) => {
@@ -232,7 +256,7 @@ const ChatBotComp = ({
         });
     }, [activeSchema, sidebarConfig, tables]);
 
-    const handleSubmit = async (message: PromptInputMessage) => {
+    const submitPrompt = async (message: PromptInputMessage) => {
         const hasText = Boolean(message.text);
         const hasAttachments = Boolean(message.files?.length);
         if (!(hasText || hasAttachments)) return;
@@ -274,24 +298,42 @@ const ChatBotComp = ({
             connection_id: connectionId,
         });
 
+        console.log('[chatbot-debug] sendMessage called', {
+            chatStateId,
+            sessionId,
+            chatIdForRequest,
+            text: message.text,
+            databaseForContext,
+            schemaForContext,
+            tableForContext,
+            status,
+            messagesCountBeforeSend: messages.length,
+        });
+
+        const requestOptions = {
+            body: {
+                webSearch,
+                database: databaseForContext,
+                activeSchema: schemaForContext,
+                table: tableForContext,
+                connectionId,
+                mode,
+                tabId,
+                copilotEnvelope,
+                chatId: chatIdForRequest,
+            },
+        };
+
         sendMessage(
             { text: message.text || t('Input.SentWithAttachments'), files: message.files },
-            {
-                body: {
-                    webSearch,
-                    database: databaseForContext,
-                    activeSchema: schemaForContext,
-                    table: tableForContext,
-                    connectionId,
-                    mode,
-                    tabId,
-                    copilotEnvelope,
-                    chatId: chatIdForRequest,
-                },
-            },
+            requestOptions,
         );
 
         setInput('');
+    };
+
+    const handleSubmit = async (message: PromptInputMessage) => {
+        await submitPrompt(message);
     };
 
     return (

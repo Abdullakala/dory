@@ -40,6 +40,9 @@ export function useChatSessions(params: { mode: ChatMode; copilotEnvelope?: Copi
 
     useEffect(() => {
         selectedSessionRef.current = selectedSessionId;
+        console.log('[chatbot-debug] selected session changed', {
+            selectedSessionId,
+        });
     }, [selectedSessionId]);
 
     const fetchSessions = useCallback(
@@ -51,6 +54,11 @@ export function useChatSessions(params: { mode: ChatMode; copilotEnvelope?: Copi
 
             setLoadingSessions(true);
             try {
+                console.log('[chatbot-debug] fetch sessions start', {
+                    connectionId,
+                    preferredId,
+                    selectedSessionId: selectedSessionRef.current,
+                });
                 const list = await apiFetchSessions({ mode: 'global', connectionId, errorMessage: t('Errors.FetchSessions') });
                 setSessions(list);
 
@@ -62,6 +70,11 @@ export function useChatSessions(params: { mode: ChatMode; copilotEnvelope?: Copi
                 }
 
                 const hasPreferred = currentPreferred && list.some(item => item.id === currentPreferred);
+                console.log('[chatbot-debug] fetch sessions success', {
+                    count: list.length,
+                    currentPreferred,
+                    nextSelectedSessionId: hasPreferred ? currentPreferred : list[0].id,
+                });
                 setSelectedSessionId(hasPreferred ? (currentPreferred as string) : list[0].id);
             } catch (e: any) {
                 console.error('[chat] fetch sessions failed', e);
@@ -77,9 +90,16 @@ export function useChatSessions(params: { mode: ChatMode; copilotEnvelope?: Copi
         async (sessionId: string) => {
             setLoadingMessages(true);
             try {
+                console.log('[chatbot-debug] fetch session detail start', {
+                    sessionId,
+                });
                 const { detail, messages } = await apiFetchSessionDetail(sessionId, { errorMessage: t('Errors.FetchSessionDetail') });
 
-                console.log('[chat] fetch session detail', detail, messages);
+                console.log('[chatbot-debug] fetch session detail success', {
+                    sessionId,
+                    detail,
+                    messagesCount: messages.length,
+                });
 
                 if (detail?.session) {
                     setSessions(prev => {
@@ -185,9 +205,21 @@ export function useChatSessions(params: { mode: ChatMode; copilotEnvelope?: Copi
         if (creatingSession) return;
         setCreatingSession(true);
         try {
+            console.log('[chatbot-debug] create session start', {
+                connectionId,
+            });
             const created = await apiCreateSession({ mode: 'global', connectionId, errorMessage: t('Errors.CreateSession') });
             if (created?.id) {
+                console.log('[chatbot-debug] create session success', {
+                    sessionId: created.id,
+                });
                 posthog.capture('chat_session_created', { session_id: created.id });
+                setSelectedSessionId(created.id);
+                setInitialMessages([]);
+                setSessions(prev => {
+                    const exists = prev.some(item => item.id === created.id);
+                    return exists ? prev : [created, ...prev];
+                });
             }
             await fetchSessions(created?.id ?? null);
         } catch (e: any) {
@@ -196,7 +228,7 @@ export function useChatSessions(params: { mode: ChatMode; copilotEnvelope?: Copi
         } finally {
             setCreatingSession(false);
         }
-    }, [mode, creatingSession, fetchSessions, t]);
+    }, [mode, creatingSession, connectionId, fetchSessions, t]);
 
     const handleSessionSelect = useCallback(
         (sessionId: string) => {

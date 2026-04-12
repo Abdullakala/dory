@@ -1,27 +1,21 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useAtom } from 'jotai';
-import { useTranslations } from 'next-intl';
+import { useAtom, useAtomValue } from 'jotai';
+import { useLocale, useTranslations } from 'next-intl';
 import { useParams } from 'next/navigation';
 import { Sparkles } from 'lucide-react';
 
-import {
-    PromptInput,
-    PromptInputBody,
-    PromptInputSubmit,
-    PromptInputTextarea,
-    PromptInputFooter,
-    type PromptInputMessage,
-} from '@/components/ai-elements/prompt-input';
+import { PromptInput, PromptInputBody, PromptInputSubmit, PromptInputTextarea, PromptInputFooter, type PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import { Suggestions, Suggestion } from '@/components/ai-elements/suggestion';
-import { activeDatabaseAtom } from '@/shared/stores/app.store';
-import { useDatabases } from '@/hooks/use-databases';
+import { activeDatabaseAtom, activeSchemaAtom, currentConnectionAtom } from '@/shared/stores/app.store';
 import { useTables } from '@/hooks/use-tables';
 import { useSchema } from '@/hooks/use-schema';
-import { DatabaseSelect } from '../../../components/sql-console-sidebar/database-select';
+import { getSidebarConfig } from '../../../components/sql-console-sidebar/sidebar-config';
+import { getSchemaName } from '../../../components/sql-console-sidebar/utils';
 import { TableMentionTextarea } from '../thread/table-mention-textarea';
-import { generateSuggestions } from './suggestion-rules';
+import { DatabaseSchemaSelect } from './database-schema-select';
+import { createSuggestionFormatters, generateSuggestions } from './suggestion-rules';
 
 type ChatWelcomeProps = {
     onSend: (text: string) => void;
@@ -32,21 +26,44 @@ const SUGGESTION_KEYS = ['TopUsers', 'ErrorLogs', 'OrderTrends', 'TableSummary']
 
 export default function ChatWelcome({ onSend, disabled = false }: ChatWelcomeProps) {
     const t = useTranslations('Chatbot');
+    const locale = useLocale();
     const [input, setInput] = useState('');
-    const [activeDatabase, setActiveDatabase] = useAtom(activeDatabaseAtom);
-    const { databases } = useDatabases();
+    const [activeDatabase] = useAtom(activeDatabaseAtom);
+    const activeSchema = useAtomValue(activeSchemaAtom);
+    const currentConnection = useAtomValue(currentConnectionAtom);
     const { tables } = useTables(activeDatabase);
     const params = useParams();
     const connectionId = params.connectionId as string | undefined;
-    const { schema } = useSchema(connectionId);
+    const { schema } = useSchema(connectionId, activeDatabase);
+    const sidebarConfig = useMemo(() => getSidebarConfig(currentConnection?.connection?.type), [currentConnection?.connection?.type]);
 
     const suggestions = useMemo(() => {
-        const fallbacks = SUGGESTION_KEYS.map((key) => t(`Welcome.Suggestions.${key}`));
-        if (!schema?.databases || !activeDatabase) return fallbacks;
-        const db = schema.databases.find((d) => d.name === activeDatabase);
-        if (!db?.tables?.length) return fallbacks;
-        return generateSuggestions(db.tables, fallbacks, 4);
-    }, [schema, activeDatabase, t]);
+        const fallbacks = SUGGESTION_KEYS.map(key => t(`Welcome.Suggestions.${key}`));
+        const schemaMap = schema?.schema;
+        if (!schemaMap || !activeDatabase) return fallbacks;
+        const formatters = createSuggestionFormatters(locale);
+
+        const allTables = Object.entries(schemaMap).map(([name, columns]) => ({
+            name,
+            columns,
+        }));
+        if (!allTables.length) return fallbacks;
+
+        const filteredTables = sidebarConfig.supportsSchemas && activeSchema ? allTables.filter(table => getSchemaName(table.name, sidebarConfig) === activeSchema) : allTables;
+        if (!filteredTables.length) return fallbacks;
+        return generateSuggestions(filteredTables, fallbacks, formatters, 4);
+    }, [schema, activeDatabase, activeSchema, sidebarConfig, t, locale]);
+
+    const mentionTables = useMemo(() => {
+        return (tables ?? []).filter(table => {
+            if (!sidebarConfig.supportsSchemas || !activeSchema) {
+                return true;
+            }
+
+            const tableName = (table as any).name ?? (table as any).value ?? (table as any).label ?? '';
+            return getSchemaName(tableName, sidebarConfig) === activeSchema;
+        });
+    }, [activeSchema, sidebarConfig, tables]);
 
     const handleSubmit = (message: PromptInputMessage) => {
         const text = message.text?.trim();
@@ -57,34 +74,20 @@ export default function ChatWelcome({ onSend, disabled = false }: ChatWelcomePro
     const handleSuggestionClick = (suggestion: string) => {
         onSend(suggestion);
     };
-
-    const handleDatabaseChange = (db: string) => {
-        setActiveDatabase(db);
-    };
-
     return (
         <div className="flex h-full w-full flex-col items-center justify-center p-4">
             <div className="flex w-full max-w-2xl flex-col items-center gap-8">
                 <div className="flex flex-col items-center gap-2 text-center">
                     <div className="flex items-center gap-2">
                         <Sparkles className="h-6 w-6 text-primary" />
-                        <h1 className="text-2xl font-semibold tracking-tight">
-                            {t('Welcome.Heading')}
-                        </h1>
+                        <h1 className="text-2xl font-semibold tracking-tight">{t('Welcome.Heading')}</h1>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                        {t('Welcome.Subheading')}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{t('Welcome.Subheading')}</p>
                 </div>
 
                 <Suggestions className="justify-center flex-wrap">
                     {suggestions.map((text, i) => (
-                        <Suggestion
-                            key={i}
-                            suggestion={text}
-                            onClick={handleSuggestionClick}
-                            disabled={disabled}
-                        />
+                        <Suggestion key={i} suggestion={text} onClick={handleSuggestionClick} disabled={disabled} />
                     ))}
                 </Suggestions>
 
@@ -93,19 +96,19 @@ export default function ChatWelcome({ onSend, disabled = false }: ChatWelcomePro
                         <PromptInputBody>
                             <div className="flex flex-col gap-2 w-full">
                                 <div className="flex items-center gap-2">
-                                    <DatabaseSelect
-                                        className="w-auto max-w-80 border-0 shadow-none text-xs outline-0 focus-visible:ring-0"
-                                        value={activeDatabase}
-                                        databases={databases}
-                                        onChange={handleDatabaseChange}
-                                    />
+                                    <DatabaseSchemaSelect />
                                 </div>
                                 <div className="flex items-start gap-2 w-full">
-                                    <TableMentionTextarea value={input} onChange={setInput} tables={tables.map((t: any) => t.name ?? t)} autoFocus>
+                                    <TableMentionTextarea
+                                        value={input}
+                                        onChange={setInput}
+                                        tables={mentionTables.map((table: any) => table.name ?? table.value ?? table.label ?? table)}
+                                        autoFocus
+                                    >
                                         <PromptInputTextarea
                                             placeholder={t('Input.WelcomePlaceholder')}
                                             value={input}
-                                            onChange={(e) => setInput(e.target.value)}
+                                            onChange={e => setInput(e.target.value)}
                                             autoFocus
                                             className="min-h-18 w-full resize-none border-0 bg-transparent text-sm focus-visible:outline-none focus-visible:ring-0"
                                         />

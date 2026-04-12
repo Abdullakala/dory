@@ -13,9 +13,10 @@ type SchemaSelectProps = {
     value: string;
     schemas: SidebarOption[];
     onChange: (schema: string) => void;
+    className?: string;
 };
 
-export function SchemaSelect({ value, schemas, onChange }: SchemaSelectProps) {
+export function SchemaSelect({ value, schemas, onChange, className }: SchemaSelectProps) {
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState('');
     const t = useTranslations('SQLConsoleSidebar');
@@ -31,7 +32,7 @@ export function SchemaSelect({ value, schemas, onChange }: SchemaSelectProps) {
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" aria-expanded={open} className="h-8 w-full justify-between">
+                <Button variant="outline" role="combobox" aria-expanded={open} className={cn('h-8 w-full justify-between', className)}>
                     <span className="flex min-w-0 items-center gap-2">
                         <Layers3 className="h-4 w-4 shrink-0" />
                         <span className="truncate text-sm">{selected?.label ?? t('Select schema')}</span>

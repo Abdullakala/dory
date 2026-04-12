@@ -39,6 +39,7 @@ export type ColumnsCacheEntry = { columns: TableColumn[]; updatedAt: number };
 const columnsCacheStorage = createJSONStorage<Record<string, ColumnsCacheEntry>>(() => sessionStorage);
 export const columnsCacheAtom = atomWithStorage<Record<string, ColumnsCacheEntry>>('columnsCache', {}, columnsCacheStorage);
 const activeDatabaseByConnectionAtom = atomWithStorage<Record<string, string>>('activeDatabaseByConnection', {});
+const activeSchemaByConnectionAtom = atomWithStorage<Record<string, string>>('activeSchemaByConnection', {});
 
 const DEFAULT_CONNECTION_KEY = '__default__';
 
@@ -57,6 +58,22 @@ export const activeDatabaseAtom = atom(
         const key = resolveConnectionKey(get);
         const prev = get(activeDatabaseByConnectionAtom);
         set(activeDatabaseByConnectionAtom, {
+            ...prev,
+            [key]: value,
+        });
+    },
+);
+
+export const activeSchemaAtom = atom(
+    get => {
+        const key = resolveConnectionKey(get);
+        const activeSchemaByConnection = get(activeSchemaByConnectionAtom);
+        return activeSchemaByConnection[key] ?? '';
+    },
+    (get, set, value: string) => {
+        const key = resolveConnectionKey(get);
+        const prev = get(activeSchemaByConnectionAtom);
+        set(activeSchemaByConnectionAtom, {
             ...prev,
             [key]: value,
         });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useChat } from '@ai-sdk/react';
 import posthog from 'posthog-js';
@@ -19,16 +19,17 @@ import { PromptInput, PromptInputBody, PromptInputSubmit, PromptInputTextarea, P
 
 import { AssistantFallbackCard } from '@/components/@dory/ui/ai/assistant-fallback';
 
-import { activeDatabaseAtom, currentConnectionAtom } from '@/shared/stores/app.store';
-import { useDatabases } from '@/hooks/use-databases';
+import { activeDatabaseAtom, activeSchemaAtom, currentConnectionAtom } from '@/shared/stores/app.store';
 import { useTables } from '@/hooks/use-tables';
 
 import MessageRenderer from './message-render';
 import { TableMentionTextarea } from './table-mention-textarea';
 import { getSqlResultFromPart, getChartResultFromPart } from '../core/utils';
-import { DatabaseSelect } from '../../../components/sql-console-sidebar/database-select';
+import { getSidebarConfig } from '../../../components/sql-console-sidebar/sidebar-config';
+import { getSchemaName } from '../../../components/sql-console-sidebar/utils';
 import { CopilotActionExecutor } from '../copilot/action-bridge';
 import { apiGetOrCreateCopilotSession } from '../core/api';
+import { DatabaseSchemaSelect } from '../components/database-schema-select';
 
 type ChatBotCompProps = {
     sessionId?: string | null;
@@ -42,7 +43,16 @@ type ChatBotCompProps = {
     onExecuteAction?: CopilotActionExecutor;
 };
 
-const ChatBotComp = ({ sessionId, initialMessages, onConversationActivity, onSessionCreated, initialPrompt = null, mode = 'global', copilotEnvelope = null, onExecuteAction }: ChatBotCompProps) => {
+const ChatBotComp = ({
+    sessionId,
+    initialMessages,
+    onConversationActivity,
+    onSessionCreated,
+    initialPrompt = null,
+    mode = 'global',
+    copilotEnvelope = null,
+    onExecuteAction,
+}: ChatBotCompProps) => {
     const router = useRouter();
     const params = useParams<{ organization: string; connectionId: string }>();
     const t = useTranslations('Chatbot');
@@ -53,10 +63,11 @@ const ChatBotComp = ({ sessionId, initialMessages, onConversationActivity, onSes
     const scrollPositionsRef = useRef<Map<string, number>>(new Map());
     const stickToBottomContextRef = useRef<StickToBottomContext | null>(null);
 
-    const [activeDatabase, setActiveDatabase] = useAtom(activeDatabaseAtom);
+    const [activeDatabase] = useAtom(activeDatabaseAtom);
+    const activeSchema = useAtomValue(activeSchemaAtom);
     const currentConnection = useAtomValue(currentConnectionAtom);
+    const sidebarConfig = useMemo(() => getSidebarConfig(currentConnection?.connection?.type), [currentConnection?.connection?.type]);
 
-    const { databases } = useDatabases();
     const { tables } = useTables(activeDatabase);
 
     const [selectedTable, setSelectedTable] = useState<string>('');
@@ -210,10 +221,16 @@ const ChatBotComp = ({ sessionId, initialMessages, onConversationActivity, onSes
         [router, t, params, currentConnection],
     );
 
-    const handleDatabaseChange = (db: string) => {
-        setActiveDatabase(db);
-        setSelectedTable('');
-    };
+    const mentionTables = useMemo(() => {
+        return (tables ?? []).filter(table => {
+            if (!sidebarConfig.supportsSchemas || !activeSchema) {
+                return true;
+            }
+
+            const tableName = (table as any).name ?? (table as any).value ?? (table as any).label ?? '';
+            return getSchemaName(tableName, sidebarConfig) === activeSchema;
+        });
+    }, [activeSchema, sidebarConfig, tables]);
 
     const handleSubmit = async (message: PromptInputMessage) => {
         const hasText = Boolean(message.text);
@@ -230,6 +247,7 @@ const ChatBotComp = ({ sessionId, initialMessages, onConversationActivity, onSes
                     ? (copilotEnvelope.context.baseline.database ?? activeDatabase ?? null)
                     : (copilotEnvelope?.context.database ?? activeDatabase ?? null)
                 : activeDatabase || null;
+        const schemaForContext = mode === 'copilot' ? (copilotEnvelope?.surface === 'table' ? (copilotEnvelope.context.table.schema ?? null) : null) : activeSchema || null;
 
         const tableForContext = mode === 'copilot' ? (copilotEnvelope?.surface === 'table' ? (copilotEnvelope.context.table.name ?? null) : null) : selectedTable || null;
 
@@ -262,6 +280,7 @@ const ChatBotComp = ({ sessionId, initialMessages, onConversationActivity, onSes
                 body: {
                     webSearch,
                     database: databaseForContext,
+                    activeSchema: schemaForContext,
                     table: tableForContext,
                     connectionId,
                     mode,
@@ -307,11 +326,13 @@ const ChatBotComp = ({ sessionId, initialMessages, onConversationActivity, onSes
                             <div className="flex items-center justify-between gap-2">
                                 <div className="flex flex-1 items-center gap-2">
                                     {mode === 'global' && (
-                                        <DatabaseSelect
-                                            className="w-auto max-w-80 border-0 shadow-none text-xs outline-0 focus-visible:ring-0"
-                                            value={activeDatabase}
-                                            databases={databases}
-                                            onChange={handleDatabaseChange}
+                                        <DatabaseSchemaSelect
+                                            onDatabaseChange={() => {
+                                                setSelectedTable('');
+                                            }}
+                                            onSchemaChange={() => {
+                                                setSelectedTable('');
+                                            }}
                                         />
                                     )}
                                 </div>
@@ -319,7 +340,11 @@ const ChatBotComp = ({ sessionId, initialMessages, onConversationActivity, onSes
 
                             <div className="flex items-start gap-2 w-full">
                                 {mode === 'global' ? (
-                                    <TableMentionTextarea value={input} onChange={setInput} tables={tables.map(t => (t as any).name ?? t)}>
+                                    <TableMentionTextarea
+                                        value={input}
+                                        onChange={setInput}
+                                        tables={mentionTables.map(table => (table as any).name ?? (table as any).value ?? (table as any).label ?? table)}
+                                    >
                                         <PromptInputTextarea
                                             placeholder={t('Input.GlobalPlaceholder')}
                                             value={input}

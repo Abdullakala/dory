@@ -15,6 +15,7 @@ type SchemaContextOptions = {
     organizationId: string;
     datasourceId: string;
     database?: string | null;
+    schema?: string | null;
     table?: string | null;
     tableSampleLimit?: number;
     columnSampleLimit?: number;
@@ -48,7 +49,16 @@ export function getDefaultSchemaSampleLimits() {
  * - Otherwise: List some representative tables, each table lists some fields.
  */
 export async function buildSchemaContext(options: SchemaContextOptions): Promise<string | null> {
-    const { userId, organizationId, datasourceId, database, table, tableSampleLimit = DEFAULT_TABLE_SAMPLE_LIMIT, columnSampleLimit = DEFAULT_COLUMN_SAMPLE_LIMIT } = options;
+    const {
+        userId,
+        organizationId,
+        datasourceId,
+        database,
+        schema,
+        table,
+        tableSampleLimit = DEFAULT_TABLE_SAMPLE_LIMIT,
+        columnSampleLimit = DEFAULT_COLUMN_SAMPLE_LIMIT,
+    } = options;
 
     try {
         const { entry, config } = await ensureConnectionPoolForUser(userId, organizationId, datasourceId, null);
@@ -65,13 +75,21 @@ export async function buildSchemaContext(options: SchemaContextOptions): Promise
         const lines: string[] = [];
 
         lines.push(`Current database: ${resolvedDatabase}`);
+        if (schema?.trim()) {
+            lines.push(`Current schema: ${schema.trim()}`);
+        }
         lines.push('Below are representative tables and columns for context; this is not a complete list.');
         lines.push('');
 
         if (table) {
             //Focus on single table mode: only display column information of the specified table
-            const columns = await fetchColumns(instance, resolvedDatabase, table, effectiveColumnLimit);
-            lines.push(`Table: ${table}`);
+            const resolvedTable = qualifyTableRef({
+                database: resolvedDatabase,
+                schema: schema?.trim() || null,
+                name: table,
+            });
+            const columns = await fetchColumns(instance, resolvedDatabase, resolvedTable, effectiveColumnLimit);
+            lines.push(`Table: ${resolvedTable}`);
             if (columns.length > 0) {
                 lines.push(`Column examples (up to ${Math.min(effectiveColumnLimit, columns.length)}):`);
                 for (const column of columns) {
@@ -90,8 +108,9 @@ export async function buildSchemaContext(options: SchemaContextOptions): Promise
             if (!tables || tables.length === 0) {
                 lines.push('No tables found.');
             } else {
-                const limitedTables = tables.slice(0, effectiveTableLimit);
-                lines.push(`Sample tables (up to ${Math.min(effectiveTableLimit, tables.length)}):`);
+                const filteredTables = schema?.trim() ? tables.filter(tableMeta => resolveSchemaName(tableMeta) === schema.trim()) : tables;
+                const limitedTables = filteredTables.slice(0, effectiveTableLimit);
+                lines.push(`Sample tables (up to ${Math.min(effectiveTableLimit, filteredTables.length)}):`);
 
                 //Concurrently pull column information from each table to avoid serial performance issues
                 const tableTasks = limitedTables.map(async (tableMeta: any) => {
@@ -133,6 +152,17 @@ export async function buildSchemaContext(options: SchemaContextOptions): Promise
     }
 }
 
+function resolveSchemaName(tableMeta: any): string | null {
+    const explicitSchema = typeof tableMeta?.schema === 'string' ? tableMeta.schema.trim() : '';
+    if (explicitSchema) {
+        return explicitSchema;
+    }
+
+    const tableName = typeof tableMeta?.value === 'string' ? tableMeta.value : typeof tableMeta?.label === 'string' ? tableMeta.label : '';
+    const parts = tableName.split('.');
+    return parts.length > 1 ? parts[0]?.trim() || null : 'public';
+}
+
 export async function buildSchemaContextForTables(options: {
     userId: string;
     organizationId: string;
@@ -161,18 +191,14 @@ export async function buildSchemaContextForTables(options: {
         lines.push('');
 
         for (const table of dedupedTables) {
-            const resolvedDatabase =
-                table.database?.trim() ||
-                (await resolveDatabaseName(instance, config.database, database, qualifyTableName(table)));
+            const resolvedDatabase = table.database?.trim() || (await resolveDatabaseName(instance, config.database, database, qualifyTableName(table)));
 
             const resolvedTable = qualifyTableRef({
                 ...table,
                 schema: table.schema?.trim() || schema?.trim() || null,
             });
 
-            lines.push(
-                `Table: ${resolvedDatabase ? `${resolvedDatabase}.` : ''}${resolvedTable}`,
-            );
+            lines.push(`Table: ${resolvedDatabase ? `${resolvedDatabase}.` : ''}${resolvedTable}`);
 
             if (!resolvedDatabase) {
                 lines.push('- <database could not be resolved>');
@@ -243,6 +269,9 @@ function dedupeSchemaTables(tables: SchemaTableRef[]): SchemaTableRef[] {
 function qualifyTableRef(table: SchemaTableRef): string {
     const schema = table.schema?.trim();
     const name = table.name.trim();
+    if (name.includes('.')) {
+        return name;
+    }
 
     if (!schema || schema === 'public') {
         return name;

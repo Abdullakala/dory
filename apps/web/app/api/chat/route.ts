@@ -52,6 +52,7 @@ async function handleChatRequest(req: NextRequest) {
         id: requestMessageId,
         messages: rawMessages,
         database,
+        activeSchema,
         table,
         tableSchema,
         connectionId: connectionIdFromBody,
@@ -64,6 +65,7 @@ async function handleChatRequest(req: NextRequest) {
         id: string;
         messages: UIMessage[];
         database?: string | null;
+        activeSchema?: string | null;
         table?: string | null;
         tableSchema?: string | null;
         connectionId?: string | null;
@@ -115,6 +117,7 @@ async function handleChatRequest(req: NextRequest) {
                   providerModel: providerModelName,
                   webSearch: Boolean(webSearch),
                   database: database ?? null,
+                  activeSchema: activeSchema ?? null,
                   table: table ?? null,
                   connectionId: connectionId ?? null,
                   tabId: tabId ?? null,
@@ -134,7 +137,7 @@ async function handleChatRequest(req: NextRequest) {
                 tabId,
                 connectionId: connectionId ?? null,
                 activeDatabase: database ?? null,
-                activeSchema: null,
+                activeSchema: activeSchema ?? null,
                 title: null,
                 settings: requestedModel ? { model: requestedModel } : null,
                 metadata: sessionMetadata ?? null,
@@ -157,7 +160,7 @@ async function handleChatRequest(req: NextRequest) {
                         userId,
                         connectionId: connectionId ?? null,
                         activeDatabase: database ?? null,
-                        activeSchema: null,
+                        activeSchema: activeSchema ?? null,
                         title: null,
                         settings: requestedModel ? { model: requestedModel } : null,
                         metadata: sessionMetadata ?? null,
@@ -171,7 +174,7 @@ async function handleChatRequest(req: NextRequest) {
                     userId,
                     connectionId: connectionId ?? null,
                     activeDatabase: database ?? null,
-                    activeSchema: null,
+                    activeSchema: activeSchema ?? null,
                     title: null,
                     settings: requestedModel ? { model: requestedModel } : null,
                     metadata: sessionMetadata ?? null,
@@ -200,6 +203,7 @@ async function handleChatRequest(req: NextRequest) {
             organizationId,
             datasourceId: connectionId,
             database,
+            schema: activeSchema,
             table,
             tableSampleLimit: defaults.table,
             columnSampleLimit: defaults.column,

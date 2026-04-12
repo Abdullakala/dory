@@ -79,8 +79,6 @@ export function useChatSessions(params: { mode: ChatMode; copilotEnvelope?: Copi
             try {
                 const { detail, messages } = await apiFetchSessionDetail(sessionId, { errorMessage: t('Errors.FetchSessionDetail') });
 
-                console.log('[chat] fetch session detail', detail, messages);
-
                 if (detail?.session) {
                     setSessions(prev => {
                         const exists = prev.some(item => item.id === detail.session.id);
@@ -188,6 +186,12 @@ export function useChatSessions(params: { mode: ChatMode; copilotEnvelope?: Copi
             const created = await apiCreateSession({ mode: 'global', connectionId, errorMessage: t('Errors.CreateSession') });
             if (created?.id) {
                 posthog.capture('chat_session_created', { session_id: created.id });
+                setSelectedSessionId(created.id);
+                setInitialMessages([]);
+                setSessions(prev => {
+                    const exists = prev.some(item => item.id === created.id);
+                    return exists ? prev : [created, ...prev];
+                });
             }
             await fetchSessions(created?.id ?? null);
         } catch (e: any) {
@@ -196,7 +200,7 @@ export function useChatSessions(params: { mode: ChatMode; copilotEnvelope?: Copi
         } finally {
             setCreatingSession(false);
         }
-    }, [mode, creatingSession, fetchSessions, t]);
+    }, [mode, creatingSession, connectionId, fetchSessions, t]);
 
     const handleSessionSelect = useCallback(
         (sessionId: string) => {

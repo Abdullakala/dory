@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/registry/new-york-v4/ui/button';
-import { Loader2, X } from 'lucide-react';
+import { X } from 'lucide-react';
 
 import ChatBotComp from './thread/chatbox';
 import ChatWelcome from './components/empty';
@@ -25,6 +25,7 @@ type ChatBotPageContentProps = {
 
 export default function ChatBotPageContent({ variant = 'sidebar', mode = 'global', copilotEnvelope = null, onClose }: ChatBotPageContentProps) {
     const [compactMode, setCompactMode] = useState<boolean>(variant === 'compact');
+    const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
     useEffect(() => setCompactMode(variant === 'compact'), [variant]);
     const t = useTranslations('Chatbot');
 
@@ -74,10 +75,8 @@ export default function ChatBotPageContent({ variant = 'sidebar', mode = 'global
         ],
     );
 
-    const pendingPromptRef = useRef<string | null>(null);
-
     const handleWelcomeSend = async (text: string) => {
-        pendingPromptRef.current = text;
+        setPendingPrompt(text);
         await chat.handleCreateSession();
     };
 
@@ -90,8 +89,8 @@ export default function ChatBotPageContent({ variant = 'sidebar', mode = 'global
         }
     };
 
-
     const hasSessions = chat.sessionsForDisplay.length > 0;
+    const shouldRenderThread = mode === 'copilot' || Boolean(chat.selectedSessionId);
 
     return (
         <div className="flex h-full relative">
@@ -107,24 +106,19 @@ export default function ChatBotPageContent({ variant = 'sidebar', mode = 'global
             )}
 
             <main className="flex-1 min-w-0 flex relative mt-10">
-                {mode === 'copilot' || chat.selectedSessionId ? (
-                    chat.loadingMessages ? (
-                        <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                            <Loader2 className="h-6 w-6 animate-spin" />
-                        </div>
-                    ) : (
-                        <ChatBotComp
-                            key={mode === 'copilot' ? (copilotEnvelope?.meta?.tabId ?? 'copilot') : chat.selectedSessionId}
-                            sessionId={chat.selectedSessionId}
-                            initialMessages={chat.initialMessages}
-                            initialPrompt={pendingPromptRef.current}
-                            onConversationActivity={chat.handleConversationActivity}
-                            onExecuteAction={onExecuteAction}
-                            onSessionCreated={sessionId => chat.setSelectedSessionId(sessionId)}
-                            mode={mode}
-                            copilotEnvelope={copilotEnvelope}
-                        />
-                    )
+                {shouldRenderThread ? (
+                    <ChatBotComp
+                        key={mode === 'copilot' ? (copilotEnvelope?.meta?.tabId ?? 'copilot') : chat.selectedSessionId}
+                        sessionId={chat.selectedSessionId}
+                        initialMessages={chat.initialMessages}
+                        initialPrompt={pendingPrompt}
+                        onInitialPromptConsumed={() => setPendingPrompt(null)}
+                        onConversationActivity={chat.handleConversationActivity}
+                        onExecuteAction={onExecuteAction}
+                        onSessionCreated={sessionId => chat.setSelectedSessionId(sessionId)}
+                        mode={mode}
+                        copilotEnvelope={copilotEnvelope}
+                    />
                 ) : (
                     <ChatWelcome
                         onSend={handleWelcomeSend}

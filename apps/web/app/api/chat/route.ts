@@ -13,7 +13,7 @@ import { buildCloudToolDeclarations } from '@/lib/ai/cloud-tools';
 import { createSqlRunnerTool, isManualExecutionRequiredSqlResult } from './sql-runner';
 import { createChartBuilderTool } from './chart-builder';
 import { MAX_HISTORY_MESSAGES, SQL_RUNNER_GUIDE, SQL_TOOL_INSTRUCTION, SYSTEM_PROMPT } from '@/lib/ai/prompts';
-import { normalizeMessage } from './utils';
+import { buildUserLanguageInstruction, extractMessageText, normalizeMessage } from './utils';
 import { newEntityId } from '@/lib/id';
 import type { CopilotEnvelopeV1 } from '@/app/(app)/[organization]/[connectionId]/chatbot/copilot/types/copilot-envelope';
 import { toPromptContext } from '@/app/(app)/[organization]/[connectionId]/chatbot/copilot/copilot-envelope';
@@ -52,6 +52,7 @@ async function handleChatRequest(req: NextRequest) {
         id: requestMessageId,
         messages: rawMessages,
         database,
+        activeSchema,
         table,
         tableSchema,
         connectionId: connectionIdFromBody,
@@ -64,6 +65,7 @@ async function handleChatRequest(req: NextRequest) {
         id: string;
         messages: UIMessage[];
         database?: string | null;
+        activeSchema?: string | null;
         table?: string | null;
         tableSchema?: string | null;
         connectionId?: string | null;
@@ -79,8 +81,12 @@ async function handleChatRequest(req: NextRequest) {
     /* ------------------------------------------------------------------ */
 
     const uiMessages: UIMessage[] = Array.isArray(rawMessages) ? rawMessages.map(normalizeMessage) : [];
-
-    const historyMessagesForModel = uiMessages.length > MAX_HISTORY_MESSAGES ? uiMessages.slice(-MAX_HISTORY_MESSAGES) : uiMessages;
+    const modelHistoryMessages = uiMessages.filter(message => (message as any)?.role !== 'tool');
+    const historyMessagesForModel =
+        modelHistoryMessages.length > MAX_HISTORY_MESSAGES ? modelHistoryMessages.slice(-MAX_HISTORY_MESSAGES) : modelHistoryMessages;
+    const currentUserMessage =
+        uiMessages.find(m => (m as any)?.id === requestMessageId && m.role === 'user') ?? [...uiMessages].reverse().find(m => m.role === 'user');
+    const currentUserText = extractMessageText(currentUserMessage);
 
     /* ------------------------------------------------------------------ */
     /* 2) auth / context                                                   */
@@ -115,6 +121,7 @@ async function handleChatRequest(req: NextRequest) {
                   providerModel: providerModelName,
                   webSearch: Boolean(webSearch),
                   database: database ?? null,
+                  activeSchema: activeSchema ?? null,
                   table: table ?? null,
                   connectionId: connectionId ?? null,
                   tabId: tabId ?? null,
@@ -134,7 +141,7 @@ async function handleChatRequest(req: NextRequest) {
                 tabId,
                 connectionId: connectionId ?? null,
                 activeDatabase: database ?? null,
-                activeSchema: null,
+                activeSchema: activeSchema ?? null,
                 title: null,
                 settings: requestedModel ? { model: requestedModel } : null,
                 metadata: sessionMetadata ?? null,
@@ -157,7 +164,7 @@ async function handleChatRequest(req: NextRequest) {
                         userId,
                         connectionId: connectionId ?? null,
                         activeDatabase: database ?? null,
-                        activeSchema: null,
+                        activeSchema: activeSchema ?? null,
                         title: null,
                         settings: requestedModel ? { model: requestedModel } : null,
                         metadata: sessionMetadata ?? null,
@@ -171,7 +178,7 @@ async function handleChatRequest(req: NextRequest) {
                     userId,
                     connectionId: connectionId ?? null,
                     activeDatabase: database ?? null,
-                    activeSchema: null,
+                    activeSchema: activeSchema ?? null,
                     title: null,
                     settings: requestedModel ? { model: requestedModel } : null,
                     metadata: sessionMetadata ?? null,
@@ -200,6 +207,7 @@ async function handleChatRequest(req: NextRequest) {
             organizationId,
             datasourceId: connectionId,
             database,
+            schema: activeSchema,
             table,
             tableSampleLimit: defaults.table,
             columnSampleLimit: defaults.column,
@@ -232,11 +240,13 @@ async function handleChatRequest(req: NextRequest) {
 
     const sqlToolSection = sqlToolEnabled ? [SQL_TOOL_INSTRUCTION, SQL_RUNNER_GUIDE].join('\n\n') : '';
 
-    const systemPrompt = [compiledSystem, SYSTEM_PROMPT, sqlToolSection, copilotContextSection, schemaSection].filter(Boolean).join('\n\n');
+    const userLanguageSection = buildUserLanguageInstruction(currentUserText, locale);
+
+    const systemPrompt = [compiledSystem, userLanguageSection, SYSTEM_PROMPT, sqlToolSection, copilotContextSection, schemaSection]
+        .filter(Boolean)
+        .join('\n\n');
 
     const modelMessages = await convertToModelMessages(historyMessagesForModel, { tools });
-
-    const currentUserMessage = uiMessages.find(m => (m as any)?.id === requestMessageId && m.role === 'user') ?? [...uiMessages].reverse().find(m => m.role === 'user');
 
     const currentUserMessageId = typeof (currentUserMessage as any)?.id === 'string' && (currentUserMessage as any).id ? (currentUserMessage as any).id : requestMessageId || null;
 
@@ -278,7 +288,7 @@ async function handleChatRequest(req: NextRequest) {
         }
     }
 
-    const useCloud = USE_CLOUD_AI;
+    const useCloud = USE_CLOUD_AI && Boolean(getCloudApiBaseUrl());
     const cloudBaseUrl = resolveCloudBaseUrl(req);
     const cloudUrl = new URL('/api/ai/stream', cloudBaseUrl).toString();
     const cloudHeaders = buildCloudForwardHeaders(req, cloudBaseUrl);

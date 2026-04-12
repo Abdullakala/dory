@@ -1,15 +1,17 @@
 import { atom } from 'jotai';
+import type { ConnectionSchemaMap } from '@/lib/connection/base/types';
 
 export interface TableSchema {
-  name: string;
-  columns: string[];
+    name: string;
+    columns: string[];
 }
 
-export interface DatabaseSchema {
-  name: string;
-  tables: TableSchema[];
-}
+export type SchemaResponse = {
+    ok?: boolean;
+    schema?: ConnectionSchemaMap;
+    error?: string;
+};
 
-export type SchemaCache = Record<string, { databases: DatabaseSchema[] }>;
+export type SchemaCache = Record<string, SchemaResponse>;
 
 export const schemaCacheAtom = atom<SchemaCache>({});

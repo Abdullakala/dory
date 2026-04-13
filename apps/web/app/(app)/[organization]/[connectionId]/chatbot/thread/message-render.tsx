@@ -613,7 +613,12 @@ const MessageRenderer = ({ message, messageIndex, messages, status, onCopySql, o
                             codeActions={
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7 rounded-full text-muted-foreground hover:bg-muted/40">
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6.5 w-6.5 rounded-full text-muted-foreground hover:bg-muted/40"
+                                        >
                                             <MoreHorizontalIcon className="size-4" />
                                         </Button>
                                     </DropdownMenuTrigger>
@@ -780,26 +785,24 @@ const MessageRenderer = ({ message, messageIndex, messages, status, onCopySql, o
                         <ChevronDownIcon className="size-3.5" />
                     </span>
                 </CollapsibleTrigger>
-                <CollapsibleContent className="pt-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:animate-in data-[state=open]:slide-in-from-top-2">
-                    <div className="space-y-2.5 border-l border-border/50 pl-3">
+                <CollapsibleContent className="pt-1 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:animate-in data-[state=open]:slide-in-from-top-2">
+                    <div className="space-y-1.5 border-l border-border/30 pl-2.5">
                         {processItems.map((item, index) => {
-                            const stepStatusCopy = getProcessStatusCopy(item.status, locale);
-
                             return (
                                 <Collapsible key={`${message.id}-process-step-${index}`} defaultOpen={item.defaultOpen ?? false} className="group/step">
                                     <div className="min-w-0">
                                         <div className="min-w-0 flex-1">
-                                            <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-md py-0.5 text-left text-[12.5px] text-muted-foreground transition-colors hover:text-foreground/80">
-                                                <span className="inline-flex min-w-0 items-center gap-1.5">
+                                            <CollapsibleTrigger className="flex w-full items-center justify-between gap-1.5 rounded-md py-0 text-left text-[12.5px] text-muted-foreground transition-colors hover:text-foreground/80">
+                                                <span className="inline-flex min-w-0 items-center gap-1">
                                                     <span className="truncate">{item.summary}</span>
                                                     <ChevronRightIcon className="size-3.5 shrink-0 group-data-[state=open]/step:hidden" />
                                                     <ChevronDownIcon className="hidden size-3.5 shrink-0 group-data-[state=open]/step:block" />
                                                 </span>
-                                                <span className="flex shrink-0 items-center gap-1">
+                                                <span className="flex shrink-0 items-center gap-0.5">
                                                     {item.actions}
                                                 </span>
                                             </CollapsibleTrigger>
-                                            <CollapsibleContent className="pt-2">
+                                            <CollapsibleContent className="pt-1">
                                                 <div className="min-w-0 pl-0.5">{item.content}</div>
                                             </CollapsibleContent>
                                         </div>

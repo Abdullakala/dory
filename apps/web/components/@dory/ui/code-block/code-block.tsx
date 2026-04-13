@@ -144,7 +144,7 @@ export function SmartCodeBlock({
         );
 
     return (
-        <div className={cn('flex flex-col gap-2', className)}>
+        <div className={cn('flex flex-col gap-1.5', className)}>
             {label && <span className="text-xs font-medium text-muted-foreground">{label}</span>}
 
             <div
@@ -156,7 +156,7 @@ export function SmartCodeBlock({
             >
                 <div
                     className={cn(
-                        'absolute right-2 top-2 z-10 flex items-center gap-1',
+                        'absolute right-1 top-1 z-10 flex items-center gap-0.5',
                         'opacity-0 transition-opacity group-hover:opacity-100',
                         (copied || actions) && 'opacity-100',
                     )}
@@ -166,7 +166,7 @@ export function SmartCodeBlock({
                         size="icon"
                         variant={variant === 'soft' ? 'ghost' : 'outline'}
                         className={cn(
-                            'h-7 w-7 rounded-full bg-background/80 shadow-sm',
+                            'h-6 w-6 rounded-full bg-background/68 shadow-sm backdrop-blur-[2px]',
                             variant === 'soft' || variant === 'bare' ? 'border-0' : 'border',
                         )}
                         onClick={handleCopy}
@@ -179,7 +179,7 @@ export function SmartCodeBlock({
                 <div
                     className={cn(
                         'relative overflow-auto',
-                        variant === 'soft' ? 'rounded-xl bg-transparent p-4' : variant === 'bare' ? 'rounded-lg bg-transparent px-3 py-2.5' : 'rounded-lg bg-card p-3',
+                        variant === 'soft' ? 'rounded-xl bg-transparent p-4' : variant === 'bare' ? 'rounded-lg bg-transparent px-2 py-1.5' : 'rounded-lg bg-card p-3',
                         maxHeightClassName,
                     )}
                 >

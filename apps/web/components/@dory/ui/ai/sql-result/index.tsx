@@ -213,17 +213,17 @@ export const SqlResultCard = React.memo(function SqlResultCard({
     const actionStyles = useMemo(() => getSqlResultActionStyles(mode), [mode]);
 
     const resultBody = (
-        <CardContent className="space-y-3 px-0 pb-0 pt-2">
+        <CardContent className="space-y-2.5 px-0 pb-0 pt-1">
             {ok ? (
                 previewRows.length > 0 ? (
-                    <div className="overflow-hidden rounded-xl border border-border/40 bg-muted/18">
+                    <div className="overflow-hidden rounded-xl border border-border/35 bg-muted/16">
                         <ScrollArea className="h-56 w-full">
                             <div className="w-full overflow-x-auto">
                                 <table className="w-full min-w-max text-sm">
-                                    <thead className="sticky top-0 z-10 bg-muted/45">
+                                    <thead className="sticky top-0 z-10 bg-muted/40">
                                         <tr>
                                             {displayColumns.map(col => (
-                                                <th key={col} className="border-b border-border/50 px-4 py-2.5 text-left text-[12px] font-medium text-muted-foreground">
+                                                <th key={col} className="border-b border-border/45 px-4 py-2 text-left text-[12px] font-medium text-muted-foreground">
                                                     {col}
                                                 </th>
                                             ))}
@@ -234,7 +234,7 @@ export const SqlResultCard = React.memo(function SqlResultCard({
                                         {previewRows.map((row, rowIndex) => (
                                             <tr key={rowIndex} className="even:bg-muted/[0.16]">
                                                 {displayColumns.map(col => (
-                                                    <td key={col} className="border-b border-border/40 px-4 py-2.5 align-top">
+                                                    <td key={col} className="border-b border-border/35 px-4 py-2 align-top">
                                                         <span className="text-[12px] font-mono leading-6 text-foreground/80">{formatCellValue((row as any)[col])}</span>
                                                     </td>
                                                 ))}

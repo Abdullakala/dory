@@ -15,9 +15,20 @@ import { ChartResultCard, ChartResultPart } from '../charts-result';
 import { buildAutoChartFromSql } from '../utils/auto-charts';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/registry/new-york-v4/ui/tooltip';
 import { useTranslations } from 'next-intl';
-import { SqlResultPart, SqlResultCardProps } from './type';
+import { SqlResultPart, SqlResultBodyProps, SqlResultCardProps } from './type';
 import { SmartCodeBlock } from '@/components/@dory/ui/code-block/code-block';
 import { getSqlResultActionStyles } from './style';
+import { cn } from '@/lib/utils';
+
+export function SqlStatementBlock({ sql, onCopy, actions, className }: { sql: string; onCopy: (sql: string) => void; actions?: React.ReactNode; className?: string }) {
+    if (!sql.trim()) return null;
+
+    return (
+        <div className={cn('w-full', className)}>
+            <SmartCodeBlock value={sql} maxHeightClassName="max-h-36" variant="bare" onCopy={() => onCopy(sql)} actions={actions} />
+        </div>
+    );
+}
 
 function formatCellValue(value: unknown): string {
     if (value === null || value === undefined) return 'NULL';
@@ -95,53 +106,28 @@ function buildFollowUpPrompt(result: SqlResultPart, t: (key: string, values?: Re
     return t('SqlResult.FollowUp.SuccessPrompt', { sql, metaLine });
 }
 
-export const SqlResultCard = React.memo(function SqlResultCard({
+export const SqlResultBody = React.memo(function SqlResultBody({
     result,
-    onCopy,
     onManualExecute,
     onFollowUp,
     footerActions,
     manualPrimaryAction,
     manualMenuActions,
     mode = 'global',
-    hideHeader = false,
-    codeActions,
-}: SqlResultCardProps) {
+    embedded = false,
+}: SqlResultBodyProps) {
     const t = useTranslations('DoryUI');
     const { sql, database, ok, manualExecution, previewRows = [], columns, rowCount, truncated, durationMs, error, timestamp } = result;
     const requiresManualExecution = manualExecution?.required === true;
-    const shouldDefaultOpen = !ok || requiresManualExecution;
-
     const [chartResult, setChartResult] = useState<ChartResultPart | null>(null);
     const [chartError, setChartError] = useState<string | null>(null);
-    const [open, setOpen] = useState(shouldDefaultOpen);
 
     const displayColumns = useMemo(() => computeDisplayColumns(columns, previewRows, t('SqlResult.ColumnPlaceholder')), [columns, previewRows, t]);
 
     const csvPreview = useMemo(() => buildCsvFromPreview(displayColumns, previewRows), [displayColumns, previewRows]);
     const canExportCsv = Boolean(csvPreview);
-    const runLabel = t('SqlResult.Actions.Run');
-    const statusText = ok ? t('SqlResult.Status.Success') : requiresManualExecution ? t('SqlResult.Status.Blocked') : t('SqlResult.Status.Failed');
-    const statusDotClass = ok ? 'text-muted-foreground' : 'text-destructive/70';
-
     const canVisualize = ok && previewRows.length > 0;
     const formattedTimestamp = useMemo(() => formatTimestamp(timestamp), [timestamp]);
-    const metaInfoItems = useMemo(() => {
-        const items: string[] = [];
-        if (database) {
-            items.push(t('SqlResult.Meta.Database', { database }));
-        }
-        if (typeof rowCount === 'number') {
-            items.push(t('SqlResult.Meta.RowCount', { rowCount }));
-        }
-        if (typeof durationMs === 'number') {
-            items.push(t('SqlResult.Meta.Duration', { durationMs }));
-        }
-        if (formattedTimestamp) {
-            items.push(t('SqlResult.Meta.Timestamp', { timestamp: formattedTimestamp }));
-        }
-        return items;
-    }, [database, durationMs, formattedTimestamp, rowCount, t]);
     const handleDownloadCsv = useCallback(() => {
         if (!csvPreview) return;
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -187,8 +173,7 @@ export const SqlResultCard = React.memo(function SqlResultCard({
     useEffect(() => {
         setChartResult(null);
         setChartError(null);
-        setOpen(shouldDefaultOpen);
-    }, [result, shouldDefaultOpen]);
+    }, [result]);
 
     const handleGenerateChart = () => {
         const nextChart = buildAutoChartFromSql(result, {
@@ -213,14 +198,18 @@ export const SqlResultCard = React.memo(function SqlResultCard({
     const actionStyles = useMemo(() => getSqlResultActionStyles(mode), [mode]);
 
     const resultBody = (
-        <CardContent className="space-y-2.5 px-0 pb-0 pt-1">
+        <CardContent className={embedded ? 'space-y-2.5 px-0 pb-0 pt-0' : 'space-y-2.5 px-0 pb-0 pt-1'}>
             {ok ? (
                 previewRows.length > 0 ? (
-                    <div className="overflow-hidden rounded-xl border border-border/35 bg-muted/16">
+                    <div
+                        className={
+                            embedded ? 'overflow-hidden rounded-lg border border-border/45 bg-background/70' : 'overflow-hidden rounded-xl border border-border/35 bg-muted/16'
+                        }
+                    >
                         <ScrollArea className="h-56 w-full">
                             <div className="w-full overflow-x-auto">
                                 <table className="w-full min-w-max text-sm">
-                                    <thead className="sticky top-0 z-10 bg-muted/40">
+                                    <thead className={embedded ? 'sticky top-0 z-10 bg-muted/25' : 'sticky top-0 z-10 bg-muted/40'}>
                                         <tr>
                                             {displayColumns.map(col => (
                                                 <th key={col} className="border-b border-border/45 px-4 py-2 text-left text-[12px] font-medium text-muted-foreground">
@@ -245,7 +234,9 @@ export const SqlResultCard = React.memo(function SqlResultCard({
                             </div>
                         </ScrollArea>
 
-                        {truncated && <div className="border-t border-border/40 px-4 py-2.5 text-[11px] text-muted-foreground">{t('SqlResult.Truncated', { count: previewRows.length })}</div>}
+                        {truncated && (
+                            <div className="border-t border-border/40 px-4 py-2.5 text-[11px] text-muted-foreground">{t('SqlResult.Truncated', { count: previewRows.length })}</div>
+                        )}
                     </div>
                 ) : (
                     <div className="text-sm text-muted-foreground">{t('SqlResult.NoRows')}</div>
@@ -306,15 +297,135 @@ export const SqlResultCard = React.memo(function SqlResultCard({
         </CardContent>
     );
 
+    return (
+        <>
+            {resultBody}
+            {chartResult && <ChartResultCard result={chartResult} source="auto" onFollowUp={onFollowUp} />}
+        </>
+    );
+});
+
+export const SqlResultCard = React.memo(function SqlResultCard({
+    result,
+    onCopy,
+    onManualExecute,
+    onFollowUp,
+    footerActions,
+    manualPrimaryAction,
+    manualMenuActions,
+    mode = 'global',
+    hideHeader = false,
+    codeActions,
+    embedded = false,
+}: SqlResultCardProps) {
+    const t = useTranslations('DoryUI');
+    const { sql, database, ok, manualExecution, rowCount, durationMs, timestamp, previewRows = [], columns } = result;
+    const requiresManualExecution = manualExecution?.required === true;
+    const shouldDefaultOpen = !ok || requiresManualExecution;
+    const [open, setOpen] = useState(shouldDefaultOpen);
+    const actionStyles = useMemo(() => getSqlResultActionStyles(mode), [mode]);
+    const statusText = ok ? t('SqlResult.Status.Success') : requiresManualExecution ? t('SqlResult.Status.Blocked') : t('SqlResult.Status.Failed');
+    const statusDotClass = ok ? 'text-muted-foreground' : 'text-destructive/70';
+    const formattedTimestamp = useMemo(() => formatTimestamp(timestamp), [timestamp]);
+    const displayColumns = useMemo(() => computeDisplayColumns(columns, previewRows, t('SqlResult.ColumnPlaceholder')), [columns, previewRows, t]);
+    const csvPreview = useMemo(() => buildCsvFromPreview(displayColumns, previewRows), [displayColumns, previewRows]);
+    const canExportCsv = Boolean(csvPreview);
+    const canVisualize = ok && previewRows.length > 0;
+    const metaInfoItems = useMemo(() => {
+        const items: string[] = [];
+        if (database) {
+            items.push(t('SqlResult.Meta.Database', { database }));
+        }
+        if (typeof rowCount === 'number') {
+            items.push(t('SqlResult.Meta.RowCount', { rowCount }));
+        }
+        if (typeof durationMs === 'number') {
+            items.push(t('SqlResult.Meta.Duration', { durationMs }));
+        }
+        if (formattedTimestamp) {
+            items.push(t('SqlResult.Meta.Timestamp', { timestamp: formattedTimestamp }));
+        }
+        return items;
+    }, [database, durationMs, formattedTimestamp, rowCount, t]);
+    const runLabel = t('SqlResult.Actions.Run');
+
+    const handleGenerateChart = useCallback(() => {
+        const nextChart = buildAutoChartFromSql(result, {
+            title: t('SqlResult.AutoChart.Title'),
+            description: t('SqlResult.AutoChart.Description'),
+        });
+        if (!nextChart) {
+            toast.error(t('SqlResult.ChartUnavailable'));
+            return;
+        }
+    }, [result, t]);
+
+    const handleFollowUpClick = useCallback(() => {
+        if (!onFollowUp) return;
+        const prompt = buildFollowUpPrompt(result, t as any);
+        onFollowUp(prompt);
+    }, [onFollowUp, result, t]);
+
+    const handleDownloadCsv = useCallback(() => {
+        if (!csvPreview) return;
+        const timestampValue = new Date().toISOString().replace(/[:.]/g, '-');
+        const fileName = `sql-result-${timestampValue}.csv`;
+        const blob = new Blob([csvPreview], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = fileName;
+        anchor.click();
+        URL.revokeObjectURL(url);
+    }, [csvPreview]);
+
+    const handleCopyResults = useCallback(async () => {
+        if (!csvPreview) return;
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(csvPreview);
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = csvPreview;
+                ta.setAttribute('readonly', 'true');
+                ta.style.position = 'fixed';
+                ta.style.top = '0';
+                ta.style.left = '0';
+                ta.style.opacity = '0';
+                ta.style.pointerEvents = 'none';
+                document.body.appendChild(ta);
+                ta.select();
+                try {
+                    document.execCommand('copy');
+                } finally {
+                    document.body.removeChild(ta);
+                }
+            }
+            toast.success(t('SqlResult.Actions.ResultsCopied'));
+        } catch (error) {
+            console.error(error);
+            toast.error(t('Errors.CopySqlFailed'));
+        }
+    }, [csvPreview, t]);
+
+    useEffect(() => {
+        setOpen(shouldDefaultOpen);
+    }, [result, shouldDefaultOpen]);
+
     if (hideHeader) {
         return (
-            <>
-                <div className="mt-1 space-y-2">
-                    <SmartCodeBlock value={sql} maxHeightClassName="max-h-36" variant="bare" onCopy={() => onCopy(sql)} actions={codeActions} />
-                    {resultBody}
-                </div>
-                {chartResult && <ChartResultCard result={chartResult} source="auto" onFollowUp={onFollowUp} />}
-            </>
+            <div className={embedded ? 'space-y-2' : 'mt-1 space-y-2'}>
+                <SqlResultBody
+                    result={result}
+                    onManualExecute={onManualExecute}
+                    onFollowUp={onFollowUp}
+                    footerActions={footerActions}
+                    manualPrimaryAction={manualPrimaryAction}
+                    manualMenuActions={manualMenuActions}
+                    mode={mode}
+                    embedded={embedded}
+                />
+            </div>
         );
     }
 
@@ -413,15 +524,24 @@ export const SqlResultCard = React.memo(function SqlResultCard({
                         </div>
 
                         <CollapsibleContent className="space-y-2">
-                            <SmartCodeBlock value={sql} maxHeightClassName="max-h-36" variant="bare" onCopy={() => onCopy(sql)} actions={codeActions} />
+                            <SqlStatementBlock sql={sql} onCopy={onCopy} actions={codeActions} />
                         </CollapsibleContent>
                     </CardHeader>
 
-                    <CollapsibleContent>{resultBody}</CollapsibleContent>
+                    <CollapsibleContent>
+                        <SqlResultBody
+                            result={result}
+                            onManualExecute={onManualExecute}
+                            onFollowUp={onFollowUp}
+                            footerActions={footerActions}
+                            manualPrimaryAction={manualPrimaryAction}
+                            manualMenuActions={manualMenuActions}
+                            mode={mode}
+                            embedded={embedded}
+                        />
+                    </CollapsibleContent>
                 </Card>
             </Collapsible>
-
-            {chartResult && <ChartResultCard result={chartResult} source="auto" onFollowUp={onFollowUp} />}
         </>
     );
 });

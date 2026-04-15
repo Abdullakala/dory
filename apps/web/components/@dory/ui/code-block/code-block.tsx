@@ -25,7 +25,7 @@ interface SmartCodeBlockProps {
     maxHeightClassName?: string;
     theme?: SyntaxHighlighterProps['style'];
     className?: string;
-    variant?: 'default' | 'soft' | 'bare';
+    variant?: 'default' | 'soft' | 'bare' | 'codex';
     forceThemeMode?: 'light' | 'dark';
     onCopy?: () => void;
     actions?: React.ReactNode;
@@ -150,7 +150,13 @@ export function SmartCodeBlock({
             <div
                 className={cn(
                     'relative group overflow-hidden',
-                    variant === 'soft' ? 'rounded-xl bg-muted/50' : variant === 'bare' ? 'rounded-lg bg-transparent' : 'rounded-lg border bg-muted/40',
+                    variant === 'codex'
+                        ? 'rounded-none bg-muted/38'
+                        : variant === 'soft'
+                          ? 'rounded-xl bg-muted/50'
+                          : variant === 'bare'
+                            ? 'rounded-lg bg-transparent'
+                            : 'rounded-lg border bg-muted/40',
                     maxHeightClassName,
                 )}
             >
@@ -164,14 +170,20 @@ export function SmartCodeBlock({
                     <Button
                         type="button"
                         size="icon"
-                        variant={variant === 'soft' ? 'ghost' : 'outline'}
+                        variant={variant === 'soft' || variant === 'codex' ? 'ghost' : 'outline'}
                         className={cn(
-                            'h-6 w-6 rounded-full bg-background/68 shadow-sm backdrop-blur-[2px]',
-                            variant === 'soft' || variant === 'bare' ? 'border-0' : 'border',
+                            variant === 'bare'
+                                ? 'h-5 w-5 rounded-full bg-background/68 shadow-sm backdrop-blur-[2px]'
+                                : 'h-6 w-6 rounded-full bg-background/68 shadow-sm backdrop-blur-[2px]',
+                            variant === 'soft' || variant === 'bare' || variant === 'codex' ? 'border-0' : 'border',
                         )}
                         onClick={handleCopy}
                     >
-                        {copied ? <Check className="h-2 w-2 text-xs" /> : <Copy className="h-2 w-2 text-xs" />}
+                        {copied ? (
+                            <Check className={variant === 'bare' ? 'h-2.5 w-2.5' : 'h-2 w-2 text-xs'} />
+                        ) : (
+                            <Copy className={variant === 'bare' ? 'h-2.5 w-2.5' : 'h-2 w-2 text-xs'} />
+                        )}
                     </Button>
                     {actions}
                 </div>
@@ -179,7 +191,13 @@ export function SmartCodeBlock({
                 <div
                     className={cn(
                         'relative overflow-auto',
-                        variant === 'soft' ? 'rounded-xl bg-transparent p-4' : variant === 'bare' ? 'rounded-lg bg-transparent px-2 py-1.5' : 'rounded-lg bg-card p-3',
+                        variant === 'codex'
+                            ? 'rounded-none bg-transparent px-5 py-4'
+                            : variant === 'soft'
+                              ? 'rounded-xl bg-transparent p-4'
+                              : variant === 'bare'
+                                ? 'rounded-lg bg-transparent px-2 py-1.5'
+                                : 'rounded-lg bg-card p-3',
                         maxHeightClassName,
                     )}
                 >

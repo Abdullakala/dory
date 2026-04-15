@@ -11,15 +11,7 @@ import { CodeBlock } from './code-block';
 
 export type ToolProps = ComponentProps<typeof Collapsible>;
 
-export const Tool = ({ className, ...props }: ToolProps) => (
-    <Collapsible
-        className={cn(
-            'group not-prose mb-2 w-full overflow-hidden',
-            className,
-        )}
-        {...props}
-    />
-);
+export const Tool = ({ className, ...props }: ToolProps) => <Collapsible className={cn('group not-prose mb-2 w-full overflow-hidden', className)} {...props} />;
 
 export type ToolPart = ToolUIPart | DynamicToolUIPart;
 
@@ -68,18 +60,10 @@ export const ToolHeader = ({ className, title, type, state, toolName, ...props }
     const derivedName = type === 'dynamic-tool' ? toolName : type.split('-').slice(1).join('-');
 
     return (
-        <CollapsibleTrigger
-            className={cn(
-                'flex w-full items-center justify-between gap-3 rounded-lg py-1 text-left text-muted-foreground transition-colors hover:text-foreground/80',
-                className,
-            )}
-            {...props}
-        >
+        <CollapsibleTrigger className={cn('flex w-full items-center gap-2 py-1 text-left text-muted-foreground transition-colors hover:text-foreground/80', className)} {...props}>
             <div className="flex min-w-0 items-center gap-2">
                 <span className="truncate text-[13px] leading-5">{title ?? derivedName}</span>
                 {getStatusBadge(state)}
-            </div>
-            <div className="shrink-0 text-muted-foreground/80">
                 <ChevronRightIcon className="size-3.5 group-data-[state=open]:hidden" />
                 <ChevronDownIcon className="hidden size-3.5 group-data-[state=open]:block" />
             </div>

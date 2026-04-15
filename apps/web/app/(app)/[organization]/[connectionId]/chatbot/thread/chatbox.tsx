@@ -44,64 +44,25 @@ type ChatBotCompProps = {
     onExecuteAction?: CopilotActionExecutor;
 };
 
-function isToolLikePart(part: any) {
+function isToolCallPart(part: any) {
     if (!part || typeof part !== 'object') return false;
     if (part.type === 'tool-call' || part.type === 'tool_call') return true;
-    if (part.type === 'tool-result' || part.type === 'tool_result' || part.type === 'tool-error') return true;
-    return typeof part.type === 'string' && part.type.startsWith('tool-');
+    return typeof part.type === 'string' && part.type.startsWith('tool-') && part.input && part.state === 'input-available';
 }
 
-function aggregateConversationMessages(messages: UIMessage[]): UIMessage[] {
-    const aggregated: UIMessage[] = [];
-    let pendingTurn: UIMessage[] = [];
-
-    const flushPendingTurn = () => {
-        if (!pendingTurn.length) return;
-
-        const assistantMessages = pendingTurn.filter(message => message.role === 'assistant');
-        const finalAssistant =
-            [...assistantMessages].reverse().find(
-                message =>
-                    Array.isArray((message as any).parts) &&
-                    (message as any).parts.some((part: any) => {
-                        if (part?.type === 'text' && part.text?.trim()) return true;
-                        if (part?.type === 'reasoning' && part.text?.trim()) return true;
-                        if (part?.type === 'source-url') return true;
-                        return false;
-                    }),
-            ) ??
-            assistantMessages.at(-1) ??
-            pendingTurn.at(-1);
-
-        const toolParts = pendingTurn.flatMap(message => (Array.isArray((message as any).parts) ? (message as any).parts.filter((part: any) => isToolLikePart(part)) : []));
-
-        const finalParts = Array.isArray((finalAssistant as any)?.parts) ? (finalAssistant as any).parts.filter((part: any) => !isToolLikePart(part)) : [];
-
-        const mergedMessage: UIMessage = {
-            id: String(finalAssistant?.id ?? pendingTurn.at(-1)?.id ?? `aggregated-${aggregated.length}`),
-            role: 'assistant',
-            parts: [...toolParts, ...finalParts] as UIMessage['parts'],
-            ...(finalAssistant?.metadata ? { metadata: finalAssistant.metadata } : {}),
-        };
-
-        aggregated.push(mergedMessage);
-        pendingTurn = [];
-    };
-
-    messages.forEach(message => {
-        if (message.role === 'user') {
-            flushPendingTurn();
-            aggregated.push(message);
-            return;
-        }
-
-        pendingTurn.push(message);
-    });
-
-    flushPendingTurn();
-
-    return aggregated;
+function getToolPartKey(part: any, fallback: string) {
+    if (!part || typeof part !== 'object') return fallback;
+    if (typeof part.callId === 'string') return part.callId;
+    if (typeof part.toolCallId === 'string') return part.toolCallId;
+    return fallback;
 }
+
+type PersistedToolCallSnapshot = {
+    key: string;
+    messageId: string;
+    part: any;
+    firstSeenOrder: number;
+};
 
 const ChatBotComp = ({
     sessionId,
@@ -143,6 +104,7 @@ const ChatBotComp = ({
     const appliedInitialRef = useRef<string | null>(null);
     const sessionRef = useRef<string>(chatStateId);
     const activityRef = useRef(false);
+    const [persistedToolCalls, setPersistedToolCalls] = useState<PersistedToolCallSnapshot[]>([]);
 
     const hasAssistantContent = messages.some(m => {
         if (m.role !== 'assistant') return false;
@@ -157,12 +119,37 @@ const ChatBotComp = ({
     });
 
     const showGlobalLoader = status === 'submitted' || (status === 'streaming' && !hasAssistantContent);
-    const renderedMessages = useMemo(() => aggregateConversationMessages(messages as UIMessage[]), [messages]);
+    const renderedMessages = useMemo(() => {
+        return (messages as UIMessage[]).map(message => {
+            if (message.role !== 'assistant' || !Array.isArray((message as any).parts)) {
+                return message;
+            }
+
+            const currentToolCallKeys = new Set(
+                (message.parts ?? []).map((part: any, index: number) => (isToolCallPart(part) ? getToolPartKey(part, `${message.id}:live:${index}`) : null)).filter(Boolean),
+            );
+
+            const persistedParts = persistedToolCalls
+                .filter(snapshot => snapshot.messageId === String(message.id) && !currentToolCallKeys.has(snapshot.key))
+                .sort((a, b) => a.firstSeenOrder - b.firstSeenOrder)
+                .map(snapshot => snapshot.part);
+
+            if (persistedParts.length === 0) {
+                return message;
+            }
+
+            return {
+                ...message,
+                parts: [...persistedParts, ...(message.parts ?? [])],
+            };
+        });
+    }, [messages, persistedToolCalls]);
 
     useEffect(() => {
         if (sessionRef.current !== chatStateId) {
             sessionRef.current = chatStateId;
             appliedInitialRef.current = null;
+            setPersistedToolCalls([]);
         }
 
         const key = initialMessages.map(message => message.id).join('|');
@@ -171,6 +158,44 @@ const ChatBotComp = ({
             appliedInitialRef.current = key;
         }
     }, [chatStateId, initialMessages, setMessages]);
+
+    useEffect(() => {
+        setPersistedToolCalls(previous => {
+            const next = [...previous];
+            const existingKeys = new Set(previous.map(snapshot => snapshot.key));
+            let changed = false;
+
+            (messages as UIMessage[]).forEach(message => {
+                (message.parts ?? []).forEach((part: any, index: number) => {
+                    if (!isToolCallPart(part)) {
+                        return;
+                    }
+
+                    const key = getToolPartKey(part, `${message.id}:seen:${index}`);
+                    if (existingKeys.has(key)) {
+                        return;
+                    }
+
+                    next.push({
+                        key,
+                        messageId: String(message.id),
+                        part,
+                        firstSeenOrder: next.length,
+                    });
+                    existingKeys.add(key);
+                    changed = true;
+                });
+            });
+
+            const liveMessageIds = new Set((messages as UIMessage[]).map(message => String(message.id)));
+            const filtered = next.filter(snapshot => liveMessageIds.has(snapshot.messageId));
+            if (filtered.length !== next.length) {
+                changed = true;
+            }
+
+            return changed ? filtered : previous;
+        });
+    }, [messages]);
 
     useEffect(() => {
         if (status === 'submitted' || status === 'streaming') {

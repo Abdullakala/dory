@@ -103,7 +103,7 @@
             "ForgotPassword": "忘记密码？",
             "Submitting": "正在登录…",
             "Submit": "登录",
-            "DemoEnter": "以访客身份继续",
+            "DemoEnter": "以演示账号登录",
             "OrContinueWith": "或使用以下方式继续",
             "LoginWithGithub": "使用 GitHub 登录",
             "LoginWithGoogle": "使用 Google 登录",
@@ -119,6 +119,10 @@
                 "Confirm": "创建访客工作区",
                 "Cancel": "返回",
                 "StartFailed": "启动访客工作区失败"
+            },
+            "Demo": {
+                "Action": "以演示账号登录",
+                "StartFailed": "以演示账号登录失败"
             },
             "ContinueAgreement": "继续即表示你同意我们的",
             "Terms": "服务条款",

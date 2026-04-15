@@ -99,7 +99,7 @@
             "ForgotPassword": "¿Olvidaste tu contraseña?",
             "Submitting": "Iniciando sesión…",
             "Submit": "Entrar",
-            "DemoEnter": "Continuar como invitado",
+            "DemoEnter": "Entrar como demo",
             "OrContinueWith": "O continuar con",
             "LoginWithGithub": "Entrar con GitHub",
             "LoginWithGoogle": "Entrar con Google",
@@ -115,6 +115,10 @@
                 "Confirm": "Crear espacio de trabajo de invitado",
                 "Cancel": "Volver",
                 "StartFailed": "No se pudo iniciar el espacio de trabajo de invitado"
+            },
+            "Demo": {
+                "Action": "Entrar como demo",
+                "StartFailed": "No se pudo iniciar sesión como demo"
             },
             "ContinueAgreement": "Al hacer clic en continuar, aceptas nuestros",
             "Terms": "Términos del servicio",

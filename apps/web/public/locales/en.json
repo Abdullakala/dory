@@ -99,7 +99,7 @@
             "ForgotPassword": "Forgot your password?",
             "Submitting": "Signing in…",
             "Submit": "Login",
-            "DemoEnter": "Continue as guest",
+            "DemoEnter": "Sign in as demo",
             "OrContinueWith": "Or continue with",
             "LoginWithGithub": "Login with Github",
             "LoginWithGoogle": "Login with Google",
@@ -115,6 +115,10 @@
                 "Confirm": "Create guest workspace",
                 "Cancel": "Back",
                 "StartFailed": "Failed to start guest workspace"
+            },
+            "Demo": {
+                "Action": "Sign in as demo",
+                "StartFailed": "Failed to sign in as demo"
             },
             "ContinueAgreement": "By clicking continue, you agree to our",
             "Terms": "Terms of Service",

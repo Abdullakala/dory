@@ -383,7 +383,7 @@ const ChatBotComp = ({
     return (
         <div className="relative flex h-full w-full flex-col p-4">
             <Conversation className="min-h-0 flex-1" contextRef={handleStickToBottomContextRef}>
-                <ConversationContent className="mx-auto w-full max-w-5xl gap-6 px-2 pb-6 pt-2 lg:px-4 lg:pt-4">
+                <ConversationContent className="mx-auto w-full max-w-5xl gap-2 px-2 pb-6 pt-2 lg:px-4 lg:pt-4">
                     {renderedMessages.map((message, messageIndex) => (
                         <MessageRenderer
                             key={message.id}

@@ -69,7 +69,7 @@ export const ToolHeader = ({ className, title, type, state, toolName, ...props }
 
     return (
         <CollapsibleTrigger
-            className={cn('flex w-full items-center gap-1.5 py-1 text-left text-muted-foreground/70 transition-colors hover:text-muted-foreground/90', className)}
+            className={cn('flex w-full items-center gap-1.5 py-1 text-left transition-colors hover:text-muted-foreground/90', className)}
             {...props}
         >
             <div className="flex min-w-0 flex-1 items-center gap-1.5">

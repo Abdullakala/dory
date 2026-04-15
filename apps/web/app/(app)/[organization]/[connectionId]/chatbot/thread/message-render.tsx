@@ -487,7 +487,7 @@ const MessageRenderer = ({ message, messageIndex, messages, status, onCopySql, o
         const defaultOpen = state !== 'output-available';
 
         return (
-            <Tool key={key} defaultOpen={defaultOpen} className="mb-0 border-border/60 bg-background/80 shadow-none">
+            <Tool key={key} defaultOpen={defaultOpen} className="mb-0 border-border/60 shadow-none">
                 <ToolHeader type="dynamic-tool" state={state} toolName={title} title={title} />
                 <ToolContent>
                     {inputContent ?? (input !== undefined ? <ToolInput input={input} /> : null)}
@@ -855,7 +855,7 @@ const MessageRenderer = ({ message, messageIndex, messages, status, onCopySql, o
 
             return (
                 <Collapsible key={item.key} defaultOpen={item.defaultOpen ?? false} className="group/step overflow-hidden">
-                    <div className="rounded-xl border border-border/50 bg-muted/[0.18] px-3 py-2">
+                    <div className="px-1 py-1.5">
                         <div className="min-w-0">
                             <div className="min-w-0 flex-1">
                                 <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-[12.5px] text-muted-foreground transition-colors hover:text-foreground/80">

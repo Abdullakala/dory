@@ -257,17 +257,22 @@ export function useSQLTabs() {
     // ---------------------------------------------------
     
     // ---------------------------------------------------
-    const updateTab = (
+    const updateTab = useCallback((
         tabId: string,
         patch: Partial<UITabPayload>,
         options?: { immediate?: boolean },
     ) => {
-        const nextTabs = tabs.map(t =>
-            t.tabId === tabId ? ({ ...t, ...patch } as UITabPayload) : t,
-        );
-        setTabs(nextTabs);
+        let updated: UITabPayload | undefined;
 
-        const updated = nextTabs.find(t => t.tabId === tabId);
+        setTabs(prevTabs => {
+            const nextTabs = prevTabs.map(t => {
+                if (t.tabId !== tabId) return t;
+                updated = { ...t, ...patch } as UITabPayload;
+                return updated;
+            });
+            return nextTabs;
+        });
+
         if (!updated) return;
 
         if (options?.immediate) {
@@ -280,7 +285,7 @@ export function useSQLTabs() {
                 debouncedSaveRef.current(tabId, updated);
             }
         }
-    };
+    }, [setTabs]);
 
     // ---------------------------------------------------
     

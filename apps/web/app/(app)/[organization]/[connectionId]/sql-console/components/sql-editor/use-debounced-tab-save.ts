@@ -25,6 +25,7 @@ export function useDebouncedTabSave(updateTab: UpdateTab) {
 
     useEffect(() => {
         return () => {
+            debouncedSave.flush();
             debouncedSave.cancel();
         };
     }, [debouncedSave]);

@@ -12,7 +12,7 @@ import { fetchCloudUiMessageStream, type CloudStreamRequest } from '@/lib/ai/clo
 import { buildCloudToolDeclarations } from '@/lib/ai/cloud-tools';
 import { createSqlRunnerTool, isManualExecutionRequiredSqlResult } from './sql-runner';
 import { createChartBuilderTool } from './chart-builder';
-import { MAX_HISTORY_MESSAGES, SQL_RUNNER_GUIDE, SQL_TOOL_INSTRUCTION, SYSTEM_PROMPT } from '@/lib/ai/prompts';
+import { buildDialectSqlPrompt, MAX_HISTORY_MESSAGES, SYSTEM_PROMPT } from '@/lib/ai/prompts';
 import { buildUserLanguageInstruction, extractMessageText, normalizeMessage } from './utils';
 import { newEntityId } from '@/lib/id';
 import type { CopilotEnvelopeV1 } from '@/app/(app)/[organization]/[connectionId]/chatbot/copilot/types/copilot-envelope';
@@ -23,6 +23,7 @@ import { resolveCurrentOrganizationId } from '@/lib/auth/current-organization';
 import { USE_CLOUD_AI } from '@/app/config/app';
 import { buildCloudForwardHeaders } from '@/app/api/utils/cloud-ai-proxy';
 import { getCloudApiBaseUrl } from '@/lib/cloud/url';
+import type { ConnectionType } from '@/types/connections';
 
 export const runtime = 'nodejs';
 
@@ -56,6 +57,7 @@ async function handleChatRequest(req: NextRequest) {
         table,
         tableSchema,
         connectionId: connectionIdFromBody,
+        connectionType,
         chatId: chatIdFromBody,
         tabId,
         model: requestedModel,
@@ -69,6 +71,7 @@ async function handleChatRequest(req: NextRequest) {
         table?: string | null;
         tableSchema?: string | null;
         connectionId?: string | null;
+        connectionType?: ConnectionType | null;
         chatId?: string | null;
         tabId?: string | null;
         model?: string | null;
@@ -156,6 +159,17 @@ async function handleChatRequest(req: NextRequest) {
                     userId,
                 });
                 if (existed) {
+                    await db.chat.updateSession({
+                        organizationId,
+                        sessionId: chatId,
+                        userId,
+                        patch: {
+                            connectionId: connectionId ?? null,
+                            activeDatabase: database ?? null,
+                            activeSchema: activeSchema ?? null,
+                            metadata: sessionMetadata ?? null,
+                        },
+                    });
                     sessionTitle = existed.title ?? null;
                 } else {
                     const s = await db.chat.createGlobalSession({
@@ -238,7 +252,7 @@ async function handleChatRequest(req: NextRequest) {
 
     const copilotContextSection = copilotEnvelope ? `Copilot Context\n${JSON.stringify(toPromptContext(copilotEnvelope), null, 2)}` : '';
 
-    const sqlToolSection = sqlToolEnabled ? [SQL_TOOL_INSTRUCTION, SQL_RUNNER_GUIDE].join('\n\n') : '';
+    const sqlToolSection = sqlToolEnabled ? buildDialectSqlPrompt(connectionType ?? null) : '';
 
     const userLanguageSection = buildUserLanguageInstruction(currentUserText, locale);
 
@@ -377,7 +391,9 @@ async function handleChatRequest(req: NextRequest) {
 
                 const [assistantMessage, toolCalls] = await Promise.all([readFinalAssistantMessage(streamForMessages), collectToolCalls(streamForTools)]);
 
-                if (assistantMessage && db && userId && organizationId && chatId) {
+                const sqlFallback = !toolCalls.length && sqlToolEnabled && tools.sqlRunner?.execute ? extractReadOnlySqlFromAssistantMessage(assistantMessage) : null;
+
+                if (assistantMessage && db && userId && organizationId && chatId && !sqlFallback) {
                     const messageId = typeof (assistantMessage as any)?.id === 'string' && (assistantMessage as any).id ? (assistantMessage as any).id : newEntityId();
 
                     if (!existedMessageIds.has(messageId)) {
@@ -407,8 +423,6 @@ async function handleChatRequest(req: NextRequest) {
                 }
 
                 if (!toolCalls.length && sqlToolEnabled && tools.sqlRunner?.execute) {
-                    const sqlFallback = extractReadOnlySqlFromAssistantMessage(assistantMessage);
-
                     if (sqlFallback) {
                         const syntheticToolCall: CollectedToolCall = {
                             toolCallId: newEntityId(),

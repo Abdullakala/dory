@@ -96,7 +96,7 @@ AI that understands your database — not just text completion.
 - Supports multi-table joins and subqueries  
 
 ---
-<img width="3024" height="1898" alt="image" src="https://github.com/user-attachments/assets/c1775613-5773-4552-a188-90442f8f82ad" />
+<img" alt="image" src="https://github.com/user-attachments/assets/c1775613-5773-4552-a188-90442f8f82ad" />
 
 ### ✍️ Intelligent SQL Editor
 
@@ -106,7 +106,7 @@ AI that understands your database — not just text completion.
 - Instant query visualization with built-in charts
 
 ---
-<img width="3024" height="1898" alt="image" src="https://github.com/user-attachments/assets/d3e0b7a7-8c16-44d0-b248-685f7e386b6b" />
+<img alt="image" src="https://github.com/user-attachments/assets/d3e0b7a7-8c16-44d0-b248-685f7e386b6b" />
 
 ### 💬 Database Chatbot
 
@@ -116,7 +116,7 @@ AI that understands your database — not just text completion.
 - Quickly locate field meanings and query ideas  
 
 ---
-<img width="3024" height="1898" alt="image" src="https://github.com/user-attachments/assets/4397055f-7c74-4505-90dc-8d822845b670" />
+<img alt="image" src="https://github.com/user-attachments/assets/4397055f-7c74-4505-90dc-8d822845b670" />
 
 ### 📈 ClickHouse Monitoring (Deep Integration)
 

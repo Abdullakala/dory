@@ -132,21 +132,30 @@ export default function CopilotPanel({ tabs, activeTabId, activeTab, updateTab, 
     ]);
 
     const actionInput: CopilotFixInput | null = useMemo(() => {
-        if (!sqlTextFromResult) return null;
-
         const hasErrorMessage = typeof sessionErrorMessage === 'string' && !!sessionErrorMessage.trim();
+        const selectedSql =
+            editorSelection && typeof tabContent === 'string' && editorSelection.end > editorSelection.start
+                ? tabContent.slice(editorSelection.start, editorSelection.end)
+                : '';
+        const editorSql = selectedSql.trim() ? selectedSql : (typeof tabContent === 'string' ? tabContent : '');
+        const sourceSql = sqlTextFromResult.trim() ? sqlTextFromResult : editorSql;
 
+        if (!sourceSql.trim()) return null;
+
+        // Prefer the last executed SQL when available, but allow editor-triggered actions
+        // to run against the current draft on the first click.
         return createCopilotFixInputFromExecution({
-            sql: sqlTextFromResult,
-            error: hasErrorMessage
-                ? {
-                      message: sessionErrorMessage!,
-                      code: sessionErrorCode ?? null,
-                  }
-                : null,
+            sql: sourceSql,
+            error:
+                sqlTextFromResult.trim() && hasErrorMessage
+                    ? {
+                          message: sessionErrorMessage!,
+                          code: sessionErrorCode ?? null,
+                      }
+                    : null,
             database: activeDatabase || null,
             dialect: (currentConnection as any)?.connection?.type ?? undefined,
-            occurredAt: sessionFinishedAt ?? sessionStartedAt ?? undefined,
+            occurredAt: sqlTextFromResult.trim() ? (sessionFinishedAt ?? sessionStartedAt ?? undefined) : undefined,
             meta: {
                 tabId,
                 tabName,
@@ -164,7 +173,19 @@ export default function CopilotPanel({ tabs, activeTabId, activeTab, updateTab, 
         tabId,
         tabName,
         tabConnectionId,
+        tabContent,
+        editorSelection,
     ]);
+
+    const autoRunRequest = useMemo(() => {
+        if (!actionRequest || !actionInput) return null;
+
+        if (actionRequest.intent === 'fix-sql-error') {
+            return actionInput.lastExecution.error?.message ? actionRequest : null;
+        }
+
+        return actionInput.lastExecution.sql.trim() ? actionRequest : null;
+    }, [actionInput, actionRequest]);
 
     type ApplySqlMeta = { intent?: ActionIntent; risk?: ActionResult['risk']; originalSql?: string; operation?: 'apply' | 'undo' };
 
@@ -317,7 +338,7 @@ export default function CopilotPanel({ tabs, activeTabId, activeTab, updateTab, 
                                     input={actionInput}
                                     onApplySql={handleApplySqlWithEvent}
                                     onExecuted={handleActionExecuted}
-                                    autoRun={actionRequest ? { intent: actionRequest.intent, requestId: actionRequest.id } : null}
+                                    autoRun={autoRunRequest ? { intent: autoRunRequest.intent, requestId: autoRunRequest.id } : null}
                                     onAutoRunHandled={requestId => {
                                         setActionRequest(prev => (prev?.id === requestId ? null : prev));
                                     }}

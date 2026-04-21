@@ -162,8 +162,8 @@ Native ClickHouse user and role management UI.
 | PostgreSQL | ✅ Supported         |
 | Neon       | ✅ Supported         |
 | MySQL      | ✅ Supported         |
-| MariaDB    | ✅ Supported         |  |
-| SQLite     | ✅ Supported (Beta)  |
+| MariaDB    | ✅ Supported         |
+| SQLite     | ✅ Supported         |
 | DuckDB     | 🚧 Planned           |
 
 ---
